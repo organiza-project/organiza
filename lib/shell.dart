@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'core/constants/app_colors.dart';
+import 'features/assistant/presentation/voice_assistant_modal.dart';
 import 'features/journal/presentation/screens/journal_screen.dart';
 import 'features/leaderboard/presentation/screens/leaderboard_screen.dart';
 import 'features/timetable/presentation/screens/timetable_screen.dart';
@@ -29,6 +31,32 @@ class _AppShellState extends ConsumerState<AppShell> {
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: Container(
+        margin: const EdgeInsets.only(top: 24),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryAccent.withAlpha(90),
+              blurRadius: 18,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: FloatingActionButton(
+          elevation: 4,
+          backgroundColor: AppColors.primaryAccent,
+          foregroundColor: AppColors.background,
+          shape: const CircleBorder(),
+          tooltip: 'Voice Assistant',
+          onPressed: () => VoiceAssistantModal.show(context),
+          child: const Icon(
+            Icons.auto_awesome_rounded,
+            size: 26,
+          ),
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(

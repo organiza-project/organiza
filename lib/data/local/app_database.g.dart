@@ -1857,12 +1857,900 @@ class AppLimitsCompanion extends UpdateCompanion<AppLimit> {
   }
 }
 
+class $TimetableEntriesTable extends TimetableEntries
+    with TableInfo<$TimetableEntriesTable, TimetableEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TimetableEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dayOfWeekMeta = const VerificationMeta(
+    'dayOfWeek',
+  );
+  @override
+  late final GeneratedColumn<int> dayOfWeek = GeneratedColumn<int>(
+    'day_of_week',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _specificDateMeta = const VerificationMeta(
+    'specificDate',
+  );
+  @override
+  late final GeneratedColumn<String> specificDate = GeneratedColumn<String>(
+    'specific_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _startTimeMeta = const VerificationMeta(
+    'startTime',
+  );
+  @override
+  late final GeneratedColumn<String> startTime = GeneratedColumn<String>(
+    'start_time',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _endTimeMeta = const VerificationMeta(
+    'endTime',
+  );
+  @override
+  late final GeneratedColumn<String> endTime = GeneratedColumn<String>(
+    'end_time',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _locationOrNotesMeta = const VerificationMeta(
+    'locationOrNotes',
+  );
+  @override
+  late final GeneratedColumn<String> locationOrNotes = GeneratedColumn<String>(
+    'location_or_notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isCanceledMeta = const VerificationMeta(
+    'isCanceled',
+  );
+  @override
+  late final GeneratedColumn<bool> isCanceled = GeneratedColumn<bool>(
+    'is_canceled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_canceled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    title,
+    dayOfWeek,
+    specificDate,
+    startTime,
+    endTime,
+    locationOrNotes,
+    isCanceled,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'timetable_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TimetableEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('day_of_week')) {
+      context.handle(
+        _dayOfWeekMeta,
+        dayOfWeek.isAcceptableOrUnknown(data['day_of_week']!, _dayOfWeekMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dayOfWeekMeta);
+    }
+    if (data.containsKey('specific_date')) {
+      context.handle(
+        _specificDateMeta,
+        specificDate.isAcceptableOrUnknown(
+          data['specific_date']!,
+          _specificDateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('start_time')) {
+      context.handle(
+        _startTimeMeta,
+        startTime.isAcceptableOrUnknown(data['start_time']!, _startTimeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_startTimeMeta);
+    }
+    if (data.containsKey('end_time')) {
+      context.handle(
+        _endTimeMeta,
+        endTime.isAcceptableOrUnknown(data['end_time']!, _endTimeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_endTimeMeta);
+    }
+    if (data.containsKey('location_or_notes')) {
+      context.handle(
+        _locationOrNotesMeta,
+        locationOrNotes.isAcceptableOrUnknown(
+          data['location_or_notes']!,
+          _locationOrNotesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_canceled')) {
+      context.handle(
+        _isCanceledMeta,
+        isCanceled.isAcceptableOrUnknown(data['is_canceled']!, _isCanceledMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TimetableEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TimetableEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      dayOfWeek: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}day_of_week'],
+      )!,
+      specificDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}specific_date'],
+      ),
+      startTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}start_time'],
+      )!,
+      endTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}end_time'],
+      )!,
+      locationOrNotes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location_or_notes'],
+      ),
+      isCanceled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_canceled'],
+      )!,
+    );
+  }
+
+  @override
+  $TimetableEntriesTable createAlias(String alias) {
+    return $TimetableEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class TimetableEntry extends DataClass implements Insertable<TimetableEntry> {
+  final String id;
+  final String title;
+  final int dayOfWeek;
+  final String? specificDate;
+  final String startTime;
+  final String endTime;
+  final String? locationOrNotes;
+  final bool isCanceled;
+  const TimetableEntry({
+    required this.id,
+    required this.title,
+    required this.dayOfWeek,
+    this.specificDate,
+    required this.startTime,
+    required this.endTime,
+    this.locationOrNotes,
+    required this.isCanceled,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['title'] = Variable<String>(title);
+    map['day_of_week'] = Variable<int>(dayOfWeek);
+    if (!nullToAbsent || specificDate != null) {
+      map['specific_date'] = Variable<String>(specificDate);
+    }
+    map['start_time'] = Variable<String>(startTime);
+    map['end_time'] = Variable<String>(endTime);
+    if (!nullToAbsent || locationOrNotes != null) {
+      map['location_or_notes'] = Variable<String>(locationOrNotes);
+    }
+    map['is_canceled'] = Variable<bool>(isCanceled);
+    return map;
+  }
+
+  TimetableEntriesCompanion toCompanion(bool nullToAbsent) {
+    return TimetableEntriesCompanion(
+      id: Value(id),
+      title: Value(title),
+      dayOfWeek: Value(dayOfWeek),
+      specificDate: specificDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(specificDate),
+      startTime: Value(startTime),
+      endTime: Value(endTime),
+      locationOrNotes: locationOrNotes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(locationOrNotes),
+      isCanceled: Value(isCanceled),
+    );
+  }
+
+  factory TimetableEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TimetableEntry(
+      id: serializer.fromJson<String>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      dayOfWeek: serializer.fromJson<int>(json['dayOfWeek']),
+      specificDate: serializer.fromJson<String?>(json['specificDate']),
+      startTime: serializer.fromJson<String>(json['startTime']),
+      endTime: serializer.fromJson<String>(json['endTime']),
+      locationOrNotes: serializer.fromJson<String?>(json['locationOrNotes']),
+      isCanceled: serializer.fromJson<bool>(json['isCanceled']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'title': serializer.toJson<String>(title),
+      'dayOfWeek': serializer.toJson<int>(dayOfWeek),
+      'specificDate': serializer.toJson<String?>(specificDate),
+      'startTime': serializer.toJson<String>(startTime),
+      'endTime': serializer.toJson<String>(endTime),
+      'locationOrNotes': serializer.toJson<String?>(locationOrNotes),
+      'isCanceled': serializer.toJson<bool>(isCanceled),
+    };
+  }
+
+  TimetableEntry copyWith({
+    String? id,
+    String? title,
+    int? dayOfWeek,
+    Value<String?> specificDate = const Value.absent(),
+    String? startTime,
+    String? endTime,
+    Value<String?> locationOrNotes = const Value.absent(),
+    bool? isCanceled,
+  }) => TimetableEntry(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    dayOfWeek: dayOfWeek ?? this.dayOfWeek,
+    specificDate: specificDate.present ? specificDate.value : this.specificDate,
+    startTime: startTime ?? this.startTime,
+    endTime: endTime ?? this.endTime,
+    locationOrNotes: locationOrNotes.present
+        ? locationOrNotes.value
+        : this.locationOrNotes,
+    isCanceled: isCanceled ?? this.isCanceled,
+  );
+  TimetableEntry copyWithCompanion(TimetableEntriesCompanion data) {
+    return TimetableEntry(
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      dayOfWeek: data.dayOfWeek.present ? data.dayOfWeek.value : this.dayOfWeek,
+      specificDate: data.specificDate.present
+          ? data.specificDate.value
+          : this.specificDate,
+      startTime: data.startTime.present ? data.startTime.value : this.startTime,
+      endTime: data.endTime.present ? data.endTime.value : this.endTime,
+      locationOrNotes: data.locationOrNotes.present
+          ? data.locationOrNotes.value
+          : this.locationOrNotes,
+      isCanceled: data.isCanceled.present
+          ? data.isCanceled.value
+          : this.isCanceled,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TimetableEntry(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('dayOfWeek: $dayOfWeek, ')
+          ..write('specificDate: $specificDate, ')
+          ..write('startTime: $startTime, ')
+          ..write('endTime: $endTime, ')
+          ..write('locationOrNotes: $locationOrNotes, ')
+          ..write('isCanceled: $isCanceled')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    title,
+    dayOfWeek,
+    specificDate,
+    startTime,
+    endTime,
+    locationOrNotes,
+    isCanceled,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TimetableEntry &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.dayOfWeek == this.dayOfWeek &&
+          other.specificDate == this.specificDate &&
+          other.startTime == this.startTime &&
+          other.endTime == this.endTime &&
+          other.locationOrNotes == this.locationOrNotes &&
+          other.isCanceled == this.isCanceled);
+}
+
+class TimetableEntriesCompanion extends UpdateCompanion<TimetableEntry> {
+  final Value<String> id;
+  final Value<String> title;
+  final Value<int> dayOfWeek;
+  final Value<String?> specificDate;
+  final Value<String> startTime;
+  final Value<String> endTime;
+  final Value<String?> locationOrNotes;
+  final Value<bool> isCanceled;
+  final Value<int> rowid;
+  const TimetableEntriesCompanion({
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.dayOfWeek = const Value.absent(),
+    this.specificDate = const Value.absent(),
+    this.startTime = const Value.absent(),
+    this.endTime = const Value.absent(),
+    this.locationOrNotes = const Value.absent(),
+    this.isCanceled = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TimetableEntriesCompanion.insert({
+    required String id,
+    required String title,
+    required int dayOfWeek,
+    this.specificDate = const Value.absent(),
+    required String startTime,
+    required String endTime,
+    this.locationOrNotes = const Value.absent(),
+    this.isCanceled = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       title = Value(title),
+       dayOfWeek = Value(dayOfWeek),
+       startTime = Value(startTime),
+       endTime = Value(endTime);
+  static Insertable<TimetableEntry> custom({
+    Expression<String>? id,
+    Expression<String>? title,
+    Expression<int>? dayOfWeek,
+    Expression<String>? specificDate,
+    Expression<String>? startTime,
+    Expression<String>? endTime,
+    Expression<String>? locationOrNotes,
+    Expression<bool>? isCanceled,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (dayOfWeek != null) 'day_of_week': dayOfWeek,
+      if (specificDate != null) 'specific_date': specificDate,
+      if (startTime != null) 'start_time': startTime,
+      if (endTime != null) 'end_time': endTime,
+      if (locationOrNotes != null) 'location_or_notes': locationOrNotes,
+      if (isCanceled != null) 'is_canceled': isCanceled,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TimetableEntriesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? title,
+    Value<int>? dayOfWeek,
+    Value<String?>? specificDate,
+    Value<String>? startTime,
+    Value<String>? endTime,
+    Value<String?>? locationOrNotes,
+    Value<bool>? isCanceled,
+    Value<int>? rowid,
+  }) {
+    return TimetableEntriesCompanion(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      dayOfWeek: dayOfWeek ?? this.dayOfWeek,
+      specificDate: specificDate ?? this.specificDate,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      locationOrNotes: locationOrNotes ?? this.locationOrNotes,
+      isCanceled: isCanceled ?? this.isCanceled,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (dayOfWeek.present) {
+      map['day_of_week'] = Variable<int>(dayOfWeek.value);
+    }
+    if (specificDate.present) {
+      map['specific_date'] = Variable<String>(specificDate.value);
+    }
+    if (startTime.present) {
+      map['start_time'] = Variable<String>(startTime.value);
+    }
+    if (endTime.present) {
+      map['end_time'] = Variable<String>(endTime.value);
+    }
+    if (locationOrNotes.present) {
+      map['location_or_notes'] = Variable<String>(locationOrNotes.value);
+    }
+    if (isCanceled.present) {
+      map['is_canceled'] = Variable<bool>(isCanceled.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TimetableEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('dayOfWeek: $dayOfWeek, ')
+          ..write('specificDate: $specificDate, ')
+          ..write('startTime: $startTime, ')
+          ..write('endTime: $endTime, ')
+          ..write('locationOrNotes: $locationOrNotes, ')
+          ..write('isCanceled: $isCanceled, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $JournalEntriesTable extends JournalEntries
+    with TableInfo<$JournalEntriesTable, JournalEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $JournalEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _entryDateMeta = const VerificationMeta(
+    'entryDate',
+  );
+  @override
+  late final GeneratedColumn<String> entryDate = GeneratedColumn<String>(
+    'entry_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+    'tags',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    entryDate,
+    content,
+    tags,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'journal_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<JournalEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('entry_date')) {
+      context.handle(
+        _entryDateMeta,
+        entryDate.isAcceptableOrUnknown(data['entry_date']!, _entryDateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_entryDateMeta);
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+        _tagsMeta,
+        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  JournalEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return JournalEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      entryDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entry_date'],
+      )!,
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+      tags: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $JournalEntriesTable createAlias(String alias) {
+    return $JournalEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class JournalEntry extends DataClass implements Insertable<JournalEntry> {
+  final String id;
+  final String entryDate;
+  final String content;
+  final String? tags;
+  final DateTime createdAt;
+  const JournalEntry({
+    required this.id,
+    required this.entryDate,
+    required this.content,
+    this.tags,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['entry_date'] = Variable<String>(entryDate);
+    map['content'] = Variable<String>(content);
+    if (!nullToAbsent || tags != null) {
+      map['tags'] = Variable<String>(tags);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  JournalEntriesCompanion toCompanion(bool nullToAbsent) {
+    return JournalEntriesCompanion(
+      id: Value(id),
+      entryDate: Value(entryDate),
+      content: Value(content),
+      tags: tags == null && nullToAbsent ? const Value.absent() : Value(tags),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory JournalEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return JournalEntry(
+      id: serializer.fromJson<String>(json['id']),
+      entryDate: serializer.fromJson<String>(json['entryDate']),
+      content: serializer.fromJson<String>(json['content']),
+      tags: serializer.fromJson<String?>(json['tags']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'entryDate': serializer.toJson<String>(entryDate),
+      'content': serializer.toJson<String>(content),
+      'tags': serializer.toJson<String?>(tags),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  JournalEntry copyWith({
+    String? id,
+    String? entryDate,
+    String? content,
+    Value<String?> tags = const Value.absent(),
+    DateTime? createdAt,
+  }) => JournalEntry(
+    id: id ?? this.id,
+    entryDate: entryDate ?? this.entryDate,
+    content: content ?? this.content,
+    tags: tags.present ? tags.value : this.tags,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  JournalEntry copyWithCompanion(JournalEntriesCompanion data) {
+    return JournalEntry(
+      id: data.id.present ? data.id.value : this.id,
+      entryDate: data.entryDate.present ? data.entryDate.value : this.entryDate,
+      content: data.content.present ? data.content.value : this.content,
+      tags: data.tags.present ? data.tags.value : this.tags,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('JournalEntry(')
+          ..write('id: $id, ')
+          ..write('entryDate: $entryDate, ')
+          ..write('content: $content, ')
+          ..write('tags: $tags, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, entryDate, content, tags, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is JournalEntry &&
+          other.id == this.id &&
+          other.entryDate == this.entryDate &&
+          other.content == this.content &&
+          other.tags == this.tags &&
+          other.createdAt == this.createdAt);
+}
+
+class JournalEntriesCompanion extends UpdateCompanion<JournalEntry> {
+  final Value<String> id;
+  final Value<String> entryDate;
+  final Value<String> content;
+  final Value<String?> tags;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const JournalEntriesCompanion({
+    this.id = const Value.absent(),
+    this.entryDate = const Value.absent(),
+    this.content = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  JournalEntriesCompanion.insert({
+    required String id,
+    required String entryDate,
+    required String content,
+    this.tags = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       entryDate = Value(entryDate),
+       content = Value(content);
+  static Insertable<JournalEntry> custom({
+    Expression<String>? id,
+    Expression<String>? entryDate,
+    Expression<String>? content,
+    Expression<String>? tags,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (entryDate != null) 'entry_date': entryDate,
+      if (content != null) 'content': content,
+      if (tags != null) 'tags': tags,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  JournalEntriesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? entryDate,
+    Value<String>? content,
+    Value<String?>? tags,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return JournalEntriesCompanion(
+      id: id ?? this.id,
+      entryDate: entryDate ?? this.entryDate,
+      content: content ?? this.content,
+      tags: tags ?? this.tags,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (entryDate.present) {
+      map['entry_date'] = Variable<String>(entryDate.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('JournalEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('entryDate: $entryDate, ')
+          ..write('content: $content, ')
+          ..write('tags: $tags, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $TasksTable tasks = $TasksTable(this);
   late final $DailyLogsTable dailyLogs = $DailyLogsTable(this);
   late final $AppLimitsTable appLimits = $AppLimitsTable(this);
+  late final $TimetableEntriesTable timetableEntries = $TimetableEntriesTable(
+    this,
+  );
+  late final $JournalEntriesTable journalEntries = $JournalEntriesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1871,6 +2759,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     tasks,
     dailyLogs,
     appLimits,
+    timetableEntries,
+    journalEntries,
   ];
 }
 
@@ -2969,6 +3859,477 @@ typedef $$AppLimitsTableProcessedTableManager =
       AppLimit,
       PrefetchHooks Function()
     >;
+typedef $$TimetableEntriesTableCreateCompanionBuilder =
+    TimetableEntriesCompanion Function({
+      required String id,
+      required String title,
+      required int dayOfWeek,
+      Value<String?> specificDate,
+      required String startTime,
+      required String endTime,
+      Value<String?> locationOrNotes,
+      Value<bool> isCanceled,
+      Value<int> rowid,
+    });
+typedef $$TimetableEntriesTableUpdateCompanionBuilder =
+    TimetableEntriesCompanion Function({
+      Value<String> id,
+      Value<String> title,
+      Value<int> dayOfWeek,
+      Value<String?> specificDate,
+      Value<String> startTime,
+      Value<String> endTime,
+      Value<String?> locationOrNotes,
+      Value<bool> isCanceled,
+      Value<int> rowid,
+    });
+
+class $$TimetableEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $TimetableEntriesTable> {
+  $$TimetableEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get dayOfWeek => $composableBuilder(
+    column: $table.dayOfWeek,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get specificDate => $composableBuilder(
+    column: $table.specificDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get startTime => $composableBuilder(
+    column: $table.startTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get endTime => $composableBuilder(
+    column: $table.endTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get locationOrNotes => $composableBuilder(
+    column: $table.locationOrNotes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isCanceled => $composableBuilder(
+    column: $table.isCanceled,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TimetableEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $TimetableEntriesTable> {
+  $$TimetableEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get dayOfWeek => $composableBuilder(
+    column: $table.dayOfWeek,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get specificDate => $composableBuilder(
+    column: $table.specificDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get startTime => $composableBuilder(
+    column: $table.startTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get endTime => $composableBuilder(
+    column: $table.endTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get locationOrNotes => $composableBuilder(
+    column: $table.locationOrNotes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isCanceled => $composableBuilder(
+    column: $table.isCanceled,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TimetableEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TimetableEntriesTable> {
+  $$TimetableEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<int> get dayOfWeek =>
+      $composableBuilder(column: $table.dayOfWeek, builder: (column) => column);
+
+  GeneratedColumn<String> get specificDate => $composableBuilder(
+    column: $table.specificDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get startTime =>
+      $composableBuilder(column: $table.startTime, builder: (column) => column);
+
+  GeneratedColumn<String> get endTime =>
+      $composableBuilder(column: $table.endTime, builder: (column) => column);
+
+  GeneratedColumn<String> get locationOrNotes => $composableBuilder(
+    column: $table.locationOrNotes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isCanceled => $composableBuilder(
+    column: $table.isCanceled,
+    builder: (column) => column,
+  );
+}
+
+class $$TimetableEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TimetableEntriesTable,
+          TimetableEntry,
+          $$TimetableEntriesTableFilterComposer,
+          $$TimetableEntriesTableOrderingComposer,
+          $$TimetableEntriesTableAnnotationComposer,
+          $$TimetableEntriesTableCreateCompanionBuilder,
+          $$TimetableEntriesTableUpdateCompanionBuilder,
+          (
+            TimetableEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $TimetableEntriesTable,
+              TimetableEntry
+            >,
+          ),
+          TimetableEntry,
+          PrefetchHooks Function()
+        > {
+  $$TimetableEntriesTableTableManager(
+    _$AppDatabase db,
+    $TimetableEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TimetableEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TimetableEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TimetableEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<int> dayOfWeek = const Value.absent(),
+                Value<String?> specificDate = const Value.absent(),
+                Value<String> startTime = const Value.absent(),
+                Value<String> endTime = const Value.absent(),
+                Value<String?> locationOrNotes = const Value.absent(),
+                Value<bool> isCanceled = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TimetableEntriesCompanion(
+                id: id,
+                title: title,
+                dayOfWeek: dayOfWeek,
+                specificDate: specificDate,
+                startTime: startTime,
+                endTime: endTime,
+                locationOrNotes: locationOrNotes,
+                isCanceled: isCanceled,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String title,
+                required int dayOfWeek,
+                Value<String?> specificDate = const Value.absent(),
+                required String startTime,
+                required String endTime,
+                Value<String?> locationOrNotes = const Value.absent(),
+                Value<bool> isCanceled = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TimetableEntriesCompanion.insert(
+                id: id,
+                title: title,
+                dayOfWeek: dayOfWeek,
+                specificDate: specificDate,
+                startTime: startTime,
+                endTime: endTime,
+                locationOrNotes: locationOrNotes,
+                isCanceled: isCanceled,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TimetableEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TimetableEntriesTable,
+      TimetableEntry,
+      $$TimetableEntriesTableFilterComposer,
+      $$TimetableEntriesTableOrderingComposer,
+      $$TimetableEntriesTableAnnotationComposer,
+      $$TimetableEntriesTableCreateCompanionBuilder,
+      $$TimetableEntriesTableUpdateCompanionBuilder,
+      (
+        TimetableEntry,
+        BaseReferences<_$AppDatabase, $TimetableEntriesTable, TimetableEntry>,
+      ),
+      TimetableEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$JournalEntriesTableCreateCompanionBuilder =
+    JournalEntriesCompanion Function({
+      required String id,
+      required String entryDate,
+      required String content,
+      Value<String?> tags,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+typedef $$JournalEntriesTableUpdateCompanionBuilder =
+    JournalEntriesCompanion Function({
+      Value<String> id,
+      Value<String> entryDate,
+      Value<String> content,
+      Value<String?> tags,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+class $$JournalEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $JournalEntriesTable> {
+  $$JournalEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entryDate => $composableBuilder(
+    column: $table.entryDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$JournalEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $JournalEntriesTable> {
+  $$JournalEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entryDate => $composableBuilder(
+    column: $table.entryDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$JournalEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $JournalEntriesTable> {
+  $$JournalEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get entryDate =>
+      $composableBuilder(column: $table.entryDate, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$JournalEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $JournalEntriesTable,
+          JournalEntry,
+          $$JournalEntriesTableFilterComposer,
+          $$JournalEntriesTableOrderingComposer,
+          $$JournalEntriesTableAnnotationComposer,
+          $$JournalEntriesTableCreateCompanionBuilder,
+          $$JournalEntriesTableUpdateCompanionBuilder,
+          (
+            JournalEntry,
+            BaseReferences<_$AppDatabase, $JournalEntriesTable, JournalEntry>,
+          ),
+          JournalEntry,
+          PrefetchHooks Function()
+        > {
+  $$JournalEntriesTableTableManager(
+    _$AppDatabase db,
+    $JournalEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$JournalEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$JournalEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$JournalEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> entryDate = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<String?> tags = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => JournalEntriesCompanion(
+                id: id,
+                entryDate: entryDate,
+                content: content,
+                tags: tags,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String entryDate,
+                required String content,
+                Value<String?> tags = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => JournalEntriesCompanion.insert(
+                id: id,
+                entryDate: entryDate,
+                content: content,
+                tags: tags,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$JournalEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $JournalEntriesTable,
+      JournalEntry,
+      $$JournalEntriesTableFilterComposer,
+      $$JournalEntriesTableOrderingComposer,
+      $$JournalEntriesTableAnnotationComposer,
+      $$JournalEntriesTableCreateCompanionBuilder,
+      $$JournalEntriesTableUpdateCompanionBuilder,
+      (
+        JournalEntry,
+        BaseReferences<_$AppDatabase, $JournalEntriesTable, JournalEntry>,
+      ),
+      JournalEntry,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2979,4 +4340,8 @@ class $AppDatabaseManager {
       $$DailyLogsTableTableManager(_db, _db.dailyLogs);
   $$AppLimitsTableTableManager get appLimits =>
       $$AppLimitsTableTableManager(_db, _db.appLimits);
+  $$TimetableEntriesTableTableManager get timetableEntries =>
+      $$TimetableEntriesTableTableManager(_db, _db.timetableEntries);
+  $$JournalEntriesTableTableManager get journalEntries =>
+      $$JournalEntriesTableTableManager(_db, _db.journalEntries);
 }

@@ -1,12 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:organiza/features/today/presentation/controllers/today_tasks_controller.dart';
 import 'package:organiza/main.dart';
 
 void main() {
   testWidgets('App shell loads and displays today tab by default', (tester) async {
     await tester.pumpWidget(
-      const ProviderScope(
-        child: OrganizaApp(),
+      ProviderScope(
+        overrides: [
+          todayTasksStreamProvider.overrideWith((ref) => Stream.value([])),
+        ],
+        child: const OrganizaApp(),
       ),
     );
 
