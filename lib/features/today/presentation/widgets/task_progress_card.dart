@@ -222,10 +222,13 @@ class _TaskProgressCardState extends ConsumerState<TaskProgressCard> {
                                     .syncLinkedAppUsage(
                                         task.id, task.linkedPackageName!);
                                 if (context.mounted) {
+                                  final cleanName = ref
+                                      .read(appUsageServiceProvider)
+                                      .getCleanAppName(task.linkedPackageName);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text(
-                                          'Synced usage for ${task.linkedPackageName!.split('.').last}'),
+                                      content:
+                                          Text('Synced usage for $cleanName'),
                                       duration: const Duration(seconds: 1),
                                       backgroundColor:
                                           AppColors.surfaceElevated,
@@ -235,8 +238,8 @@ class _TaskProgressCardState extends ConsumerState<TaskProgressCard> {
                               },
                               borderRadius: BorderRadius.circular(6),
                               child: _buildPill(
-                                icon: Icons.sync_rounded,
-                                label: task.linkedPackageName!.split('.').last,
+                                label:
+                                    '📱 ${ref.watch(appUsageServiceProvider).getCleanAppName(task.linkedPackageName)}',
                                 color: const Color(0xFF38BDF8),
                               ),
                             ),
@@ -427,7 +430,7 @@ class _TaskProgressCardState extends ConsumerState<TaskProgressCard> {
   }
 
   Widget _buildPill({
-    required IconData icon,
+    IconData? icon,
     required String label,
     required Color color,
   }) {
@@ -441,8 +444,10 @@ class _TaskProgressCardState extends ConsumerState<TaskProgressCard> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 4),
+          ],
           Text(
             label,
             style: AppTypography.bodySmall.copyWith(

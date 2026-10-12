@@ -38,6 +38,9 @@ class GroqTranscriptionService {
     final request = http.MultipartRequest('POST', Uri.parse(_endpoint))
       ..headers['Authorization'] = 'Bearer $apiKey'
       ..fields['model'] = 'whisper-large-v3'
+      ..fields['language'] = 'en'
+      ..fields['prompt'] =
+          'Organiza productivity assistant commands in English: habits, tasks, timetable, schedule, journal.'
       ..fields['response_format'] = 'json'
       ..files.add(await http.MultipartFile.fromPath('file', audioFilePath));
 

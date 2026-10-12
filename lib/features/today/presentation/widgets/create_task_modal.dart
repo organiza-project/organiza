@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/services/app_usage_service.dart';
 import '../controllers/today_tasks_controller.dart';
 
 class CreateTaskModal extends ConsumerStatefulWidget {
@@ -25,7 +28,6 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _customDurationController = TextEditingController();
-  final _linkedPackageController = TextEditingController();
 
   int _durationMinutes = 30;
   bool _isCustomDuration = false;
@@ -35,15 +37,31 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
 
+  List<AppInfoOption> _availableApps = [];
+  String? _selectedPackageName;
+
   bool _isSaving = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    if (Platform.isAndroid || Platform.isIOS) {
+      ref.read(appUsageServiceProvider).getInstalledAppOptions().then((apps) {
+        if (mounted) {
+          setState(() {
+            _availableApps = apps;
+          });
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
     _customDurationController.dispose();
-    _linkedPackageController.dispose();
     super.dispose();
   }
 
@@ -111,9 +129,8 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
       _errorMessage = null;
     });
 
-    final linkedPkg = _linkedPackageController.text.trim().isEmpty
-        ? null
-        : _linkedPackageController.text.trim();
+    final isMobile = Platform.isAndroid || Platform.isIOS;
+    final linkedPkg = isMobile ? _selectedPackageName : null;
 
     try {
       await ref.read(todayTasksControllerProvider).createNewTask(
@@ -145,6 +162,7 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isMobile = Platform.isAndroid || Platform.isIOS;
 
     return Container(
       padding: EdgeInsets.only(
@@ -356,63 +374,78 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
             ],
             const SizedBox(height: 16),
 
-            // Linked App Tracking Section
-            Row(
-              children: [
-                const Icon(Icons.link_rounded,
-                    size: 16, color: AppColors.primaryAccent),
-                const SizedBox(width: 6),
-                Text('LINKED APP TRACKING (OPTIONAL)',
-                    style: AppTypography.bodySmall),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Organiza can automatically record time spent in this app towards your habit.',
-              style: AppTypography.bodySmall.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 11,
+            // Linked App Tracking Section (Mobile Only)
+            if (isMobile) ...[
+              Row(
+                children: [
+                  const Icon(Icons.phone_android_rounded,
+                      size: 16, color: AppColors.primaryAccent),
+                  const SizedBox(width: 6),
+                  Text('LINK APP TRACKING (OPTIONAL)',
+                      style: AppTypography.bodySmall),
+                ],
               ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                _buildAppPresetChip('Kindle', 'com.amazon.kindle'),
-                _buildAppPresetChip('Duolingo', 'com.duolingo'),
-                _buildAppPresetChip('AnkiDroid', 'com.ichi2.anki'),
-                _buildAppPresetChip('Audible', 'com.audible.application'),
-              ],
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _linkedPackageController,
-              style: AppTypography.bodyMedium,
-              decoration: InputDecoration(
-                hintText: 'Package name (e.g. com.amazon.kindle)',
-                hintStyle: AppTypography.bodySmall,
-                filled: true,
-                fillColor: AppColors.background,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.primaryAccent),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
+              const SizedBox(height: 4),
+              Text(
+                'Automatically track time when you use this app today.',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    value: _selectedPackageName,
+                    isExpanded: true,
+                    dropdownColor: AppColors.surfaceElevated,
+                    style: AppTypography.bodyMedium,
+                    hint: Text(
+                      'None (Manual timer only)',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text(
+                          'None (Manual timer only)',
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      ..._availableApps.map((app) {
+                        return DropdownMenuItem<String?>(
+                          value: app.packageName,
+                          child: Text(
+                            app.name,
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                    onChanged: (val) {
+                      setState(() {
+                        _selectedPackageName = val;
+                      });
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // Cadence & Frequency
             Text('CADENCE & FREQUENCY', style: AppTypography.bodySmall),
@@ -596,31 +629,6 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildAppPresetChip(String label, String packageName) {
-    final isSelected = _linkedPackageController.text == packageName;
-    return ActionChip(
-      label: Text(label),
-      backgroundColor:
-          isSelected ? AppColors.surfaceElevated : AppColors.background,
-      side: BorderSide(
-        color: isSelected ? AppColors.primaryAccent : AppColors.border,
-      ),
-      labelStyle: AppTypography.bodySmall.copyWith(
-        color: isSelected ? AppColors.primaryAccent : AppColors.textSecondary,
-        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-      ),
-      onPressed: () {
-        setState(() {
-          if (isSelected) {
-            _linkedPackageController.clear();
-          } else {
-            _linkedPackageController.text = packageName;
-          }
-        });
-      },
     );
   }
 }
