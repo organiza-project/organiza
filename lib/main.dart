@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'core/network/supabase_service.dart';
 import 'core/theme/app_theme.dart';
 import 'shell.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final supabaseService = SupabaseService();
+  await supabaseService.initialize();
+
   runApp(
-    const ProviderScope(
-      child: OrganizaApp(),
+    ProviderScope(
+      overrides: [
+        supabaseServiceProvider.overrideWithValue(supabaseService),
+      ],
+      child: const OrganizaApp(),
     ),
   );
 }

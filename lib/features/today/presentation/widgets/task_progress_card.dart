@@ -7,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../data/local/app_database.dart';
 import '../controllers/today_tasks_controller.dart';
+import 'edit_habit_modal.dart';
 
 class TaskProgressCard extends ConsumerStatefulWidget {
   final TaskWithDailyLog taskWithLog;
@@ -310,6 +311,24 @@ class _TaskProgressCardState extends ConsumerState<TaskProgressCard> {
                       color: isCompleted
                           ? AppColors.background
                           : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Contextual Edit Button
+                GestureDetector(
+                  onTap: () => EditHabitModal.show(context, widget.taskWithLog),
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.surfaceElevated,
+                      border: Border.all(color: AppColors.border, width: 1.2),
+                    ),
+                    child: const Icon(
+                      Icons.edit_rounded,
+                      size: 16,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),

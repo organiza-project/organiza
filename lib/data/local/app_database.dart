@@ -41,7 +41,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -53,6 +53,9 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 3) {
             await m.addColumn(tasks, tasks.linkedPackageName);
+          }
+          if (from < 4) {
+            await m.addColumn(dailyLogs, dailyLogs.stars);
           }
         },
       );
@@ -102,6 +105,9 @@ class AppDatabase extends _$AppDatabase {
       final xpToAward = isNowCompleted
           ? (existingLog.xpAwarded > 0 ? existingLog.xpAwarded : taskXp)
           : existingLog.xpAwarded;
+      final starsToAward = isNowCompleted
+          ? (existingLog.stars > 0 ? existingLog.stars : 5)
+          : existingLog.stars;
 
       await (update(dailyLogs)..where((tbl) => tbl.id.equals(existingLog.id)))
           .write(
@@ -109,6 +115,7 @@ class AppDatabase extends _$AppDatabase {
           durationLoggedSeconds: Value(newDuration),
           isCompleted: Value(isNowCompleted),
           xpAwarded: Value(xpToAward),
+          stars: Value(starsToAward),
           updatedAt: Value(now),
         ),
       );
@@ -116,6 +123,7 @@ class AppDatabase extends _$AppDatabase {
       final isNowCompleted =
           targetSeconds > 0 && addedSeconds >= targetSeconds;
       final xpToAward = isNowCompleted ? taskXp : 0;
+      final starsToAward = isNowCompleted ? 5 : 0;
       final uuid = const Uuid().v4();
 
       await into(dailyLogs).insert(
@@ -126,10 +134,76 @@ class AppDatabase extends _$AppDatabase {
           durationLoggedSeconds: Value(addedSeconds),
           isCompleted: Value(isNowCompleted),
           xpAwarded: Value(xpToAward),
+          stars: Value(starsToAward),
           updatedAt: Value(now),
         ),
       );
     }
+  }
+
+  Future<void> setLogDuration(
+    String taskId,
+    String todayDate,
+    int durationSeconds,
+    int targetSeconds,
+    int taskXp,
+  ) async {
+    final existingQuery = select(dailyLogs)
+      ..where((tbl) =>
+          tbl.taskId.equals(taskId) & tbl.logDate.equals(todayDate));
+    final existingLog = await existingQuery.getSingleOrNull();
+
+    final now = DateTime.now();
+    final isNowCompleted =
+        targetSeconds > 0 && durationSeconds >= targetSeconds;
+    final xpToAward = isNowCompleted ? taskXp : 0;
+    final starsToAward = isNowCompleted ? 5 : 0;
+
+    if (existingLog != null) {
+      await (update(dailyLogs)..where((tbl) => tbl.id.equals(existingLog.id)))
+          .write(
+        DailyLogsCompanion(
+          durationLoggedSeconds: Value(durationSeconds),
+          isCompleted: Value(isNowCompleted),
+          xpAwarded: Value(xpToAward),
+          stars: Value(starsToAward),
+          updatedAt: Value(now),
+        ),
+      );
+    } else {
+      final uuid = const Uuid().v4();
+      await into(dailyLogs).insert(
+        DailyLogsCompanion(
+          id: Value(uuid),
+          taskId: Value(taskId),
+          logDate: Value(todayDate),
+          durationLoggedSeconds: Value(durationSeconds),
+          isCompleted: Value(isNowCompleted),
+          xpAwarded: Value(xpToAward),
+          stars: Value(starsToAward),
+          updatedAt: Value(now),
+        ),
+      );
+    }
+  }
+
+  Future<int> updateTask(String taskId, TasksCompanion companion) {
+    return (update(tasks)..where((tbl) => tbl.id.equals(taskId))).write(companion);
+  }
+
+  Future<int> softDeleteTask(String taskId) {
+    return (update(tasks)..where((tbl) => tbl.id.equals(taskId))).write(
+      TasksCompanion(
+        isDeleted: const Value(true),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  Stream<int> watchTotalStars() {
+    return select(dailyLogs).watch().map((rows) {
+      return rows.fold<int>(0, (sum, row) => sum + row.stars);
+    });
   }
 
   Stream<List<AppLimit>> watchAppLimits() {

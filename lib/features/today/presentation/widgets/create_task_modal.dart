@@ -27,10 +27,9 @@ class CreateTaskModal extends ConsumerStatefulWidget {
 class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _customDurationController = TextEditingController();
 
-  int _durationMinutes = 30;
-  bool _isCustomDuration = false;
+  int _durationHours = 0;
+  int _durationMins = 30;
   String _cadenceUnit = 'day';
   int _targetFrequency = 1;
 
@@ -42,6 +41,8 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
 
   bool _isSaving = false;
   String? _errorMessage;
+
+  int get _totalDurationMinutes => (_durationHours * 60) + _durationMins;
 
   @override
   void initState() {
@@ -61,7 +62,6 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _customDurationController.dispose();
     super.dispose();
   }
 
@@ -113,15 +113,11 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
       return;
     }
 
-    if (_isCustomDuration) {
-      final customMins = int.tryParse(_customDurationController.text.trim());
-      if (customMins == null || customMins <= 0) {
-        setState(() {
-          _errorMessage = 'Please enter a valid duration in minutes.';
-        });
-        return;
-      }
-      _durationMinutes = customMins;
+    if (_totalDurationMinutes <= 0) {
+      setState(() {
+        _errorMessage = 'Please set a goal duration greater than 0 minutes.';
+      });
+      return;
     }
 
     setState(() {
@@ -140,7 +136,7 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
                 : _descriptionController.text.trim(),
             cadenceUnit: _cadenceUnit,
             targetFrequency: _targetFrequency,
-            targetDurationSeconds: _durationMinutes * 60,
+            targetDurationSeconds: _totalDurationMinutes * 60,
             bestTimeStart:
                 _startTime != null ? _formatTimeOfDay(_startTime!) : null,
             bestTimeEnd: _endTime != null ? _formatTimeOfDay(_endTime!) : null,
@@ -261,117 +257,154 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
             ),
             const SizedBox(height: 16),
 
-            // Duration Goal Picker
+            // Duration Goal Picker Stepper: < [ hr ] hr [ min ] min >
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('DAILY DURATION GOAL', style: AppTypography.bodySmall),
                 Text(
-                  '$_durationMinutes min',
+                  _durationHours > 0
+                      ? '${_durationHours}h ${_durationMins}m ($_totalDurationMinutes min)'
+                      : '$_durationMins min',
                   style: AppTypography.accentMono,
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Hour Stepper
+                  IconButton.filledTonal(
+                    onPressed: _durationHours > 0
+                        ? () => setState(() => _durationHours--)
+                        : null,
+                    icon: const Icon(Icons.remove_rounded, size: 18),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.surfaceElevated,
+                      foregroundColor: AppColors.textPrimary,
+                    ),
+                  ),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 6),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Text(
+                      '$_durationHours hr',
+                      style: AppTypography.accentMono.copyWith(fontSize: 15),
+                    ),
+                  ),
+                  IconButton.filledTonal(
+                    onPressed: _durationHours < 12
+                        ? () => setState(() => _durationHours++)
+                        : null,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.surfaceElevated,
+                      foregroundColor: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  // Minute Stepper
+                  IconButton.filledTonal(
+                    onPressed: (_durationHours > 0 || _durationMins > 5) &&
+                            _durationMins >= 5
+                        ? () => setState(() {
+                              _durationMins =
+                                  (_durationMins - 5).clamp(0, 55);
+                            })
+                        : null,
+                    icon: const Icon(Icons.remove_rounded, size: 18),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.surfaceElevated,
+                      foregroundColor: AppColors.textPrimary,
+                    ),
+                  ),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 6),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Text(
+                      '$_durationMins min',
+                      style: AppTypography.accentMono.copyWith(fontSize: 15),
+                    ),
+                  ),
+                  IconButton.filledTonal(
+                    onPressed: () => setState(() {
+                      if (_durationMins + 5 >= 60) {
+                        _durationHours++;
+                        _durationMins = 0;
+                      } else {
+                        _durationMins += 5;
+                      }
+                    }),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.surfaceElevated,
+                      foregroundColor: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                ...[15, 30, 45, 60, 90].map((mins) {
-                  final selected = !_isCustomDuration && _durationMinutes == mins;
-                  return ChoiceChip(
-                    label: Text('${mins}m'),
-                    selected: selected,
-                    selectedColor: AppColors.primaryAccent,
-                    backgroundColor: AppColors.background,
-                    labelStyle: AppTypography.bodySmall.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: selected
-                          ? AppColors.background
-                          : AppColors.textPrimary,
-                    ),
-                    side: BorderSide(
-                      color: selected
-                          ? AppColors.primaryAccent
-                          : AppColors.border,
-                    ),
-                    onSelected: (val) {
-                      if (val) {
-                        setState(() {
-                          _isCustomDuration = false;
-                          _durationMinutes = mins;
-                        });
-                      }
-                    },
-                  );
-                }),
-                ChoiceChip(
-                  label: const Text('Custom'),
-                  selected: _isCustomDuration,
+                {'h': 0, 'm': 15, 'l': '15m'},
+                {'h': 0, 'm': 30, 'l': '30m'},
+                {'h': 0, 'm': 45, 'l': '45m'},
+                {'h': 1, 'm': 0, 'l': '1h'},
+                {'h': 1, 'm': 30, 'l': '1h 30m'},
+                {'h': 2, 'm': 0, 'l': '2h'},
+              ].map((preset) {
+                final selected = _durationHours == preset['h'] &&
+                    _durationMins == preset['m'];
+                return ChoiceChip(
+                  label: Text(preset['l'] as String),
+                  selected: selected,
                   selectedColor: AppColors.primaryAccent,
                   backgroundColor: AppColors.background,
                   labelStyle: AppTypography.bodySmall.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: _isCustomDuration
+                    color: selected
                         ? AppColors.background
                         : AppColors.textPrimary,
                   ),
                   side: BorderSide(
-                    color: _isCustomDuration
+                    color: selected
                         ? AppColors.primaryAccent
                         : AppColors.border,
                   ),
                   onSelected: (val) {
-                    setState(() {
-                      _isCustomDuration = val;
-                      if (_isCustomDuration &&
-                          _customDurationController.text.isEmpty) {
-                        _customDurationController.text =
-                            _durationMinutes.toString();
-                      }
-                    });
+                    if (val) {
+                      setState(() {
+                        _durationHours = preset['h'] as int;
+                        _durationMins = preset['m'] as int;
+                      });
+                    }
                   },
-                ),
-              ],
+                );
+              }).toList(),
             ),
-            if (_isCustomDuration) ...[
-              const SizedBox(height: 10),
-              TextField(
-                controller: _customDurationController,
-                keyboardType: TextInputType.number,
-                style: AppTypography.bodyMedium,
-                decoration: InputDecoration(
-                  hintText: 'Enter custom minutes (e.g. 25, 75, 120)',
-                  hintStyle: AppTypography.bodySmall,
-                  suffixText: 'minutes',
-                  suffixStyle: AppTypography.accentMono,
-                  filled: true,
-                  fillColor: AppColors.background,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppColors.primaryAccent),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                ),
-                onChanged: (val) {
-                  final v = int.tryParse(val.trim());
-                  if (v != null && v > 0) {
-                    setState(() => _durationMinutes = v);
-                  }
-                },
-              ),
-            ],
             const SizedBox(height: 16),
 
             // Linked App Tracking Section (Mobile Only)
@@ -457,6 +490,7 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
                     segments: const [
                       ButtonSegment(value: 'day', label: Text('Daily')),
                       ButtonSegment(value: 'week', label: Text('Weekly')),
+                      ButtonSegment(value: 'month', label: Text('Monthly')),
                     ],
                     selected: {_cadenceUnit},
                     onSelectionChanged: (val) {
@@ -464,8 +498,10 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
                         _cadenceUnit = val.first;
                         if (_cadenceUnit == 'day') {
                           _targetFrequency = 1;
-                        } else {
+                        } else if (_cadenceUnit == 'week') {
                           _targetFrequency = 5;
+                        } else {
+                          _targetFrequency = 20;
                         }
                       });
                     },
@@ -519,9 +555,46 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 16),
-            ] else
-              const SizedBox(height: 8),
+            ] else if (_cadenceUnit == 'month') ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Frequency per month:', style: AppTypography.bodySmall),
+                  Text(
+                    '$_targetFrequency times',
+                    style: AppTypography.accentMono,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                children: [10, 15, 20, 25, 30].map((freq) {
+                  final selected = _targetFrequency == freq;
+                  return ChoiceChip(
+                    label: Text('${freq}x'),
+                    selected: selected,
+                    selectedColor: AppColors.primaryAccent,
+                    backgroundColor: AppColors.background,
+                    labelStyle: AppTypography.bodySmall.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: selected
+                          ? AppColors.background
+                          : AppColors.textPrimary,
+                    ),
+                    side: BorderSide(
+                      color: selected
+                          ? AppColors.primaryAccent
+                          : AppColors.border,
+                    ),
+                    onSelected: (val) {
+                      if (val) setState(() => _targetFrequency = freq);
+                    },
+                  );
+                }).toList(),
+              ),
+            ],
+            const SizedBox(height: 16),
 
             // Best Time Slot
             Text('OPTIMAL TIME WINDOW (OPTIONAL)',

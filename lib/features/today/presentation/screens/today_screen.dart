@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../data/local/app_database.dart';
+import '../../../blocker/presentation/screens/distraction_blocker_screen.dart';
 import '../controllers/today_tasks_controller.dart';
 import '../widgets/create_task_modal.dart';
 import '../widgets/essay_lockout_dialog.dart';
@@ -45,6 +46,7 @@ class TodayScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tasksAsync = ref.watch(todayTasksStreamProvider);
     final earnedXp = ref.watch(todayEarnedXpProvider);
+    final earnedStars = ref.watch(todayEarnedStarsProvider);
     final todayDate = DateTime.now();
 
     return Scaffold(
@@ -88,6 +90,14 @@ class TodayScreen extends ConsumerWidget {
             ),
           ),
           IconButton(
+            tooltip: 'App Limits & Curfew Blocker',
+            onPressed: () => DistractionBlockerScreen.show(context),
+            icon: const Icon(
+              Icons.hourglass_bottom_rounded,
+              color: AppColors.primaryAccent,
+            ),
+          ),
+          IconButton(
             tooltip: 'Emergency Focus Lockout',
             onPressed: () => EssayLockoutDialog.show(context),
             icon: const Icon(
@@ -109,53 +119,156 @@ class TodayScreen extends ConsumerWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // XP Banner
+            // Daily Goal & Circular Progress Ring (Wireframe #2)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryAccent.withAlpha(35),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.bolt_rounded,
-                        color: AppColors.primaryAccent,
-                        size: 20,
-                      ),
+              child: tasksAsync.maybeWhen(
+                data: (tasks) {
+                  final totalCount = tasks.length;
+                  final completedCount = tasks.where((t) {
+                    final target = t.task.targetDurationSeconds ?? 1800;
+                    return (t.log?.isCompleted ?? false) ||
+                        ((t.log?.durationLoggedSeconds ?? 0) >= target);
+                  }).length;
+                  final double progress = totalCount > 0 ? (completedCount / totalCount) : 0.0;
+                  final int percent = (progress * 100).round();
+
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '$earnedXp XP Earned Today',
-                            style: AppTypography.accentMono.copyWith(
-                              fontSize: 15,
-                              color: AppColors.textPrimary,
-                            ),
+                    child: Row(
+                      children: [
+                        // Circular Progress Ring
+                        SizedBox(
+                          width: 72,
+                          height: 72,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                value: totalCount == 0 ? 0.0 : progress,
+                                strokeWidth: 7,
+                                strokeCap: StrokeCap.round,
+                                backgroundColor: AppColors.surfaceElevated,
+                                valueColor: const AlwaysStoppedAnimation(
+                                  AppColors.primaryAccent,
+                                ),
+                              ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '$percent%',
+                                    style: AppTypography.accentMono.copyWith(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                          Text(
-                            earnedXp > 0
-                                ? 'Keep momentum high and complete remaining habits!'
-                                : 'Start a focus timer to level up and earn XP.',
-                            style: AppTypography.bodySmall,
+                        ),
+                        const SizedBox(width: 18),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Daily Goal Completion',
+                                style: AppTypography.h2.copyWith(fontSize: 16),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                totalCount == 0
+                                    ? 'No habits scheduled for today.'
+                                    : '$completedCount of $totalCount habits completed',
+                                style: AppTypography.bodySmall,
+                              ),
+                              const SizedBox(height: 10),
+                              // XP & Stars Badges
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryAccent.withAlpha(30),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: AppColors.primaryAccent.withAlpha(80),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.bolt_rounded,
+                                          size: 14,
+                                          color: AppColors.primaryAccent,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '$earnedXp XP',
+                                          style: AppTypography.accentMono.copyWith(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.withAlpha(30),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: Colors.amber.withAlpha(80),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.star_rounded,
+                                          size: 14,
+                                          color: Colors.amber,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '+$earnedStars Stars',
+                                          style: AppTypography.accentMono.copyWith(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.amber,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
+                orElse: () => const SizedBox.shrink(),
               ),
             ),
 

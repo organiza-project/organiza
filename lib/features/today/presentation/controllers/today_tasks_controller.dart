@@ -37,6 +37,20 @@ final todayEarnedXpProvider = Provider<int>((ref) {
   );
 });
 
+final todayEarnedStarsProvider = Provider<int>((ref) {
+  final tasksAsync = ref.watch(todayTasksStreamProvider);
+  return tasksAsync.maybeWhen(
+    data: (items) =>
+        items.fold<int>(0, (sum, item) => sum + (item.log?.stars ?? 0)),
+    orElse: () => 0,
+  );
+});
+
+final totalStarsStreamProvider = StreamProvider<int>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  return db.watchTotalStars();
+});
+
 class TodayTasksController {
   final AppDatabase _db;
   final Ref _ref;
@@ -59,6 +73,53 @@ class TodayTasksController {
       targetSeconds,
       taskXp,
     );
+  }
+
+  Future<void> setLoggedDuration({
+    required String taskId,
+    required int durationSeconds,
+    required int targetSeconds,
+    required int taskXp,
+  }) async {
+    final todayDate = _ref.read(todayDateProvider);
+    await _db.setLogDuration(
+      taskId,
+      todayDate,
+      durationSeconds,
+      targetSeconds,
+      taskXp,
+    );
+  }
+
+  Future<void> updateHabit({
+    required String taskId,
+    required String title,
+    required String cadenceUnit,
+    required int targetFrequency,
+    int? targetDurationSeconds,
+    String? bestTimeStart,
+    String? bestTimeEnd,
+    String? description,
+    String? linkedPackageName,
+  }) async {
+    await _db.updateTask(
+      taskId,
+      TasksCompanion(
+        title: Value(title),
+        cadenceUnit: Value(cadenceUnit),
+        targetFrequency: Value(targetFrequency),
+        targetDurationSeconds: Value(targetDurationSeconds),
+        bestTimeStart: Value(bestTimeStart),
+        bestTimeEnd: Value(bestTimeEnd),
+        description: Value(description),
+        linkedPackageName: Value(linkedPackageName),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  Future<void> deleteHabit(String taskId) async {
+    await _db.softDeleteTask(taskId);
   }
 
   Future<void> syncLinkedAppUsage(String taskId, String packageName) async {

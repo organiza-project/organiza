@@ -929,6 +929,16 @@ class $DailyLogsTable extends DailyLogs
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _starsMeta = const VerificationMeta('stars');
+  @override
+  late final GeneratedColumn<int> stars = GeneratedColumn<int>(
+    'stars',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _notesMeta = const VerificationMeta('notes');
   @override
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
@@ -958,6 +968,7 @@ class $DailyLogsTable extends DailyLogs
     durationLoggedSeconds,
     isCompleted,
     xpAwarded,
+    stars,
     notes,
     updatedAt,
   ];
@@ -1018,6 +1029,12 @@ class $DailyLogsTable extends DailyLogs
         xpAwarded.isAcceptableOrUnknown(data['xp_awarded']!, _xpAwardedMeta),
       );
     }
+    if (data.containsKey('stars')) {
+      context.handle(
+        _starsMeta,
+        stars.isAcceptableOrUnknown(data['stars']!, _starsMeta),
+      );
+    }
     if (data.containsKey('notes')) {
       context.handle(
         _notesMeta,
@@ -1063,6 +1080,10 @@ class $DailyLogsTable extends DailyLogs
         DriftSqlType.int,
         data['${effectivePrefix}xp_awarded'],
       )!,
+      stars: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}stars'],
+      )!,
       notes: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
@@ -1087,6 +1108,7 @@ class DailyLog extends DataClass implements Insertable<DailyLog> {
   final int durationLoggedSeconds;
   final bool isCompleted;
   final int xpAwarded;
+  final int stars;
   final String? notes;
   final DateTime updatedAt;
   const DailyLog({
@@ -1096,6 +1118,7 @@ class DailyLog extends DataClass implements Insertable<DailyLog> {
     required this.durationLoggedSeconds,
     required this.isCompleted,
     required this.xpAwarded,
+    required this.stars,
     this.notes,
     required this.updatedAt,
   });
@@ -1108,6 +1131,7 @@ class DailyLog extends DataClass implements Insertable<DailyLog> {
     map['duration_logged_seconds'] = Variable<int>(durationLoggedSeconds);
     map['is_completed'] = Variable<bool>(isCompleted);
     map['xp_awarded'] = Variable<int>(xpAwarded);
+    map['stars'] = Variable<int>(stars);
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
     }
@@ -1123,6 +1147,7 @@ class DailyLog extends DataClass implements Insertable<DailyLog> {
       durationLoggedSeconds: Value(durationLoggedSeconds),
       isCompleted: Value(isCompleted),
       xpAwarded: Value(xpAwarded),
+      stars: Value(stars),
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
@@ -1144,6 +1169,7 @@ class DailyLog extends DataClass implements Insertable<DailyLog> {
       ),
       isCompleted: serializer.fromJson<bool>(json['isCompleted']),
       xpAwarded: serializer.fromJson<int>(json['xpAwarded']),
+      stars: serializer.fromJson<int>(json['stars']),
       notes: serializer.fromJson<String?>(json['notes']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -1158,6 +1184,7 @@ class DailyLog extends DataClass implements Insertable<DailyLog> {
       'durationLoggedSeconds': serializer.toJson<int>(durationLoggedSeconds),
       'isCompleted': serializer.toJson<bool>(isCompleted),
       'xpAwarded': serializer.toJson<int>(xpAwarded),
+      'stars': serializer.toJson<int>(stars),
       'notes': serializer.toJson<String?>(notes),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -1170,6 +1197,7 @@ class DailyLog extends DataClass implements Insertable<DailyLog> {
     int? durationLoggedSeconds,
     bool? isCompleted,
     int? xpAwarded,
+    int? stars,
     Value<String?> notes = const Value.absent(),
     DateTime? updatedAt,
   }) => DailyLog(
@@ -1179,6 +1207,7 @@ class DailyLog extends DataClass implements Insertable<DailyLog> {
     durationLoggedSeconds: durationLoggedSeconds ?? this.durationLoggedSeconds,
     isCompleted: isCompleted ?? this.isCompleted,
     xpAwarded: xpAwarded ?? this.xpAwarded,
+    stars: stars ?? this.stars,
     notes: notes.present ? notes.value : this.notes,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -1194,6 +1223,7 @@ class DailyLog extends DataClass implements Insertable<DailyLog> {
           ? data.isCompleted.value
           : this.isCompleted,
       xpAwarded: data.xpAwarded.present ? data.xpAwarded.value : this.xpAwarded,
+      stars: data.stars.present ? data.stars.value : this.stars,
       notes: data.notes.present ? data.notes.value : this.notes,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -1208,6 +1238,7 @@ class DailyLog extends DataClass implements Insertable<DailyLog> {
           ..write('durationLoggedSeconds: $durationLoggedSeconds, ')
           ..write('isCompleted: $isCompleted, ')
           ..write('xpAwarded: $xpAwarded, ')
+          ..write('stars: $stars, ')
           ..write('notes: $notes, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1222,6 +1253,7 @@ class DailyLog extends DataClass implements Insertable<DailyLog> {
     durationLoggedSeconds,
     isCompleted,
     xpAwarded,
+    stars,
     notes,
     updatedAt,
   );
@@ -1235,6 +1267,7 @@ class DailyLog extends DataClass implements Insertable<DailyLog> {
           other.durationLoggedSeconds == this.durationLoggedSeconds &&
           other.isCompleted == this.isCompleted &&
           other.xpAwarded == this.xpAwarded &&
+          other.stars == this.stars &&
           other.notes == this.notes &&
           other.updatedAt == this.updatedAt);
 }
@@ -1246,6 +1279,7 @@ class DailyLogsCompanion extends UpdateCompanion<DailyLog> {
   final Value<int> durationLoggedSeconds;
   final Value<bool> isCompleted;
   final Value<int> xpAwarded;
+  final Value<int> stars;
   final Value<String?> notes;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -1256,6 +1290,7 @@ class DailyLogsCompanion extends UpdateCompanion<DailyLog> {
     this.durationLoggedSeconds = const Value.absent(),
     this.isCompleted = const Value.absent(),
     this.xpAwarded = const Value.absent(),
+    this.stars = const Value.absent(),
     this.notes = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1267,6 +1302,7 @@ class DailyLogsCompanion extends UpdateCompanion<DailyLog> {
     this.durationLoggedSeconds = const Value.absent(),
     this.isCompleted = const Value.absent(),
     this.xpAwarded = const Value.absent(),
+    this.stars = const Value.absent(),
     this.notes = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1280,6 +1316,7 @@ class DailyLogsCompanion extends UpdateCompanion<DailyLog> {
     Expression<int>? durationLoggedSeconds,
     Expression<bool>? isCompleted,
     Expression<int>? xpAwarded,
+    Expression<int>? stars,
     Expression<String>? notes,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -1292,6 +1329,7 @@ class DailyLogsCompanion extends UpdateCompanion<DailyLog> {
         'duration_logged_seconds': durationLoggedSeconds,
       if (isCompleted != null) 'is_completed': isCompleted,
       if (xpAwarded != null) 'xp_awarded': xpAwarded,
+      if (stars != null) 'stars': stars,
       if (notes != null) 'notes': notes,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1305,6 +1343,7 @@ class DailyLogsCompanion extends UpdateCompanion<DailyLog> {
     Value<int>? durationLoggedSeconds,
     Value<bool>? isCompleted,
     Value<int>? xpAwarded,
+    Value<int>? stars,
     Value<String?>? notes,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -1317,6 +1356,7 @@ class DailyLogsCompanion extends UpdateCompanion<DailyLog> {
           durationLoggedSeconds ?? this.durationLoggedSeconds,
       isCompleted: isCompleted ?? this.isCompleted,
       xpAwarded: xpAwarded ?? this.xpAwarded,
+      stars: stars ?? this.stars,
       notes: notes ?? this.notes,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -1346,6 +1386,9 @@ class DailyLogsCompanion extends UpdateCompanion<DailyLog> {
     if (xpAwarded.present) {
       map['xp_awarded'] = Variable<int>(xpAwarded.value);
     }
+    if (stars.present) {
+      map['stars'] = Variable<int>(stars.value);
+    }
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
@@ -1367,6 +1410,7 @@ class DailyLogsCompanion extends UpdateCompanion<DailyLog> {
           ..write('durationLoggedSeconds: $durationLoggedSeconds, ')
           ..write('isCompleted: $isCompleted, ')
           ..write('xpAwarded: $xpAwarded, ')
+          ..write('stars: $stars, ')
           ..write('notes: $notes, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -3308,6 +3352,7 @@ typedef $$DailyLogsTableCreateCompanionBuilder =
       Value<int> durationLoggedSeconds,
       Value<bool> isCompleted,
       Value<int> xpAwarded,
+      Value<int> stars,
       Value<String?> notes,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -3320,6 +3365,7 @@ typedef $$DailyLogsTableUpdateCompanionBuilder =
       Value<int> durationLoggedSeconds,
       Value<bool> isCompleted,
       Value<int> xpAwarded,
+      Value<int> stars,
       Value<String?> notes,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -3378,6 +3424,11 @@ class $$DailyLogsTableFilterComposer
 
   ColumnFilters<int> get xpAwarded => $composableBuilder(
     column: $table.xpAwarded,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get stars => $composableBuilder(
+    column: $table.stars,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3449,6 +3500,11 @@ class $$DailyLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get stars => $composableBuilder(
+    column: $table.stars,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get notes => $composableBuilder(
     column: $table.notes,
     builder: (column) => ColumnOrderings(column),
@@ -3510,6 +3566,9 @@ class $$DailyLogsTableAnnotationComposer
 
   GeneratedColumn<int> get xpAwarded =>
       $composableBuilder(column: $table.xpAwarded, builder: (column) => column);
+
+  GeneratedColumn<int> get stars =>
+      $composableBuilder(column: $table.stars, builder: (column) => column);
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
@@ -3575,6 +3634,7 @@ class $$DailyLogsTableTableManager
                 Value<int> durationLoggedSeconds = const Value.absent(),
                 Value<bool> isCompleted = const Value.absent(),
                 Value<int> xpAwarded = const Value.absent(),
+                Value<int> stars = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -3585,6 +3645,7 @@ class $$DailyLogsTableTableManager
                 durationLoggedSeconds: durationLoggedSeconds,
                 isCompleted: isCompleted,
                 xpAwarded: xpAwarded,
+                stars: stars,
                 notes: notes,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -3597,6 +3658,7 @@ class $$DailyLogsTableTableManager
                 Value<int> durationLoggedSeconds = const Value.absent(),
                 Value<bool> isCompleted = const Value.absent(),
                 Value<int> xpAwarded = const Value.absent(),
+                Value<int> stars = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -3607,6 +3669,7 @@ class $$DailyLogsTableTableManager
                 durationLoggedSeconds: durationLoggedSeconds,
                 isCompleted: isCompleted,
                 xpAwarded: xpAwarded,
+                stars: stars,
                 notes: notes,
                 updatedAt: updatedAt,
                 rowid: rowid,

@@ -36,6 +36,8 @@ class AssistantAiService {
     await prefs.setString(_prefsKey, key.trim());
   }
 
+  List<Map<String, dynamic>> getToolsDefinition() => _getToolsDefinition();
+
   List<Map<String, dynamic>> _getToolsDefinition() {
     return [
       {
@@ -53,6 +55,49 @@ class AssistantAiService {
       {
         'type': 'function',
         'function': {
+          'name': 'add_timetable_event',
+          'description':
+              'Schedule a calendar event, class, meeting, lecture, or appointment into the timetable.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'title': {
+                'type': 'string',
+                'description':
+                    'Title or subject of the event (e.g. Team Meet Up, Algorithms Lecture)',
+              },
+              'startTime': {
+                'type': 'string',
+                'description':
+                    'Start time in HH:mm 24-hour format, e.g. 07:00, 14:30',
+              },
+              'endTime': {
+                'type': 'string',
+                'description':
+                    'End time in HH:mm 24-hour format, e.g. 09:00, 16:00',
+              },
+              'dayOfWeek': {
+                'type': 'integer',
+                'description':
+                    'Day of the week: 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 7=Sun. Defaults to 0 or current day.',
+              },
+              'specificDate': {
+                'type': 'string',
+                'description':
+                    'Optional specific date formatted as YYYY-MM-DD for one-off events (e.g. tomorrow).',
+              },
+              'notes': {
+                'type': 'string',
+                'description': 'Optional notes, location, or room',
+              },
+            },
+            'required': ['title', 'startTime', 'endTime'],
+          },
+        },
+      },
+      {
+        'type': 'function',
+        'function': {
           'name': 'check_habit_status',
           'description':
               'Check if a specific task or habit was completed or logged today, and return duration logged vs target.',
@@ -62,7 +107,7 @@ class AssistantAiService {
               'task_title_query': {
                 'type': 'string',
                 'description':
-                    'The name or keyword of the habit/task to check, e.g. Reading, Gym, Coding'
+                    'The name or keyword of the habit/task to check, e.g. Reading, Gym, Coding',
               },
             },
             'required': ['task_title_query'],
@@ -74,22 +119,22 @@ class AssistantAiService {
         'function': {
           'name': 'reschedule_item',
           'description':
-              'Reschedule a class, lecture, or habit to a new time window.',
+              'Reschedule an existing timetable class/event or habit to a new time window.',
           'parameters': {
             'type': 'object',
             'properties': {
               'titleQuery': {
                 'type': 'string',
                 'description':
-                    'The name or subject of the item to reschedule, e.g. Maths, Gym'
+                    'The name or subject of the item to reschedule, e.g. Maths, Gym',
               },
               'newStartTime': {
                 'type': 'string',
-                'description': 'Start time in HH:mm 24-hour format, e.g. 17:00'
+                'description': 'Start time in HH:mm 24-hour format, e.g. 17:00',
               },
               'newEndTime': {
                 'type': 'string',
-                'description': 'End time in HH:mm 24-hour format, e.g. 18:30'
+                'description': 'End time in HH:mm 24-hour format, e.g. 18:30',
               },
             },
             'required': ['titleQuery', 'newStartTime', 'newEndTime'],
@@ -106,25 +151,25 @@ class AssistantAiService {
             'properties': {
               'title': {
                 'type': 'string',
-                'description': 'Name of the habit or task'
+                'description': 'Name of the habit or task',
               },
               'cadenceUnit': {
                 'type': 'string',
                 'enum': ['day', 'week'],
-                'description': 'Cadence unit: day or week'
+                'description': 'Cadence unit: day or week',
               },
               'frequency': {
                 'type': 'integer',
                 'description':
-                    'Target frequency (e.g. 1 for daily, 3 for 3x a week)'
+                    'Target frequency (e.g. 1 for daily, 3 for 3x a week)',
               },
               'durationMinutes': {
                 'type': 'integer',
-                'description': 'Goal duration in minutes (e.g. 30)'
+                'description': 'Goal duration in minutes (e.g. 30)',
               },
               'bestTimeStart': {
                 'type': 'string',
-                'description': 'Optional start time in HH:mm format, e.g. 07:00'
+                'description': 'Optional start time in HH:mm format, e.g. 07:00',
               },
             },
             'required': ['title', 'cadenceUnit', 'frequency'],
@@ -143,7 +188,7 @@ class AssistantAiService {
               'titleQuery': {
                 'type': 'string',
                 'description':
-                    'The name or subject of the item to cancel or remove'
+                    'The name or subject of the item to cancel or remove',
               },
             },
             'required': ['titleQuery'],
@@ -161,13 +206,13 @@ class AssistantAiService {
             'properties': {
               'content': {
                 'type': 'string',
-                'description': 'The journal entry content or reflection'
+                'description': 'The journal entry content or reflection',
               },
               'tags': {
                 'type': 'array',
                 'items': {'type': 'string'},
                 'description':
-                    'Optional list of tags, e.g. ["reflection", "gratitude"]'
+                    'Optional list of tags, e.g. ["reflection", "gratitude"]',
               },
             },
             'required': ['content'],
@@ -223,6 +268,17 @@ class AssistantAiService {
             return '- ${t.task.title}: ${loggedMins}m / ${targetMins}m (${isDone ? "Completed" : "Incomplete"})';
           }).join('\n');
 
+    // Fetch all active habit and timetable names for precision grounding
+    final allHabits = await (db.select(db.tasks)
+          ..where((t) => t.isDeleted.equals(false)))
+        .get();
+    final habitNames = allHabits.map((h) => h.title).join(', ');
+    final allTimetable = await (db.select(db.timetableEntries)
+          ..where((t) => t.isCanceled.equals(false)))
+        .get();
+    final timetableTitles =
+        allTimetable.map((t) => t.title).toSet().join(', ');
+
     final systemPrompt = '''
 CRITICAL LANGUAGE RULE: You must operate exclusively in English. All parsed intents, tool arguments, and conversational responses must be in English only. Do not interpret or reply in Arabic or any other language, even if phonetic artifacts are present.
 
@@ -237,12 +293,19 @@ $timetableContext
 Habits & Tasks:
 $habitContext
 
-Rules:
-1. When the user asks to inspect their schedule, check habit progress, reschedule, add habits, remove events, or log reflections, call the appropriate function tool.
-2. If the user asks whether a habit was completed or how much time they logged, call `check_habit_status` or reference the context above.
-3. If rescheduling an item that is not found, suggest similar existing items.
-4. Provide concise, clear 1-2 sentence spoken confirmations.
-5. Be encouraging, concise, and direct.
+Known Existing Entities:
+- Active Habits: ${habitNames.isEmpty ? 'None' : habitNames}
+- Known Timetable Events: ${timetableTitles.isEmpty ? 'None' : timetableTitles}
+
+Tool Routing Rules:
+1. When the user asks to schedule a new meeting, event, appointment, or class (e.g. "schedule team meet up tomorrow morning from 7 a.m. till 9 a.m."), call `add_timetable_event`. NEVER confuse scheduling an event/meeting with looking up an existing habit.
+2. When the user asks whether a habit was completed or how much time was logged, call `check_habit_status`.
+3. When rescheduling an existing item, call `reschedule_item`.
+4. When canceling or removing a scheduled event or habit, call `remove_schedule_item`.
+5. When creating a recurring habit or routine, call `create_recurring_habit`.
+6. When saving a reflection or journal thought, call `append_journal`.
+7. Provide concise, clear 1-2 sentence spoken confirmations.
+8. Be encouraging, concise, and direct.
 ''';
 
     final messages = <Map<String, dynamic>>[
@@ -304,7 +367,8 @@ Rules:
 
     if (toolCalls == null || toolCalls.isEmpty) {
       // Direct text response without tools
-      final textContent = (firstMessage['content'] as String?)?.trim() ?? 'Done.';
+      final textContent =
+          (firstMessage['content'] as String?)?.trim() ?? 'Done.';
       _recordConversationTurn(transcript, textContent);
       return AssistantExecutionResult(
         userTranscript: transcript,
@@ -352,6 +416,53 @@ Rules:
           executedDetails = {
             'events': timetableSummary.length,
             'tasks': tasksSummary.length,
+          };
+          break;
+
+        case 'add_timetable_event':
+          final title = args['title'] as String? ?? 'Untitled Event';
+          final start = args['startTime'] as String? ?? '09:00';
+          final end = args['endTime'] as String? ?? '10:00';
+          final specificDate = args['specificDate'] as String?;
+          final notes = args['notes'] as String?;
+          int dow = (args['dayOfWeek'] as num?)?.toInt() ?? 0;
+          if (dow == 0 && specificDate != null) {
+            try {
+              final parsed = DateTime.parse(specificDate);
+              dow = parsed.weekday;
+            } catch (_) {
+              dow = dayOfWeek;
+            }
+          } else if (dow == 0) {
+            dow = dayOfWeek;
+          }
+
+          final eventId = const Uuid().v4();
+          await db.insertTimetableEntry(
+            TimetableEntriesCompanion(
+              id: Value(eventId),
+              title: Value(title),
+              startTime: Value(start),
+              endTime: Value(end),
+              dayOfWeek: Value(dow),
+              specificDate: Value(specificDate),
+              locationOrNotes: Value(notes),
+              isCanceled: const Value(false),
+            ),
+          );
+
+          toolResult = {
+            'status': 'scheduled',
+            'eventId': eventId,
+            'title': title,
+            'window': '$start - $end',
+            'date': specificDate ?? 'Every week',
+          };
+          executedActionName = 'Scheduled $title';
+          executedDetails = {
+            'title': title,
+            'time': '$start - $end',
+            'date': specificDate ?? 'Day $dow',
           };
           break;
 

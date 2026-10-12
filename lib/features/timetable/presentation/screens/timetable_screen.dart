@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,8 +9,38 @@ import '../../../../data/local/app_database.dart';
 import '../controllers/timetable_controller.dart';
 import '../widgets/add_timetable_modal.dart';
 
-class TimetableScreen extends ConsumerWidget {
+class TimetableScreen extends ConsumerStatefulWidget {
   const TimetableScreen({super.key});
+
+  @override
+  ConsumerState<TimetableScreen> createState() => _TimetableScreenState();
+}
+
+class _TimetableScreenState extends ConsumerState<TimetableScreen> {
+  static const double _hourHeight = 64.0;
+  final ScrollController _scrollController = ScrollController();
+  bool _isGridView = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToCurrentTime();
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToCurrentTime() {
+    if (!_scrollController.hasClients) return;
+    final now = DateTime.now();
+    final targetOffset = math.max(0.0, (now.hour - 1) * _hourHeight);
+    _scrollController.jumpTo(targetOffset);
+  }
 
   String _formatDisplayDate(DateTime date) {
     const months = [
@@ -28,9 +60,15 @@ class TimetableScreen extends ConsumerWidget {
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
+  int _parseTimeToMinutes(String timeStr) {
+    final parts = timeStr.split(':');
+    final hour = int.tryParse(parts[0]) ?? 0;
+    final min = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+    return hour * 60 + min;
+  }
+
   Future<void> _showRescheduleDialog(
     BuildContext context,
-    WidgetRef ref,
     TimetableEntry entry,
   ) async {
     final startParts = entry.startTime.split(':');
@@ -48,7 +86,7 @@ class TimetableScreen extends ConsumerWidget {
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) {
+        builder: (context, setDialogState) {
           String formatTime(TimeOfDay t) =>
               '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
@@ -77,7 +115,7 @@ class TimetableScreen extends ConsumerWidget {
                             initialTime: startTime,
                           );
                           if (picked != null) {
-                            setState(() => startTime = picked);
+                            setDialogState(() => startTime = picked);
                           }
                         },
                         style: OutlinedButton.styleFrom(
@@ -106,7 +144,7 @@ class TimetableScreen extends ConsumerWidget {
                             initialTime: endTime,
                           );
                           if (picked != null) {
-                            setState(() => endTime = picked);
+                            setDialogState(() => endTime = picked);
                           }
                         },
                         style: OutlinedButton.styleFrom(
@@ -129,7 +167,10 @@ class TimetableScreen extends ConsumerWidget {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: Text('Cancel', style: AppTypography.bodyMedium),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -160,7 +201,7 @@ class TimetableScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final selectedDate = ref.watch(selectedTimetableDateProvider);
     final timetableAsync = ref.watch(timetableEntriesStreamProvider);
 
@@ -173,7 +214,7 @@ class TimetableScreen extends ConsumerWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Timetable & Calendar', style: AppTypography.h1),
+            Text('Timetable & Schedule', style: AppTypography.h1),
             const SizedBox(height: 2),
             Text(
               _formatDisplayDate(selectedDate),
@@ -182,6 +223,14 @@ class TimetableScreen extends ConsumerWidget {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: _isGridView ? 'Switch to Agenda List' : 'Switch to 24-hr Grid',
+            onPressed: () => setState(() => _isGridView = !_isGridView),
+            icon: Icon(
+              _isGridView ? Icons.view_agenda_outlined : Icons.calendar_view_day_rounded,
+              color: AppColors.textSecondary,
+            ),
+          ),
           IconButton(
             onPressed: () => AddTimetableModal.show(context),
             icon: const Icon(
@@ -198,10 +247,10 @@ class TimetableScreen extends ConsumerWidget {
         child: Column(
           children: [
             // Horizontal Calendar Strip
-            _buildCalendarStrip(context, ref, selectedDate),
-            const SizedBox(height: 12),
+            _buildCalendarStrip(context, selectedDate),
+            const SizedBox(height: 8),
 
-            // Schedule Events List
+            // Timetable View
             Expanded(
               child: timetableAsync.when(
                 loading: () => const Center(
@@ -225,14 +274,11 @@ class TimetableScreen extends ConsumerWidget {
                     return _buildEmptyState(context);
                   }
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-                    itemCount: entries.length,
-                    itemBuilder: (context, index) {
-                      final item = entries[index];
-                      return _buildEventCard(context, ref, item);
-                    },
-                  );
+                  if (_isGridView) {
+                    return _build24HourVerticalGrid(selectedDate, entries);
+                  } else {
+                    return _buildAgendaList(entries);
+                  }
                 },
               ),
             ),
@@ -242,15 +288,9 @@ class TimetableScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCalendarStrip(
-    BuildContext context,
-    WidgetRef ref,
-    DateTime selectedDate,
-  ) {
-    // Generate 14 days centered around today/selectedDate
+  Widget _buildCalendarStrip(BuildContext context, DateTime selectedDate) {
     final today = DateTime.now();
     final startDate = today.subtract(const Duration(days: 3));
-
     const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     return Container(
@@ -328,11 +368,270 @@ class TimetableScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEventCard(
-    BuildContext context,
-    WidgetRef ref,
-    TimetableEntry entry,
+  // 24-Hour Visual Vertical Grid (Wireframe Screen 4)
+  Widget _build24HourVerticalGrid(
+    DateTime selectedDate,
+    List<TimetableEntry> entries,
   ) {
+    final now = DateTime.now();
+    final isSelectedToday = selectedDate.year == now.year &&
+        selectedDate.month == now.month &&
+        selectedDate.day == now.day;
+    final currentMinutes = now.hour * 60 + now.minute;
+    final currentLineTop = (currentMinutes / 60.0) * _hourHeight;
+
+    const accentPalette = [
+      Color(0xFF3B82F6), // Blue
+      Color(0xFF10B981), // Emerald
+      Color(0xFF8B5CF6), // Purple
+      Color(0xFFF59E0B), // Amber
+      Color(0xFFEC4899), // Pink
+      Color(0xFF06B6D4), // Cyan
+    ];
+
+    return SingleChildScrollView(
+      controller: _scrollController,
+      padding: const EdgeInsets.only(bottom: 80),
+      child: SizedBox(
+        height: 24 * _hourHeight,
+        child: Stack(
+          children: [
+            // Hour slots background lines
+            ...List.generate(24, (hour) {
+              final top = hour * _hourHeight;
+              final hourText = '${hour.toString().padLeft(2, '0')}:00';
+              return Positioned(
+                top: top,
+                left: 0,
+                right: 0,
+                height: _hourHeight,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 54,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 10, top: 4),
+                        child: Text(
+                          hourText,
+                          style: AppTypography.bodySmall.copyWith(
+                            fontSize: 11,
+                            color: AppColors.textSecondary.withAlpha(160),
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            top: BorderSide(
+                              color: AppColors.border,
+                              width: 0.6,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+
+            // Scheduled Event Blocks (Proportionally Placed)
+            ...entries.asMap().entries.map((entryItem) {
+              final index = entryItem.key;
+              final entry = entryItem.value;
+              final startMin = _parseTimeToMinutes(entry.startTime);
+              var endMin = _parseTimeToMinutes(entry.endTime);
+              if (endMin <= startMin) endMin = startMin + 60;
+
+              final top = (startMin / 60.0) * _hourHeight;
+              final blockHeight = math.max(
+                ((endMin - startMin) / 60.0) * _hourHeight - 2,
+                30.0,
+              );
+              final accentColor = accentPalette[index % accentPalette.length];
+
+              return Positioned(
+                top: top,
+                left: 60,
+                right: 16,
+                height: blockHeight,
+                child: GestureDetector(
+                  onTap: () => _showRescheduleDialog(context, entry),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: accentColor.withAlpha(120),
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(40),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 4,
+                          height: double.infinity,
+                          decoration: BoxDecoration(
+                            color: accentColor,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                entry.title,
+                                style: AppTypography.h2.copyWith(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                '${entry.startTime} – ${entry.endTime}',
+                                style: AppTypography.accentMono.copyWith(
+                                  fontSize: 11,
+                                  color: accentColor,
+                                ),
+                              ),
+                              if (blockHeight > 50 &&
+                                  entry.locationOrNotes != null &&
+                                  entry.locationOrNotes!.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  entry.locationOrNotes!,
+                                  style: AppTypography.bodySmall.copyWith(
+                                    fontSize: 10,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        PopupMenuButton<String>(
+                          padding: EdgeInsets.zero,
+                          iconSize: 18,
+                          color: AppColors.surfaceElevated,
+                          icon: const Icon(
+                            Icons.more_vert_rounded,
+                            color: AppColors.textSecondary,
+                          ),
+                          onSelected: (val) async {
+                            if (val == 'reschedule') {
+                              await _showRescheduleDialog(context, entry);
+                            } else if (val == 'delete') {
+                              await ref
+                                  .read(timetableControllerProvider)
+                                  .deleteEntry(entry.id);
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'reschedule',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.schedule_rounded,
+                                      size: 16, color: AppColors.primaryAccent),
+                                  SizedBox(width: 8),
+                                  Text('Reschedule'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_outline_rounded,
+                                      size: 16, color: AppColors.errorRed),
+                                  SizedBox(width: 8),
+                                  Text('Delete',
+                                      style: TextStyle(color: AppColors.errorRed)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+
+            // Current-Time Horizontal Red Line Indicator (Wireframe Screen 4)
+            if (isSelectedToday)
+              Positioned(
+                top: currentLineTop,
+                left: 48,
+                right: 0,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppColors.errorRed,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.errorRed,
+                            blurRadius: 6,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Container(
+                        height: 2,
+                        color: AppColors.errorRed,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Agenda List View
+  Widget _buildAgendaList(List<TimetableEntry> entries) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+      itemCount: entries.length,
+      itemBuilder: (context, index) {
+        final item = entries[index];
+        return _buildEventCard(context, item);
+      },
+    );
+  }
+
+  Widget _buildEventCard(BuildContext context, TimetableEntry entry) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -445,7 +744,7 @@ class TimetableScreen extends ConsumerWidget {
               ),
               onSelected: (val) async {
                 if (val == 'reschedule') {
-                  await _showRescheduleDialog(context, ref, entry);
+                  await _showRescheduleDialog(context, entry);
                 } else if (val == 'delete') {
                   await ref
                       .read(timetableControllerProvider)

@@ -147,15 +147,17 @@ class _EssayLockoutDialogState extends State<EssayLockoutDialog> {
   Widget build(BuildContext context) {
     final isUnlocked = _similarity >= 95.0;
 
-    return Dialog(
-      backgroundColor: AppColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.border, width: 1),
-      ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 720),
+    return PopScope(
+      canPop: false,
+      child: Dialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.border, width: 1),
+        ),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 580, maxHeight: 720),
         child: Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
@@ -432,6 +434,7 @@ class _EssayLockoutDialogState extends State<EssayLockoutDialog> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
