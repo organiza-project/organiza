@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
-import '../../../../core/network/deepseek_assistant_service.dart';
+import '../../../../core/network/assistant_ai_service.dart';
 import '../../../../core/network/groq_transcription_service.dart';
 import '../../../../core/services/voice_recording_service.dart';
 import '../../../../data/local/database_provider.dart';
@@ -39,7 +39,7 @@ class _VoiceAssistantModalState extends ConsumerState<VoiceAssistantModal>
     with SingleTickerProviderStateMixin {
   final VoiceRecordingService _recordingService = VoiceRecordingService();
   final GroqTranscriptionService _groqService = GroqTranscriptionService();
-  final DeepSeekAssistantService _deepSeekService = DeepSeekAssistantService();
+  final AssistantAiService _aiService = AssistantAiService();
   final TextEditingController _textController = TextEditingController();
 
   late AnimationController _pulseController;
@@ -128,8 +128,8 @@ class _VoiceAssistantModalState extends ConsumerState<VoiceAssistantModal>
         _state = AssistantUiState.thinking;
       });
 
-      // 2. Process with DeepSeek Tool-calling
-      await _executeDeepSeek(transcript);
+      // 2. Process with Groq Llama 3.3 Tool-calling
+      await _executeAiAssistant(transcript);
     } catch (e) {
       setState(() {
         _state = AssistantUiState.error;
@@ -152,7 +152,7 @@ class _VoiceAssistantModalState extends ConsumerState<VoiceAssistantModal>
     });
 
     try {
-      await _executeDeepSeek(text);
+      await _executeAiAssistant(text);
     } catch (e) {
       setState(() {
         _state = AssistantUiState.error;
@@ -161,9 +161,9 @@ class _VoiceAssistantModalState extends ConsumerState<VoiceAssistantModal>
     }
   }
 
-  Future<void> _executeDeepSeek(String prompt) async {
+  Future<void> _executeAiAssistant(String prompt) async {
     final db = ref.read(appDatabaseProvider);
-    final result = await _deepSeekService.processCommand(
+    final result = await _aiService.processCommand(
       transcript: prompt,
       db: db,
     );
@@ -176,7 +176,6 @@ class _VoiceAssistantModalState extends ConsumerState<VoiceAssistantModal>
 
   void _showApiKeyDialog() {
     final groqKeyController = TextEditingController();
-    final deepseekKeyController = TextEditingController();
 
     showDialog(
       context: context,
@@ -186,12 +185,17 @@ class _VoiceAssistantModalState extends ConsumerState<VoiceAssistantModal>
           borderRadius: BorderRadius.circular(14),
           side: const BorderSide(color: AppColors.border),
         ),
-        title: Text('API Keys Configuration', style: AppTypography.h2),
+        title: Text('Groq API Key (Free)', style: AppTypography.h2),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Groq API Key (Whisper)', style: AppTypography.bodySmall),
+            Text(
+              'A single Groq key powers both Whisper audio transcription and Llama 3.3 function calling 100% free.',
+              style: AppTypography.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            Text('Groq API Key', style: AppTypography.bodySmall),
             const SizedBox(height: 6),
             TextField(
               controller: groqKeyController,
@@ -199,24 +203,6 @@ class _VoiceAssistantModalState extends ConsumerState<VoiceAssistantModal>
               style: AppTypography.bodyMedium,
               decoration: InputDecoration(
                 hintText: 'gsk_...',
-                hintStyle: AppTypography.bodySmall,
-                filled: true,
-                fillColor: AppColors.background,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text('DeepSeek API Key', style: AppTypography.bodySmall),
-            const SizedBox(height: 6),
-            TextField(
-              controller: deepseekKeyController,
-              obscureText: true,
-              style: AppTypography.bodyMedium,
-              decoration: InputDecoration(
-                hintText: 'sk-...',
                 hintStyle: AppTypography.bodySmall,
                 filled: true,
                 fillColor: AppColors.background,
@@ -240,16 +226,12 @@ class _VoiceAssistantModalState extends ConsumerState<VoiceAssistantModal>
             ),
             onPressed: () async {
               if (groqKeyController.text.trim().isNotEmpty) {
-                await _groqService.saveApiKey(groqKeyController.text.trim());
-              }
-              if (deepseekKeyController.text.trim().isNotEmpty) {
-                await _deepSeekService
-                    .saveApiKey(deepseekKeyController.text.trim());
+                await _aiService.saveApiKey(groqKeyController.text.trim());
               }
               if (ctx.mounted) Navigator.pop(ctx);
             },
             child: Text(
-              'Save Keys',
+              'Save Key',
               style: AppTypography.bodyMedium.copyWith(
                 fontWeight: FontWeight.bold,
                 color: AppColors.background,
@@ -445,7 +427,7 @@ class _VoiceAssistantModalState extends ConsumerState<VoiceAssistantModal>
             ),
             const SizedBox(height: 12),
             Text(
-              'Reasoning & executing tools with DeepSeek...',
+              'Reasoning & executing tools with Groq (Llama 3.3)...',
               style: AppTypography.bodyMedium,
             ),
           ],

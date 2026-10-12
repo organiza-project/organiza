@@ -259,8 +259,60 @@ class AppDatabase extends _$AppDatabase {
     return into(timetableEntries).insert(entry);
   }
 
+  Stream<List<TimetableEntry>> watchTimetableForDate(
+      String date, int dayOfWeek) {
+    return (select(timetableEntries)
+          ..where((tbl) =>
+              tbl.isCanceled.equals(false) &
+              (tbl.specificDate.equals(date) |
+                  (tbl.specificDate.isNull() & tbl.dayOfWeek.equals(dayOfWeek))))
+          ..orderBy([(tbl) => OrderingTerm.asc(tbl.startTime)]))
+        .watch();
+  }
+
+  Future<int> deleteTimetableEntry(String id) {
+    return (delete(timetableEntries)..where((tbl) => tbl.id.equals(id))).go();
+  }
+
+  Future<int> rescheduleTimetableById(
+      String id, String newStart, String newEnd) {
+    return (update(timetableEntries)..where((tbl) => tbl.id.equals(id))).write(
+      TimetableEntriesCompanion(
+        startTime: Value(newStart),
+        endTime: Value(newEnd),
+      ),
+    );
+  }
+
+  Future<int> toggleCancelTimetableEntry(String id, bool isCanceled) {
+    return (update(timetableEntries)..where((tbl) => tbl.id.equals(id))).write(
+      TimetableEntriesCompanion(
+        isCanceled: Value(isCanceled),
+      ),
+    );
+  }
+
   Future<int> insertJournalEntry(JournalEntriesCompanion entry) {
     return into(journalEntries).insert(entry);
+  }
+
+  Stream<List<JournalEntry>> watchAllJournalEntries() {
+    return (select(journalEntries)
+          ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)]))
+        .watch();
+  }
+
+  Future<int> deleteJournalEntry(String id) {
+    return (delete(journalEntries)..where((tbl) => tbl.id.equals(id))).go();
+  }
+
+  Future<int> updateJournalEntry(String id, String content, String? tags) {
+    return (update(journalEntries)..where((tbl) => tbl.id.equals(id))).write(
+      JournalEntriesCompanion(
+        content: Value(content),
+        tags: Value(tags),
+      ),
+    );
   }
 }
 
