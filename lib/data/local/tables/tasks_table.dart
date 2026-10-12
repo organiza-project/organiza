@@ -14,6 +14,7 @@ class Tasks extends Table {
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
   TextColumn get syncStatus => text().withDefault(const Constant('pending'))(); // 'synced', 'pending'
+  TextColumn get linkedPackageName => text().nullable()(); // e.g. "com.amazon.kindle"
 
   @override
   Set<Column> get primaryKey => {id};

@@ -158,6 +158,18 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
     requiredDuringInsert: false,
     defaultValue: const Constant('pending'),
   );
+  static const VerificationMeta _linkedPackageNameMeta = const VerificationMeta(
+    'linkedPackageName',
+  );
+  @override
+  late final GeneratedColumn<String> linkedPackageName =
+      GeneratedColumn<String>(
+        'linked_package_name',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -173,6 +185,7 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
     updatedAt,
     isDeleted,
     syncStatus,
+    linkedPackageName,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -287,6 +300,15 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
         syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
       );
     }
+    if (data.containsKey('linked_package_name')) {
+      context.handle(
+        _linkedPackageNameMeta,
+        linkedPackageName.isAcceptableOrUnknown(
+          data['linked_package_name']!,
+          _linkedPackageNameMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -348,6 +370,10 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
         DriftSqlType.string,
         data['${effectivePrefix}sync_status'],
       )!,
+      linkedPackageName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}linked_package_name'],
+      ),
     );
   }
 
@@ -371,6 +397,7 @@ class Task extends DataClass implements Insertable<Task> {
   final DateTime updatedAt;
   final bool isDeleted;
   final String syncStatus;
+  final String? linkedPackageName;
   const Task({
     required this.id,
     required this.title,
@@ -385,6 +412,7 @@ class Task extends DataClass implements Insertable<Task> {
     required this.updatedAt,
     required this.isDeleted,
     required this.syncStatus,
+    this.linkedPackageName,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -410,6 +438,9 @@ class Task extends DataClass implements Insertable<Task> {
     map['updated_at'] = Variable<DateTime>(updatedAt);
     map['is_deleted'] = Variable<bool>(isDeleted);
     map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || linkedPackageName != null) {
+      map['linked_package_name'] = Variable<String>(linkedPackageName);
+    }
     return map;
   }
 
@@ -436,6 +467,9 @@ class Task extends DataClass implements Insertable<Task> {
       updatedAt: Value(updatedAt),
       isDeleted: Value(isDeleted),
       syncStatus: Value(syncStatus),
+      linkedPackageName: linkedPackageName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(linkedPackageName),
     );
   }
 
@@ -460,6 +494,9 @@ class Task extends DataClass implements Insertable<Task> {
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
       syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      linkedPackageName: serializer.fromJson<String?>(
+        json['linkedPackageName'],
+      ),
     );
   }
   @override
@@ -479,6 +516,7 @@ class Task extends DataClass implements Insertable<Task> {
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'isDeleted': serializer.toJson<bool>(isDeleted),
       'syncStatus': serializer.toJson<String>(syncStatus),
+      'linkedPackageName': serializer.toJson<String?>(linkedPackageName),
     };
   }
 
@@ -496,6 +534,7 @@ class Task extends DataClass implements Insertable<Task> {
     DateTime? updatedAt,
     bool? isDeleted,
     String? syncStatus,
+    Value<String?> linkedPackageName = const Value.absent(),
   }) => Task(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -514,6 +553,9 @@ class Task extends DataClass implements Insertable<Task> {
     updatedAt: updatedAt ?? this.updatedAt,
     isDeleted: isDeleted ?? this.isDeleted,
     syncStatus: syncStatus ?? this.syncStatus,
+    linkedPackageName: linkedPackageName.present
+        ? linkedPackageName.value
+        : this.linkedPackageName,
   );
   Task copyWithCompanion(TasksCompanion data) {
     return Task(
@@ -544,6 +586,9 @@ class Task extends DataClass implements Insertable<Task> {
       syncStatus: data.syncStatus.present
           ? data.syncStatus.value
           : this.syncStatus,
+      linkedPackageName: data.linkedPackageName.present
+          ? data.linkedPackageName.value
+          : this.linkedPackageName,
     );
   }
 
@@ -562,7 +607,8 @@ class Task extends DataClass implements Insertable<Task> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('isDeleted: $isDeleted, ')
-          ..write('syncStatus: $syncStatus')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('linkedPackageName: $linkedPackageName')
           ..write(')'))
         .toString();
   }
@@ -582,6 +628,7 @@ class Task extends DataClass implements Insertable<Task> {
     updatedAt,
     isDeleted,
     syncStatus,
+    linkedPackageName,
   );
   @override
   bool operator ==(Object other) =>
@@ -599,7 +646,8 @@ class Task extends DataClass implements Insertable<Task> {
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.isDeleted == this.isDeleted &&
-          other.syncStatus == this.syncStatus);
+          other.syncStatus == this.syncStatus &&
+          other.linkedPackageName == this.linkedPackageName);
 }
 
 class TasksCompanion extends UpdateCompanion<Task> {
@@ -616,6 +664,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
   final Value<DateTime> updatedAt;
   final Value<bool> isDeleted;
   final Value<String> syncStatus;
+  final Value<String?> linkedPackageName;
   final Value<int> rowid;
   const TasksCompanion({
     this.id = const Value.absent(),
@@ -631,6 +680,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
     this.updatedAt = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.syncStatus = const Value.absent(),
+    this.linkedPackageName = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TasksCompanion.insert({
@@ -647,6 +697,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
     this.updatedAt = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.syncStatus = const Value.absent(),
+    this.linkedPackageName = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
@@ -666,6 +717,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
     Expression<DateTime>? updatedAt,
     Expression<bool>? isDeleted,
     Expression<String>? syncStatus,
+    Expression<String>? linkedPackageName,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -683,6 +735,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
       if (updatedAt != null) 'updated_at': updatedAt,
       if (isDeleted != null) 'is_deleted': isDeleted,
       if (syncStatus != null) 'sync_status': syncStatus,
+      if (linkedPackageName != null) 'linked_package_name': linkedPackageName,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -701,6 +754,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
     Value<DateTime>? updatedAt,
     Value<bool>? isDeleted,
     Value<String>? syncStatus,
+    Value<String?>? linkedPackageName,
     Value<int>? rowid,
   }) {
     return TasksCompanion(
@@ -718,6 +772,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
       updatedAt: updatedAt ?? this.updatedAt,
       isDeleted: isDeleted ?? this.isDeleted,
       syncStatus: syncStatus ?? this.syncStatus,
+      linkedPackageName: linkedPackageName ?? this.linkedPackageName,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -766,6 +821,9 @@ class TasksCompanion extends UpdateCompanion<Task> {
     if (syncStatus.present) {
       map['sync_status'] = Variable<String>(syncStatus.value);
     }
+    if (linkedPackageName.present) {
+      map['linked_package_name'] = Variable<String>(linkedPackageName.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -788,6 +846,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
           ..write('updatedAt: $updatedAt, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('syncStatus: $syncStatus, ')
+          ..write('linkedPackageName: $linkedPackageName, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2779,6 +2838,7 @@ typedef $$TasksTableCreateCompanionBuilder =
       Value<DateTime> updatedAt,
       Value<bool> isDeleted,
       Value<String> syncStatus,
+      Value<String?> linkedPackageName,
       Value<int> rowid,
     });
 typedef $$TasksTableUpdateCompanionBuilder =
@@ -2796,6 +2856,7 @@ typedef $$TasksTableUpdateCompanionBuilder =
       Value<DateTime> updatedAt,
       Value<bool> isDeleted,
       Value<String> syncStatus,
+      Value<String?> linkedPackageName,
       Value<int> rowid,
     });
 
@@ -2892,6 +2953,11 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<String> get syncStatus => $composableBuilder(
     column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get linkedPackageName => $composableBuilder(
+    column: $table.linkedPackageName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2994,6 +3060,11 @@ class $$TasksTableOrderingComposer
     column: $table.syncStatus,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get linkedPackageName => $composableBuilder(
+    column: $table.linkedPackageName,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$TasksTableAnnotationComposer
@@ -3055,6 +3126,11 @@ class $$TasksTableAnnotationComposer
 
   GeneratedColumn<String> get syncStatus => $composableBuilder(
     column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get linkedPackageName => $composableBuilder(
+    column: $table.linkedPackageName,
     builder: (column) => column,
   );
 
@@ -3125,6 +3201,7 @@ class $$TasksTableTableManager
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
+                Value<String?> linkedPackageName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TasksCompanion(
                 id: id,
@@ -3140,6 +3217,7 @@ class $$TasksTableTableManager
                 updatedAt: updatedAt,
                 isDeleted: isDeleted,
                 syncStatus: syncStatus,
+                linkedPackageName: linkedPackageName,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3157,6 +3235,7 @@ class $$TasksTableTableManager
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
+                Value<String?> linkedPackageName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TasksCompanion.insert(
                 id: id,
@@ -3172,6 +3251,7 @@ class $$TasksTableTableManager
                 updatedAt: updatedAt,
                 isDeleted: isDeleted,
                 syncStatus: syncStatus,
+                linkedPackageName: linkedPackageName,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

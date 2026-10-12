@@ -41,7 +41,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -50,6 +50,9 @@ class AppDatabase extends _$AppDatabase {
           if (from < 2) {
             await m.createTable(timetableEntries);
             await m.createTable(journalEntries);
+          }
+          if (from < 3) {
+            await m.addColumn(tasks, tasks.linkedPackageName);
           }
         },
       );
@@ -313,6 +316,35 @@ class AppDatabase extends _$AppDatabase {
         tags: Value(tags),
       ),
     );
+  }
+
+  Future<TaskWithDailyLog?> findHabitByTitle(
+      String query, String todayDate) async {
+    final pattern = '%${query.trim().toLowerCase()}%';
+    final joined = await (select(tasks).join([
+      leftOuterJoin(
+        dailyLogs,
+        dailyLogs.taskId.equalsExp(tasks.id) &
+            dailyLogs.logDate.equals(todayDate),
+      ),
+    ])..where(tasks.title.lower().like(pattern) & tasks.isDeleted.equals(false)))
+        .get();
+
+    if (joined.isEmpty) return null;
+    final row = joined.first;
+    return TaskWithDailyLog(
+      task: row.readTable(tasks),
+      log: row.readTableOrNull(dailyLogs),
+    );
+  }
+
+  Future<List<String>> getSimilarItemTitles(String query) async {
+    final t = await (select(timetableEntries)
+          ..where((tbl) => tbl.isCanceled.equals(false)))
+        .get();
+    final k = await (select(tasks)..where((tbl) => tbl.isDeleted.equals(false)))
+        .get();
+    return [...t.map((e) => e.title), ...k.map((e) => e.title)];
   }
 }
 

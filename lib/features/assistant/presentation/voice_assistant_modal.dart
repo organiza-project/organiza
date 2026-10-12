@@ -427,7 +427,7 @@ class _VoiceAssistantModalState extends ConsumerState<VoiceAssistantModal>
             ),
             const SizedBox(height: 12),
             Text(
-              'Reasoning & executing tools with Groq (Llama 3.3)...',
+              'Reasoning & executing tools with Groq AI...',
               style: AppTypography.bodyMedium,
             ),
           ],

@@ -24,8 +24,11 @@ class CreateTaskModal extends ConsumerStatefulWidget {
 class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _customDurationController = TextEditingController();
+  final _linkedPackageController = TextEditingController();
 
   int _durationMinutes = 30;
+  bool _isCustomDuration = false;
   String _cadenceUnit = 'day';
   int _targetFrequency = 1;
 
@@ -39,6 +42,8 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _customDurationController.dispose();
+    _linkedPackageController.dispose();
     super.dispose();
   }
 
@@ -90,10 +95,25 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
       return;
     }
 
+    if (_isCustomDuration) {
+      final customMins = int.tryParse(_customDurationController.text.trim());
+      if (customMins == null || customMins <= 0) {
+        setState(() {
+          _errorMessage = 'Please enter a valid duration in minutes.';
+        });
+        return;
+      }
+      _durationMinutes = customMins;
+    }
+
     setState(() {
       _isSaving = true;
       _errorMessage = null;
     });
+
+    final linkedPkg = _linkedPackageController.text.trim().isEmpty
+        ? null
+        : _linkedPackageController.text.trim();
 
     try {
       await ref.read(todayTasksControllerProvider).createNewTask(
@@ -108,6 +128,7 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
                 _startTime != null ? _formatTimeOfDay(_startTime!) : null,
             bestTimeEnd: _endTime != null ? _formatTimeOfDay(_endTime!) : null,
             xpValue: 50,
+            linkedPackageName: linkedPkg,
           );
 
       if (mounted) {
@@ -236,29 +257,160 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              children: [15, 30, 45, 60, 90].map((mins) {
-                final selected = _durationMinutes == mins;
-                return ChoiceChip(
-                  label: Text('${mins}m'),
-                  selected: selected,
+              runSpacing: 8,
+              children: [
+                ...[15, 30, 45, 60, 90].map((mins) {
+                  final selected = !_isCustomDuration && _durationMinutes == mins;
+                  return ChoiceChip(
+                    label: Text('${mins}m'),
+                    selected: selected,
+                    selectedColor: AppColors.primaryAccent,
+                    backgroundColor: AppColors.background,
+                    labelStyle: AppTypography.bodySmall.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: selected
+                          ? AppColors.background
+                          : AppColors.textPrimary,
+                    ),
+                    side: BorderSide(
+                      color: selected
+                          ? AppColors.primaryAccent
+                          : AppColors.border,
+                    ),
+                    onSelected: (val) {
+                      if (val) {
+                        setState(() {
+                          _isCustomDuration = false;
+                          _durationMinutes = mins;
+                        });
+                      }
+                    },
+                  );
+                }),
+                ChoiceChip(
+                  label: const Text('Custom'),
+                  selected: _isCustomDuration,
                   selectedColor: AppColors.primaryAccent,
                   backgroundColor: AppColors.background,
                   labelStyle: AppTypography.bodySmall.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: selected
+                    color: _isCustomDuration
                         ? AppColors.background
                         : AppColors.textPrimary,
                   ),
                   side: BorderSide(
-                    color: selected
+                    color: _isCustomDuration
                         ? AppColors.primaryAccent
                         : AppColors.border,
                   ),
                   onSelected: (val) {
-                    if (val) setState(() => _durationMinutes = mins);
+                    setState(() {
+                      _isCustomDuration = val;
+                      if (_isCustomDuration &&
+                          _customDurationController.text.isEmpty) {
+                        _customDurationController.text =
+                            _durationMinutes.toString();
+                      }
+                    });
                   },
-                );
-              }).toList(),
+                ),
+              ],
+            ),
+            if (_isCustomDuration) ...[
+              const SizedBox(height: 10),
+              TextField(
+                controller: _customDurationController,
+                keyboardType: TextInputType.number,
+                style: AppTypography.bodyMedium,
+                decoration: InputDecoration(
+                  hintText: 'Enter custom minutes (e.g. 25, 75, 120)',
+                  hintStyle: AppTypography.bodySmall,
+                  suffixText: 'minutes',
+                  suffixStyle: AppTypography.accentMono,
+                  filled: true,
+                  fillColor: AppColors.background,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.primaryAccent),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                ),
+                onChanged: (val) {
+                  final v = int.tryParse(val.trim());
+                  if (v != null && v > 0) {
+                    setState(() => _durationMinutes = v);
+                  }
+                },
+              ),
+            ],
+            const SizedBox(height: 16),
+
+            // Linked App Tracking Section
+            Row(
+              children: [
+                const Icon(Icons.link_rounded,
+                    size: 16, color: AppColors.primaryAccent),
+                const SizedBox(width: 6),
+                Text('LINKED APP TRACKING (OPTIONAL)',
+                    style: AppTypography.bodySmall),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Organiza can automatically record time spent in this app towards your habit.',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _buildAppPresetChip('Kindle', 'com.amazon.kindle'),
+                _buildAppPresetChip('Duolingo', 'com.duolingo'),
+                _buildAppPresetChip('AnkiDroid', 'com.ichi2.anki'),
+                _buildAppPresetChip('Audible', 'com.audible.application'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _linkedPackageController,
+              style: AppTypography.bodyMedium,
+              decoration: InputDecoration(
+                hintText: 'Package name (e.g. com.amazon.kindle)',
+                hintStyle: AppTypography.bodySmall,
+                filled: true,
+                fillColor: AppColors.background,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.primaryAccent),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+              ),
             ),
             const SizedBox(height: 16),
 
@@ -370,12 +522,14 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
                 ),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Text('–', style: TextStyle(color: AppColors.textSecondary)),
+                  child: Text('–',
+                      style: TextStyle(color: AppColors.textSecondary)),
                 ),
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => _pickTime(isStart: false),
-                    icon: const Icon(Icons.access_time_filled_rounded, size: 16),
+                    icon:
+                        const Icon(Icons.access_time_filled_rounded, size: 16),
                     label: Text(
                       _endTime == null
                           ? 'End Time'
@@ -442,6 +596,31 @@ class _CreateTaskModalState extends ConsumerState<CreateTaskModal> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAppPresetChip(String label, String packageName) {
+    final isSelected = _linkedPackageController.text == packageName;
+    return ActionChip(
+      label: Text(label),
+      backgroundColor:
+          isSelected ? AppColors.surfaceElevated : AppColors.background,
+      side: BorderSide(
+        color: isSelected ? AppColors.primaryAccent : AppColors.border,
+      ),
+      labelStyle: AppTypography.bodySmall.copyWith(
+        color: isSelected ? AppColors.primaryAccent : AppColors.textSecondary,
+        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+      ),
+      onPressed: () {
+        setState(() {
+          if (isSelected) {
+            _linkedPackageController.clear();
+          } else {
+            _linkedPackageController.text = packageName;
+          }
+        });
+      },
     );
   }
 }

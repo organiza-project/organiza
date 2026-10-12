@@ -69,6 +69,25 @@ class TodayScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            tooltip: 'Sync Linked Apps',
+            onPressed: () async {
+              await ref.read(todayTasksControllerProvider).syncAllLinkedApps();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Synced all linked apps.'),
+                    duration: Duration(seconds: 1),
+                    backgroundColor: AppColors.surfaceElevated,
+                  ),
+                );
+              }
+            },
+            icon: const Icon(
+              Icons.sync_rounded,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          IconButton(
             tooltip: 'Emergency Focus Lockout',
             onPressed: () => EssayLockoutDialog.show(context),
             icon: const Icon(
@@ -177,16 +196,22 @@ class TodayScreen extends ConsumerWidget {
                       return aDone ? 1 : -1;
                     });
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-                    itemCount: sortedTasks.length,
-                    itemBuilder: (context, index) {
-                      final taskWithLog = sortedTasks[index];
-                      return TaskProgressCard(
-                        key: ValueKey(taskWithLog.task.id),
-                        taskWithLog: taskWithLog,
-                      );
-                    },
+                  return RefreshIndicator(
+                    onRefresh: () =>
+                        ref.read(todayTasksControllerProvider).syncAllLinkedApps(),
+                    color: AppColors.primaryAccent,
+                    backgroundColor: AppColors.surface,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+                      itemCount: sortedTasks.length,
+                      itemBuilder: (context, index) {
+                        final taskWithLog = sortedTasks[index];
+                        return TaskProgressCard(
+                          key: ValueKey(taskWithLog.task.id),
+                          taskWithLog: taskWithLog,
+                        );
+                      },
+                    ),
                   );
                 },
               ),

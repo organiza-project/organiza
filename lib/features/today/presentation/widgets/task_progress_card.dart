@@ -212,6 +212,34 @@ class _TaskProgressCardState extends ConsumerState<TaskProgressCard> {
                                   : task.bestTimeStart!,
                               color: AppColors.primaryAccent,
                             ),
+                          // Linked app badge
+                          if (task.linkedPackageName != null &&
+                              task.linkedPackageName!.isNotEmpty)
+                            InkWell(
+                              onTap: () async {
+                                await ref
+                                    .read(todayTasksControllerProvider)
+                                    .syncLinkedAppUsage(
+                                        task.id, task.linkedPackageName!);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          'Synced usage for ${task.linkedPackageName!.split('.').last}'),
+                                      duration: const Duration(seconds: 1),
+                                      backgroundColor:
+                                          AppColors.surfaceElevated,
+                                    ),
+                                  );
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(6),
+                              child: _buildPill(
+                                icon: Icons.sync_rounded,
+                                label: task.linkedPackageName!.split('.').last,
+                                color: const Color(0xFF38BDF8),
+                              ),
+                            ),
                         ],
                       ),
                     ],
