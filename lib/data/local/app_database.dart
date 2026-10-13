@@ -214,6 +214,10 @@ class AppDatabase extends _$AppDatabase {
     return into(appLimits).insertOnConflictUpdate(limit);
   }
 
+  Future<int> deleteAppLimit(String id) {
+    return (delete(appLimits)..where((tbl) => tbl.id.equals(id))).go();
+  }
+
   // --- Voice Assistant DAO Queries ---
 
   Future<TodayScheduleResult> getTodaySchedule(

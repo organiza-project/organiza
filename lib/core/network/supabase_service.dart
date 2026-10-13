@@ -14,6 +14,9 @@ class LeaderboardUser {
   final int streakDays;
   final int rank;
   final bool isCurrentUser;
+  final String avatarFrame;
+  final String bannerUrl;
+  final String nameEffect;
 
   const LeaderboardUser({
     required this.id,
@@ -23,6 +26,9 @@ class LeaderboardUser {
     required this.streakDays,
     required this.rank,
     this.isCurrentUser = false,
+    this.avatarFrame = 'frame_stoic_laurel',
+    this.bannerUrl = 'banner_deep_space',
+    this.nameEffect = 'effect_clean_white',
   });
 }
 
@@ -104,16 +110,17 @@ class SupabaseService {
     }
   }
 
-  /// Fetch leaderboard rankings (with fallback realistic cohort)
+  /// Fetch leaderboard rankings directly from profiles
   Future<List<LeaderboardUser>> fetchLeaderboard() async {
     final c = client;
     if (c != null) {
       try {
         final res = await c
             .from('profiles')
-            .select('id, username, avatar_url, total_xp, streak_days')
+            .select(
+                'id, username, avatar_url, total_xp, streak_days, avatar_frame, banner_url, name_effect')
             .order('total_xp', ascending: false)
-            .limit(20);
+            .limit(50);
 
         final list = (res as List)
             .asMap()
@@ -126,75 +133,96 @@ class SupabaseService {
                   streakDays: e.value['streak_days'] as int? ?? 1,
                   rank: e.key + 1,
                   isCurrentUser: e.value['id'] == c.auth.currentUser?.id,
+                  avatarFrame: e.value['avatar_frame'] as String? ?? 'frame_stoic_laurel',
+                  bannerUrl: e.value['banner_url'] as String? ?? 'banner_deep_space',
+                  nameEffect: e.value['name_effect'] as String? ?? 'effect_clean_white',
                 ))
             .toList();
 
-        if (list.isNotEmpty) return list;
+        return list;
       } catch (e) {
-        debugPrint('Organiza: Falling back to local/cached leaderboard: $e');
+        debugPrint('Organiza: Leaderboard query error: $e');
       }
     }
 
-    // Default authentic Stoic cohort for offline MVP
-    return const [
-      LeaderboardUser(
-        id: 'user_1',
-        username: 'Marcus Aurelius',
-        avatarUrl: 'assets/avatars/marcus.png',
-        xp: 3420,
-        streakDays: 42,
-        rank: 1,
-      ),
-      LeaderboardUser(
-        id: 'user_2',
-        username: 'Seneca Focus',
-        avatarUrl: 'assets/avatars/seneca.png',
-        xp: 2890,
-        streakDays: 28,
-        rank: 2,
-      ),
-      LeaderboardUser(
-        id: 'user_3',
-        username: 'Epictetus Will',
-        avatarUrl: 'assets/avatars/epictetus.png',
-        xp: 2410,
-        streakDays: 21,
-        rank: 3,
-      ),
-      LeaderboardUser(
-        id: 'user_me',
-        username: 'You (Stoic Initiate)',
-        avatarUrl: '',
-        xp: 1850,
-        streakDays: 14,
-        rank: 4,
-        isCurrentUser: true,
-      ),
-      LeaderboardUser(
-        id: 'user_5',
-        username: 'Alexander The Great',
-        avatarUrl: '',
-        xp: 1620,
-        streakDays: 12,
-        rank: 5,
-      ),
-      LeaderboardUser(
-        id: 'user_6',
-        username: 'Hypatia Scholar',
-        avatarUrl: '',
-        xp: 1430,
-        streakDays: 9,
-        rank: 6,
-      ),
-      LeaderboardUser(
-        id: 'user_7',
-        username: 'Zeno of Citium',
-        avatarUrl: '',
-        xp: 1100,
-        streakDays: 7,
-        rank: 7,
-      ),
-    ];
+    return const [];
+  }
+
+  /// Fetch live friends for current user from public.friendships
+  Future<List<Map<String, dynamic>>> fetchFriends() async {
+    final c = client;
+    final user = currentUser;
+    if (c == null || user == null) return [];
+
+    try {
+      final res = await c
+          .from('friendships')
+          .select('id, friend_id, status, profiles:friend_id(id, username, total_xp, streak_days, avatar_frame, name_effect)')
+          .eq('user_id', user.id);
+
+      return List<Map<String, dynamic>>.from(res as List);
+    } catch (e) {
+      debugPrint('Organiza: Fetch friendships notice: $e');
+      return [];
+    }
+  }
+
+  /// Add a friend by exact @username
+  Future<bool> addFriendByUsername(String username) async {
+    final clean = username.trim().replaceAll('@', '');
+    if (clean.isEmpty) return false;
+
+    final c = client;
+    final user = currentUser;
+    if (c == null || user == null) return false;
+
+    try {
+      final target = await c
+          .from('profiles')
+          .select('id, username')
+          .eq('username', clean)
+          .maybeSingle();
+
+      if (target == null) return false;
+      final friendId = target['id'] as String;
+
+      await c.from('friendships').upsert({
+        'user_id': user.id,
+        'friend_id': friendId,
+        'status': 'accepted',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Organiza: Add friend notice: $e');
+      return false;
+    }
+  }
+
+  /// Update equipped cosmetics in public.profiles
+  Future<bool> updateEquippedCosmetics({
+    String? avatarFrame,
+    String? bannerUrl,
+    String? nameEffect,
+  }) async {
+    final c = client;
+    final user = currentUser;
+    if (c == null || user == null) return false;
+
+    final updates = <String, dynamic>{
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    if (avatarFrame != null) updates['avatar_frame'] = avatarFrame;
+    if (bannerUrl != null) updates['banner_url'] = bannerUrl;
+    if (nameEffect != null) updates['name_effect'] = nameEffect;
+
+    try {
+      await c.from('profiles').update(updates).eq('id', user.id);
+      return true;
+    } catch (e) {
+      debugPrint('Organiza: Update cosmetics notice: $e');
+      return false;
+    }
   }
 
   /// Nudge a peer to resume their habits
@@ -302,6 +330,27 @@ class SupabaseService {
     }
 
     return response;
+  }
+
+  /// Resend signup confirmation email
+  Future<void> resendVerificationEmail(String email) async {
+    final c = client;
+    if (c != null) {
+      await c.auth.resend(
+        type: OtpType.signup,
+        email: email.trim(),
+      );
+    }
+  }
+
+  /// Refresh current session to check if email has been verified
+  Future<User?> refreshSession() async {
+    final c = client;
+    if (c != null) {
+      final res = await c.auth.refreshSession();
+      return res.user;
+    }
+    return null;
   }
 
   /// Sign out current session

@@ -4,7 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/network/supabase_service.dart';
 import '../../../today/presentation/controllers/today_tasks_controller.dart';
+import '../../domain/cosmetics_catalog.dart';
 
 class BattlepassTier {
   final int tierNumber;
@@ -44,13 +46,26 @@ class BattlepassShopScreen extends ConsumerStatefulWidget {
       _BattlepassShopScreenState();
 }
 
-class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
+class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen>
+    with SingleTickerProviderStateMixin {
   static const int _userLevel = 14;
   static const int _currentXp = 1850;
   static const int _nextTierXp = 2000;
 
+  late TabController _tabController;
+
   final Set<String> _ownedTierIds = {'tier_1', 'tier_2', 'tier_3'};
   String? _equippedTierId = 'tier_3';
+
+  final Set<String> _ownedCosmeticIds = {
+    'frame_stoic_laurel',
+    'banner_deep_space',
+    'effect_clean_white',
+  };
+
+  String? _equippedFrame = 'frame_stoic_laurel';
+  String? _equippedBanner = 'banner_deep_space';
+  String? _equippedEffect = 'effect_clean_white';
 
   static const List<BattlepassTier> _tiers = [
     BattlepassTier(
@@ -149,24 +164,48 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
     _loadState();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadState() async {
     final prefs = await SharedPreferences.getInstance();
-    final owned = prefs.getStringList('battlepass_owned_tiers') ?? ['tier_1', 'tier_2', 'tier_3'];
-    final equipped = prefs.getString('battlepass_equipped_tier') ?? 'tier_3';
+    final ownedTiers = prefs.getStringList('battlepass_owned_tiers') ??
+        ['tier_1', 'tier_2', 'tier_3'];
+    final equippedTier =
+        prefs.getString('battlepass_equipped_tier') ?? 'tier_3';
+
+    final ownedCosmetics = prefs.getStringList('owned_cosmetic_ids') ??
+        ['frame_stoic_laurel', 'banner_deep_space', 'effect_clean_white'];
+    final frame =
+        prefs.getString('equipped_avatar_frame') ?? 'frame_stoic_laurel';
+    final banner =
+        prefs.getString('equipped_banner_url') ?? 'banner_deep_space';
+    final effect =
+        prefs.getString('equipped_name_effect') ?? 'effect_clean_white';
 
     if (mounted) {
       setState(() {
         _ownedTierIds.clear();
-        _ownedTierIds.addAll(owned);
-        _equippedTierId = equipped;
+        _ownedTierIds.addAll(ownedTiers);
+        _equippedTierId = equippedTier;
+
+        _ownedCosmeticIds.clear();
+        _ownedCosmeticIds.addAll(ownedCosmetics);
+        _equippedFrame = frame;
+        _equippedBanner = banner;
+        _equippedEffect = effect;
       });
     }
   }
 
-  Future<void> _claimOrEquip(BattlepassTier tier, int totalStars) async {
+  Future<void> _claimOrEquipTier(BattlepassTier tier, int totalStars) async {
     final tierId = 'tier_${tier.tierNumber}';
     final isOwned = _ownedTierIds.contains(tierId);
     final isLevelMet = _userLevel >= tier.requiredLevel;
@@ -211,7 +250,7 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Need ${tier.starCost - totalStars} more Stars! Complete 100% of daily habits to earn +5 Stars.',
+            'Need ${tier.starCost - totalStars} more Stars! Complete daily habits to earn Stars.',
           ),
           backgroundColor: AppColors.errorRed,
         ),
@@ -219,7 +258,6 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
       return;
     }
 
-    // Unlock and save
     setState(() {
       _ownedTierIds.add(tierId);
       _equippedTierId = tierId;
@@ -233,6 +271,111 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Claimed Tier ${tier.tierNumber}: ${tier.title}! ⭐'),
+          backgroundColor: AppColors.successGreen,
+        ),
+      );
+    }
+  }
+
+  Future<void> _claimOrEquipCosmetic(
+      CosmeticItem item, int totalStars) async {
+    final isOwned = _ownedCosmeticIds.contains(item.id);
+    final isLevelMet = _userLevel >= item.requiredLevel;
+
+    if (isOwned) {
+      setState(() {
+        if (item.type == CosmeticType.avatarFrame) {
+          _equippedFrame = item.id;
+        } else if (item.type == CosmeticType.profileBanner) {
+          _equippedBanner = item.id;
+        } else if (item.type == CosmeticType.nameEffect) {
+          _equippedEffect = item.id;
+        }
+      });
+
+      final prefs = await SharedPreferences.getInstance();
+      if (item.type == CosmeticType.avatarFrame) {
+        await prefs.setString('equipped_avatar_frame', item.id);
+      } else if (item.type == CosmeticType.profileBanner) {
+        await prefs.setString('equipped_banner_url', item.id);
+      } else if (item.type == CosmeticType.nameEffect) {
+        await prefs.setString('equipped_name_effect', item.id);
+      }
+
+      await ref.read(supabaseServiceProvider).updateEquippedCosmetics(
+            avatarFrame: _equippedFrame,
+            bannerUrl: _equippedBanner,
+            nameEffect: _equippedEffect,
+          );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Equipped ${item.name}!'),
+            duration: const Duration(seconds: 1),
+            backgroundColor: AppColors.surfaceElevated,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (!isLevelMet) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Locked! Requires Player Level ${item.requiredLevel}. (Current: Lvl $_userLevel)',
+          ),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+      return;
+    }
+
+    if (totalStars < item.costStars) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Need ${item.costStars - totalStars} more Stars! Complete daily habits to earn Stars.',
+          ),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _ownedCosmeticIds.add(item.id);
+      if (item.type == CosmeticType.avatarFrame) {
+        _equippedFrame = item.id;
+      } else if (item.type == CosmeticType.profileBanner) {
+        _equippedBanner = item.id;
+      } else if (item.type == CosmeticType.nameEffect) {
+        _equippedEffect = item.id;
+      }
+    });
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+        'owned_cosmetic_ids', _ownedCosmeticIds.toList());
+    if (item.type == CosmeticType.avatarFrame) {
+      await prefs.setString('equipped_avatar_frame', item.id);
+    } else if (item.type == CosmeticType.profileBanner) {
+      await prefs.setString('equipped_banner_url', item.id);
+    } else if (item.type == CosmeticType.nameEffect) {
+      await prefs.setString('equipped_name_effect', item.id);
+    }
+
+    await ref.read(supabaseServiceProvider).updateEquippedCosmetics(
+          avatarFrame: _equippedFrame,
+          bannerUrl: _equippedBanner,
+          nameEffect: _equippedEffect,
+        );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unlocked & Equipped ${item.name}! ⭐'),
           backgroundColor: AppColors.successGreen,
         ),
       );
@@ -253,7 +396,7 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Battlepass & Tier Shop', style: AppTypography.h1),
+            Text('Battlepass & Star Shop', style: AppTypography.h1),
             const SizedBox(height: 2),
             Text(
               'Season 1 · The Discipline Initiative',
@@ -286,44 +429,198 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
             ),
           ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: AppColors.primaryAccent,
+          indicatorWeight: 3,
+          labelColor: AppColors.primaryAccent,
+          unselectedLabelColor: AppColors.textSecondary,
+          labelStyle:
+              AppTypography.bodySmall.copyWith(fontWeight: FontWeight.bold),
+          tabs: const [
+            Tab(text: 'Tiers'),
+            Tab(text: 'Frames'),
+            Tab(text: 'Banners'),
+            Tab(text: 'Effects'),
+          ],
+        ),
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+        child: TabBarView(
+          controller: _tabController,
           children: [
-            // Angular Header Badge: SEASON 1 · LVL 14 · Countdown
-            _buildAngularHeaderBadge(),
-            const SizedBox(height: 22),
-
-            // Horizontal Battlepass Reward Track
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('TIER REWARD TRACK', style: AppTypography.bodySmall),
-                Text(
-                  'Scroll ↔ to explore Tiers',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.primaryAccent,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _buildHorizontalTierTrack(totalStars),
-            const SizedBox(height: 24),
-
-            // Detailed Catalog List
-            Text('ALL SEASON REWARDS', style: AppTypography.bodySmall),
-            const SizedBox(height: 12),
-            ..._tiers.map((tier) => _buildTierListTile(tier, totalStars)),
+            _buildTiersTab(totalStars),
+            _buildCosmeticsGrid(CosmeticsCatalog.avatarFrames, totalStars,
+                CosmeticType.avatarFrame),
+            _buildCosmeticsGrid(CosmeticsCatalog.banners, totalStars,
+                CosmeticType.profileBanner),
+            _buildCosmeticsGrid(CosmeticsCatalog.nameEffects, totalStars,
+                CosmeticType.nameEffect),
           ],
         ),
       ),
     );
   }
 
-  // Comic/Gaming Angular Header Badge
+  Widget _buildTiersTab(int totalStars) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+      children: [
+        _buildAngularHeaderBadge(),
+        const SizedBox(height: 20),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('TIER REWARD TRACK', style: AppTypography.bodySmall),
+            Text(
+              'Scroll ↔ to explore Tiers',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.primaryAccent,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _buildHorizontalTierTrack(totalStars),
+        const SizedBox(height: 24),
+        Text('ALL SEASON REWARDS', style: AppTypography.bodySmall),
+        const SizedBox(height: 12),
+        ..._tiers.map((tier) => _buildTierListTile(tier, totalStars)),
+      ],
+    );
+  }
+
+  Widget _buildCosmeticsGrid(
+      List<CosmeticItem> items, int totalStars, CosmeticType type) {
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.76,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        final isOwned = _ownedCosmeticIds.contains(item.id);
+        final isEquipped = (type == CosmeticType.avatarFrame &&
+                _equippedFrame == item.id) ||
+            (type == CosmeticType.profileBanner &&
+                _equippedBanner == item.id) ||
+            (type == CosmeticType.nameEffect && _equippedEffect == item.id);
+        final isLevelMet = _userLevel >= item.requiredLevel;
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isEquipped
+                  ? AppColors.primaryAccent
+                  : (isOwned
+                      ? AppColors.successGreen.withAlpha(90)
+                      : AppColors.border),
+              width: isEquipped ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: item.primaryColor.withAlpha(25),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: item.primaryColor.withAlpha(80),
+                    ),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      item.icon,
+                      size: 40,
+                      color: item.primaryColor,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                item.name,
+                style: AppTypography.bodySmall.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                item.description,
+                style: AppTypography.bodySmall.copyWith(
+                  fontSize: 10,
+                  color: AppColors.textSecondary,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () => _claimOrEquipCosmetic(item, totalStars),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  elevation: 0,
+                  backgroundColor: isEquipped
+                      ? AppColors.primaryAccent
+                      : (isOwned
+                          ? AppColors.surfaceElevated
+                          : (isLevelMet
+                              ? Colors.amber.withAlpha(35)
+                              : AppColors.surfaceElevated)),
+                  foregroundColor: isEquipped
+                      ? AppColors.background
+                      : (isOwned
+                          ? AppColors.textPrimary
+                          : (isLevelMet
+                              ? Colors.amber
+                              : AppColors.textSecondary)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(
+                      color: isEquipped
+                          ? AppColors.primaryAccent
+                          : (isOwned
+                              ? AppColors.border
+                              : (isLevelMet
+                                  ? Colors.amber
+                                  : Colors.transparent)),
+                    ),
+                  ),
+                ),
+                child: Text(
+                  isEquipped
+                      ? 'Equipped'
+                      : (isOwned
+                          ? 'Equip'
+                          : (isLevelMet
+                              ? (item.costStars == 0
+                                  ? 'Free'
+                                  : '${item.costStars} ★')
+                              : 'Lvl ${item.requiredLevel}')),
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildAngularHeaderBadge() {
     final progress = (_currentXp / _nextTierXp).clamp(0.0, 1.0);
 
@@ -332,7 +629,8 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.primaryAccent.withAlpha(80), width: 1.2),
+        border: Border.all(
+            color: AppColors.primaryAccent.withAlpha(80), width: 1.2),
         boxShadow: [
           BoxShadow(
             color: AppColors.primaryAccent.withAlpha(20),
@@ -347,9 +645,9 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Bold Season Badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
@@ -365,10 +663,9 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
                   ),
                 ),
               ),
-
-              // Active Countdown
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceElevated,
                   borderRadius: BorderRadius.circular(8),
@@ -376,7 +673,8 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.timer_outlined, size: 14, color: AppColors.textSecondary),
+                    const Icon(Icons.timer_outlined,
+                        size: 14, color: AppColors.textSecondary),
                     const SizedBox(width: 4),
                     Text(
                       'Ends in 18 days',
@@ -391,17 +689,16 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
             ],
           ),
           const SizedBox(height: 16),
-
           Row(
             children: [
-              // Angular Level Emblem
               Container(
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
                   color: AppColors.primaryAccent.withAlpha(35),
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.primaryAccent, width: 2),
+                  border:
+                      Border.all(color: AppColors.primaryAccent, width: 2),
                 ),
                 child: Center(
                   child: Text(
@@ -433,7 +730,6 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
             ],
           ),
           const SizedBox(height: 16),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -451,7 +747,8 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
               value: progress,
               minHeight: 8,
               backgroundColor: AppColors.surfaceElevated,
-              valueColor: const AlwaysStoppedAnimation(AppColors.primaryAccent),
+              valueColor:
+                  const AlwaysStoppedAnimation(AppColors.primaryAccent),
             ),
           ),
         ],
@@ -459,10 +756,9 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
     );
   }
 
-  // Horizontal Battlepass Reward Track
   Widget _buildHorizontalTierTrack(int totalStars) {
     return SizedBox(
-      height: 220,
+      height: 200,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: _tiers.length,
@@ -474,7 +770,7 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
           final isLevelMet = _userLevel >= tier.requiredLevel;
 
           return Container(
-            width: 154,
+            width: 140,
             margin: const EdgeInsets.only(right: 12),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -484,68 +780,61 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
                 color: isEquipped
                     ? AppColors.primaryAccent
                     : (isOwned
-                        ? AppColors.successGreen
-                        : (isLevelMet
-                            ? AppColors.border
-                            : AppColors.border.withAlpha(60))),
-                width: (isEquipped || isOwned) ? 1.8 : 1.0,
+                        ? AppColors.successGreen.withAlpha(90)
+                        : AppColors.border),
+                width: isEquipped ? 2 : 1,
               ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Top Tag: TIER X
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceElevated,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'TIER ${tier.tierNumber}',
-                        style: AppTypography.accentMono.copyWith(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    Text(
+                      'T${tier.tierNumber}',
+                      style: AppTypography.accentMono.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: tier.accentColor,
                       ),
                     ),
-                    if (isEquipped)
-                      const Icon(Icons.check_circle_rounded,
-                          color: AppColors.primaryAccent, size: 16)
-                    else if (isOwned)
-                      const Icon(Icons.check_circle_outline_rounded,
-                          color: AppColors.successGreen, size: 16)
-                    else if (!isLevelMet)
-                      const Icon(Icons.lock_rounded,
-                          color: AppColors.textSecondary, size: 14),
+                    if (tier.isFree)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.successGreen.withAlpha(35),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'FREE',
+                          style: AppTypography.accentMono.copyWith(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.successGreen,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
                 const Spacer(),
-
-                // Item Icon preview
                 Center(
                   child: Container(
-                    width: 54,
-                    height: 54,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
-                      color: tier.accentColor.withAlpha(35),
+                      color: tier.accentColor.withAlpha(25),
                       shape: BoxShape.circle,
-                      border: Border.all(color: tier.accentColor.withAlpha(90)),
                     ),
-                    child: Icon(tier.icon, color: tier.accentColor, size: 28),
+                    child: Icon(tier.icon, color: tier.accentColor, size: 26),
                   ),
                 ),
                 const Spacer(),
-
-                // Title
                 Text(
                   tier.title,
                   style: AppTypography.bodySmall.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: isLevelMet ? AppColors.textPrimary : AppColors.textSecondary,
                     fontSize: 11,
                   ),
                   maxLines: 1,
@@ -553,10 +842,8 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-
-                // Claim / Equip / Lock Button
                 ElevatedButton(
-                  onPressed: () => _claimOrEquip(tier, totalStars),
+                  onPressed: () => _claimOrEquipTier(tier, totalStars),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     elevation: 0,
@@ -564,12 +851,16 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
                         ? AppColors.primaryAccent
                         : (isOwned
                             ? AppColors.surfaceElevated
-                            : (isLevelMet ? Colors.amber.withAlpha(35) : AppColors.surfaceElevated)),
+                            : (isLevelMet
+                                ? Colors.amber.withAlpha(35)
+                                : AppColors.surfaceElevated)),
                     foregroundColor: isEquipped
                         ? AppColors.background
                         : (isOwned
                             ? AppColors.textPrimary
-                            : (isLevelMet ? Colors.amber : AppColors.textSecondary)),
+                            : (isLevelMet
+                                ? Colors.amber
+                                : AppColors.textSecondary)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                       side: BorderSide(
@@ -577,7 +868,9 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
                             ? AppColors.primaryAccent
                             : (isOwned
                                 ? AppColors.border
-                                : (isLevelMet ? Colors.amber : Colors.transparent)),
+                                : (isLevelMet
+                                    ? Colors.amber
+                                    : Colors.transparent)),
                       ),
                     ),
                   ),
@@ -587,9 +880,12 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
                         : (isOwned
                             ? 'Equip'
                             : (isLevelMet
-                                ? (tier.isFree ? 'Free' : '${tier.starCost} ★')
+                                ? (tier.isFree
+                                    ? 'Free'
+                                    : '${tier.starCost} ★')
                                 : 'Lvl ${tier.requiredLevel}')),
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -615,7 +911,9 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
         border: Border.all(
           color: isEquipped
               ? AppColors.primaryAccent
-              : (isOwned ? AppColors.successGreen.withAlpha(90) : AppColors.border),
+              : (isOwned
+                  ? AppColors.successGreen.withAlpha(90)
+                  : AppColors.border),
         ),
       ),
       child: Row(
@@ -634,15 +932,11 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      'TIER ${tier.tierNumber} · ${tier.title}',
-                      style: AppTypography.bodyMedium.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                Text(
+                  'TIER ${tier.tierNumber} · ${tier.title}',
+                  style: AppTypography.bodyMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -656,19 +950,24 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
           ),
           const SizedBox(width: 8),
           ElevatedButton(
-            onPressed: () => _claimOrEquip(tier, totalStars),
+            onPressed: () => _claimOrEquipTier(tier, totalStars),
             style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               backgroundColor: isEquipped
                   ? AppColors.primaryAccent
                   : (isOwned
                       ? AppColors.surfaceElevated
-                      : (isLevelMet ? Colors.amber.withAlpha(35) : AppColors.surfaceElevated)),
+                      : (isLevelMet
+                          ? Colors.amber.withAlpha(35)
+                          : AppColors.surfaceElevated)),
               foregroundColor: isEquipped
                   ? AppColors.background
                   : (isOwned
                       ? AppColors.textPrimary
-                      : (isLevelMet ? Colors.amber : AppColors.textSecondary)),
+                      : (isLevelMet
+                          ? Colors.amber
+                          : AppColors.textSecondary)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -681,7 +980,8 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen> {
                       : (isLevelMet
                           ? (tier.isFree ? 'Claim' : '${tier.starCost} ★')
                           : 'Lvl ${tier.requiredLevel}')),
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.bold),
             ),
           ),
         ],

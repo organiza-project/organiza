@@ -6,6 +6,7 @@ import 'core/network/supabase_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/controllers/auth_controller.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
+import 'features/auth/presentation/screens/verify_email_screen.dart';
 import 'shell.dart';
 
 void main() async {
@@ -44,6 +45,15 @@ class OrganizaApp extends ConsumerWidget {
   Widget _buildRoot(OrganizaAuthState authState) {
     switch (authState.status) {
       case AuthStatus.authenticated:
+        // Email confirmation guard for registered Supabase accounts
+        if (!authState.isGuest && authState.user != null) {
+          final emailConfirmed = authState.user!.emailConfirmedAt != null;
+          if (!emailConfirmed) {
+            return VerifyEmailScreen(
+              email: authState.user!.email ?? 'your email',
+            );
+          }
+        }
         return const AppShell();
       case AuthStatus.unauthenticated:
       case AuthStatus.error:

@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/services/app_usage_service.dart';
 import '../../../../data/local/app_database.dart';
 import '../../../../data/local/database_provider.dart';
+import '../../../today/presentation/controllers/today_tasks_controller.dart';
 import '../../../today/presentation/widgets/essay_lockout_dialog.dart';
 
 enum TimeSegment { week, day, hour }
@@ -50,125 +52,102 @@ class _ScreenTimeBlockerScreenState
     extends ConsumerState<ScreenTimeBlockerScreen> {
   TimeSegment _selectedSegment = TimeSegment.day;
   DateTime _currentDate = DateTime.now();
-  final int _selectedBarIndex = 5; // Highlight Friday / Today by default
-  final Set<String> _expandedCategories = {'Social & Video', 'Movies & Video'};
+  final Set<String> _expandedCategories = {};
 
-  // Sample realistic tracking cohort
-  final List<AppUsageData> _appsUsage = const [
-    AppUsageData(
-      appName: 'Instagram',
-      packageName: 'com.instagram.android',
-      usageMinutes: 98,
-      category: 'Social & Video',
-      icon: Icons.camera_alt_rounded,
-      color: Color(0xFFE1306C),
-    ),
-    AppUsageData(
-      appName: 'YouTube',
-      packageName: 'com.google.android.youtube',
-      usageMinutes: 111,
-      category: 'Movies & Video',
-      icon: Icons.play_arrow_rounded,
-      color: Color(0xFFFF0000),
-    ),
-    AppUsageData(
-      appName: 'WhatsApp',
-      packageName: 'com.whatsapp',
-      usageMinutes: 44,
-      category: 'Productivity & Communication',
-      icon: Icons.chat_rounded,
-      color: Color(0xFF25D366),
-    ),
-    AppUsageData(
-      appName: 'Discord',
-      packageName: 'com.discord',
-      usageMinutes: 32,
-      category: 'Productivity & Communication',
-      icon: Icons.forum_rounded,
-      color: Color(0xFF5865F2),
-    ),
-    AppUsageData(
-      appName: 'X / Twitter',
-      packageName: 'com.twitter.android',
-      usageMinutes: 28,
-      category: 'Social & Video',
-      icon: Icons.alternate_email_rounded,
-      color: Color(0xFF1DA1F2),
-    ),
-  ];
-
-  final List<Map<String, dynamic>> _defaultApps = [
-    {
-      'id': 'instagram_limit',
-      'packageName': 'com.instagram.android',
-      'appName': 'Instagram',
-      'cap': 45,
-      'blockReels': true,
-      'blockShorts': false,
-      'essayLock': true,
-      'curfewStart': '22:30',
-      'curfewEnd': '07:00',
-    },
-    {
-      'id': 'youtube_limit',
-      'packageName': 'com.google.android.youtube',
-      'appName': 'YouTube',
-      'cap': 60,
-      'blockReels': false,
-      'blockShorts': true,
-      'essayLock': true,
-      'curfewStart': '23:00',
-      'curfewEnd': '07:00',
-    },
-    {
-      'id': 'whatsapp_limit',
-      'packageName': 'com.whatsapp',
-      'appName': 'WhatsApp',
-      'cap': 90,
-      'blockReels': false,
-      'blockShorts': false,
-      'essayLock': false,
-      'curfewStart': '23:30',
-      'curfewEnd': '06:30',
-    },
-    {
-      'id': 'discord_limit',
-      'packageName': 'com.discord',
-      'appName': 'Discord',
-      'cap': 45,
-      'blockReels': false,
-      'blockShorts': false,
-      'essayLock': true,
-      'curfewStart': '22:00',
-      'curfewEnd': '07:00',
-    },
-  ];
+  bool _isLoadingUsage = true;
+  List<AppUsageData> _liveUsageList = [];
 
   @override
   void initState() {
     super.initState();
-    _seedDefaultLimits();
+    _fetchLiveUsage();
   }
 
-  Future<void> _seedDefaultLimits() async {
-    final db = ref.read(appDatabaseProvider);
-    final existing = await db.select(db.appLimits).get();
-    if (existing.isEmpty) {
-      for (final a in _defaultApps) {
-        await db.updateAppLimit(
-          AppLimitsCompanion(
-            id: drift.Value(a['id'] as String),
-            packageName: drift.Value(a['packageName'] as String),
-            appName: drift.Value(a['appName'] as String),
-            dailyCapMinutes: drift.Value(a['cap'] as int),
-            curfewStart: drift.Value(a['curfewStart'] as String),
-            curfewEnd: drift.Value(a['curfewEnd'] as String),
-            blockReelsShorts: drift.Value(a['blockReels'] as bool),
-            isEssayLocked: drift.Value(a['essayLock'] as bool),
-          ),
-        );
+  Future<void> _fetchLiveUsage() async {
+    setState(() => _isLoadingUsage = true);
+    final usageService = ref.read(appUsageServiceProvider);
+    final usageMap = await usageService.getAggregatedUsageToday();
+
+    final List<AppUsageData> list = [];
+    usageMap.forEach((pkg, seconds) {
+      final mins = seconds ~/ 60;
+      if (mins > 0 || seconds > 30) {
+        final cleanName = usageService.getCleanAppName(pkg);
+        final category = _resolveCategory(pkg);
+        final icon = _resolveIcon(pkg);
+        final color = _resolveColor(pkg);
+        list.add(AppUsageData(
+          appName: cleanName,
+          packageName: pkg,
+          usageMinutes: mins > 0 ? mins : 1,
+          category: category,
+          icon: icon,
+          color: color,
+        ));
       }
+    });
+
+    list.sort((a, b) => b.usageMinutes.compareTo(a.usageMinutes));
+
+    if (mounted) {
+      setState(() {
+        _liveUsageList = list;
+        _isLoadingUsage = false;
+        if (list.isNotEmpty) {
+          _expandedCategories.add(list.first.category);
+        }
+      });
     }
+  }
+
+  String _resolveCategory(String pkg) {
+    final lower = pkg.toLowerCase();
+    if (lower.contains('instagram') ||
+        lower.contains('twitter') ||
+        lower.contains('reddit') ||
+        lower.contains('musically') ||
+        lower.contains('tiktok')) {
+      return 'Social & Video';
+    }
+    if (lower.contains('youtube') ||
+        lower.contains('netflix') ||
+        lower.contains('twitch')) {
+      return 'Entertainment & Video';
+    }
+    if (lower.contains('whatsapp') ||
+        lower.contains('telegram') ||
+        lower.contains('discord') ||
+        lower.contains('slack')) {
+      return 'Productivity & Communication';
+    }
+    return 'General & Utility';
+  }
+
+  IconData _resolveIcon(String pkg) {
+    final lower = pkg.toLowerCase();
+    if (lower.contains('instagram')) return Icons.camera_alt_rounded;
+    if (lower.contains('youtube')) return Icons.play_arrow_rounded;
+    if (lower.contains('whatsapp')) return Icons.chat_rounded;
+    if (lower.contains('discord')) return Icons.forum_rounded;
+    if (lower.contains('twitter')) return Icons.alternate_email_rounded;
+    if (lower.contains('reddit')) return Icons.fireplace_rounded;
+    if (lower.contains('spotify')) return Icons.music_note_rounded;
+    if (lower.contains('obsidian') || lower.contains('notion')) {
+      return Icons.edit_note_rounded;
+    }
+    return Icons.apps_rounded;
+  }
+
+  Color _resolveColor(String pkg) {
+    final lower = pkg.toLowerCase();
+    if (lower.contains('instagram')) return const Color(0xFFE1306C);
+    if (lower.contains('youtube')) return const Color(0xFFFF0000);
+    if (lower.contains('whatsapp')) return const Color(0xFF25D366);
+    if (lower.contains('discord')) return const Color(0xFF5865F2);
+    if (lower.contains('twitter')) return const Color(0xFF1DA1F2);
+    if (lower.contains('spotify')) return const Color(0xFF1DB954);
+    if (lower.contains('reddit')) return const Color(0xFFFF4500);
+    return AppColors.primaryAccent;
   }
 
   Future<void> _updateLimit(
@@ -240,10 +219,25 @@ class _ScreenTimeBlockerScreenState
     return '${mins}m';
   }
 
+  void _showAddCustomAppBlockModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _AddCustomBlockSheet(
+        onAdded: () {
+          _fetchLiveUsage();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final db = ref.watch(appDatabaseProvider);
     final limitsStream = db.watchAppLimits();
+    final totalMinutes =
+        _liveUsageList.fold<int>(0, (sum, a) => sum + a.usageMinutes);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -264,6 +258,12 @@ class _ScreenTimeBlockerScreenState
         ),
         actions: [
           IconButton(
+            tooltip: 'Add Custom App Block',
+            icon: const Icon(Icons.add_circle_outline_rounded,
+                color: AppColors.primaryAccent),
+            onPressed: _showAddCustomAppBlockModal,
+          ),
+          IconButton(
             tooltip: 'Trigger Stoic Lockout',
             icon: const Icon(Icons.shield_rounded, color: AppColors.errorRed),
             onPressed: () => EssayLockoutDialog.show(context),
@@ -276,35 +276,39 @@ class _ScreenTimeBlockerScreenState
         builder: (context, snapshot) {
           final limits = snapshot.data ?? [];
 
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-            children: [
-              // Segment Picker: [Week] | [Day] | [Hour]
-              _buildSegmentPicker(),
-              const SizedBox(height: 16),
+          return RefreshIndicator(
+            onRefresh: _fetchLiveUsage,
+            color: AppColors.primaryAccent,
+            backgroundColor: AppColors.surface,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+              children: [
+                // Segment Picker: [Week] | [Day] | [Hour]
+                _buildSegmentPicker(),
+                const SizedBox(height: 16),
 
-              // Date Navigation Header: < Today, October 13 • 4h 54m >
-              _buildDateNavigationHeader(),
-              const SizedBox(height: 16),
+                // Date Navigation Header
+                _buildDateNavigationHeader(totalMinutes),
+                const SizedBox(height: 16),
 
-              // Vertical Histogram Usage Bar Chart
-              _buildUsageBarChartCard(),
-              const SizedBox(height: 22),
+                // Vertical Histogram Usage Bar Chart
+                _buildUsageBarChartCard(totalMinutes),
+                const SizedBox(height: 22),
 
-              // Most Used Apps & Expandable Categories
-              _buildMostUsedSection(),
-              const SizedBox(height: 24),
+                // Most Used Apps & Expandable Categories
+                _buildMostUsedSection(totalMinutes),
+                const SizedBox(height: 24),
 
-              // Granular Limits & Social Feed Toggles
-              _buildLimitsSection(limits),
-            ],
+                // Granular Limits & Social Feed Toggles
+                _buildLimitsSection(limits),
+              ],
+            ),
           );
         },
       ),
     );
   }
 
-  // Pill Segment Selector with Amber/Violet Gradient Indicator
   Widget _buildSegmentPicker() {
     return Container(
       padding: const EdgeInsets.all(4),
@@ -357,8 +361,7 @@ class _ScreenTimeBlockerScreenState
     );
   }
 
-  // Date Navigation Header: < Today, October 13 • 4h 54m >
-  Widget _buildDateNavigationHeader() {
+  Widget _buildDateNavigationHeader(int totalMinutes) {
     const months = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
@@ -401,7 +404,7 @@ class _ScreenTimeBlockerScreenState
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '4h 54m',
+                  _formatDuration(totalMinutes),
                   style: AppTypography.accentMono.copyWith(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -424,19 +427,55 @@ class _ScreenTimeBlockerScreenState
     );
   }
 
-  // Usage Bar Chart with Average Line
-  Widget _buildUsageBarChartCard() {
-    final barData = _selectedSegment == TimeSegment.week
-        ? [190, 240, 310, 280, 294, 210, 180]
-        : _selectedSegment == TimeSegment.day
-            ? [15, 30, 45, 60, 40, 55, 35, 14]
-            : [10, 20, 25, 40, 15, 30];
+  Widget _buildUsageBarChartCard(int totalMinutes) {
+    if (_isLoadingUsage) {
+      return _buildSkeletonCard(height: 220);
+    }
 
-    final labels = _selectedSegment == TimeSegment.week
-        ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-        : _selectedSegment == TimeSegment.day
-            ? ['6A', '8A', '10A', '12P', '2P', '4P', '6P', '8P']
-            : ['10m', '20m', '30m', '40m', '50m', '60m'];
+    if (totalMinutes == 0) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.hourglass_empty_rounded,
+                size: 36, color: AppColors.textSecondary),
+            const SizedBox(height: 12),
+            Text(
+              'No distraction metrics recorded yet today.',
+              textAlign: TextAlign.center,
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Active app time from Android or linked habits will stream here.',
+              textAlign: TextAlign.center,
+              style: AppTypography.bodySmall.copyWith(fontSize: 11),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final barData = _liveUsageList.take(7).map((e) => e.usageMinutes).toList();
+    final labels = _liveUsageList.take(7).map((e) {
+      final name = e.appName;
+      return name.length > 5 ? name.substring(0, 4) : name;
+    }).toList();
+
+    while (barData.length < 3) {
+      barData.add(0);
+      labels.add('-');
+    }
+
+    final avg = (totalMinutes / math.max(1, _liveUsageList.length)).round();
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -457,7 +496,7 @@ class _ScreenTimeBlockerScreenState
                   Text('DAILY ACTIVITY HISTOGRAM',
                       style: AppTypography.bodySmall),
                   const SizedBox(height: 4),
-                  Text('4h 54m Active Screen Time',
+                  Text('${_formatDuration(totalMinutes)} Active Screen Time',
                       style: AppTypography.h2.copyWith(fontSize: 18)),
                 ],
               ),
@@ -477,7 +516,7 @@ class _ScreenTimeBlockerScreenState
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Avg 3h 15m',
+                      'Avg ${_formatDuration(avg)}',
                       style: AppTypography.accentMono.copyWith(fontSize: 11),
                     ),
                   ],
@@ -486,8 +525,6 @@ class _ScreenTimeBlockerScreenState
             ],
           ),
           const SizedBox(height: 20),
-
-          // Custom Painted Bar Chart
           SizedBox(
             height: 160,
             child: CustomPaint(
@@ -495,8 +532,8 @@ class _ScreenTimeBlockerScreenState
               painter: ScreenTimeChartPainter(
                 values: barData,
                 labels: labels,
-                selectedIndex: _selectedBarIndex % barData.length,
-                averageValue: 210,
+                selectedIndex: 0,
+                averageValue: avg > 0 ? avg : 15,
               ),
             ),
           ),
@@ -505,10 +542,23 @@ class _ScreenTimeBlockerScreenState
     );
   }
 
-  // Most Used Apps & Category Breakdown
-  Widget _buildMostUsedSection() {
+  Widget _buildMostUsedSection(int totalMinutes) {
+    if (_isLoadingUsage) {
+      return Column(
+        children: [
+          _buildSkeletonCard(height: 70),
+          const SizedBox(height: 8),
+          _buildSkeletonCard(height: 70),
+        ],
+      );
+    }
+
+    if (_liveUsageList.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     final categories = <String, List<AppUsageData>>{};
-    for (final app in _appsUsage) {
+    for (final app in _liveUsageList) {
       categories.putIfAbsent(app.category, () => []).add(app);
     }
 
@@ -519,12 +569,11 @@ class _ScreenTimeBlockerScreenState
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('MOST USED APPS & CATEGORIES', style: AppTypography.bodySmall),
-            Text('4h 54m Total',
+            Text('${_formatDuration(totalMinutes)} Total',
                 style: AppTypography.accentMono.copyWith(fontSize: 11)),
           ],
         ),
         const SizedBox(height: 12),
-
         ...categories.entries.map((entry) {
           final catName = entry.key;
           final catApps = entry.value;
@@ -541,7 +590,6 @@ class _ScreenTimeBlockerScreenState
             ),
             child: Column(
               children: [
-                // Category Header (Tap to expand/collapse)
                 InkWell(
                   onTap: () {
                     setState(() {
@@ -566,7 +614,7 @@ class _ScreenTimeBlockerScreenState
                           child: Icon(
                             catName.contains('Social')
                                 ? Icons.share_rounded
-                                : (catName.contains('Movies')
+                                : (catName.contains('Video')
                                     ? Icons.smart_display_rounded
                                     : Icons.work_outline_rounded),
                             color: AppColors.primaryAccent,
@@ -584,7 +632,8 @@ class _ScreenTimeBlockerScreenState
                                   )),
                               Text(
                                 '${catApps.length} apps · ${_formatDuration(catTotal)}',
-                                style: AppTypography.bodySmall.copyWith(fontSize: 11),
+                                style: AppTypography.bodySmall
+                                    .copyWith(fontSize: 11),
                               ),
                             ],
                           ),
@@ -599,14 +648,14 @@ class _ScreenTimeBlockerScreenState
                     ),
                   ),
                 ),
-
-                // Expanded App Items
                 if (isExpanded)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
                     child: Column(
                       children: catApps.map((app) {
-                        final ratio = (app.usageMinutes / 120).clamp(0.0, 1.0);
+                        final ratio = (app.usageMinutes /
+                                math.max(1, totalMinutes))
+                            .clamp(0.0, 1.0);
 
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 6.0),
@@ -628,7 +677,8 @@ class _ScreenTimeBlockerScreenState
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(app.appName,
-                                        style: AppTypography.bodySmall.copyWith(
+                                        style:
+                                            AppTypography.bodySmall.copyWith(
                                           fontWeight: FontWeight.w600,
                                           color: AppColors.textPrimary,
                                         )),
@@ -638,7 +688,8 @@ class _ScreenTimeBlockerScreenState
                                       child: LinearProgressIndicator(
                                         value: ratio,
                                         minHeight: 5,
-                                        backgroundColor: AppColors.surfaceElevated,
+                                        backgroundColor:
+                                            AppColors.surfaceElevated,
                                         valueColor: AlwaysStoppedAnimation(
                                           ratio > 0.8
                                               ? AppColors.errorRed
@@ -671,7 +722,6 @@ class _ScreenTimeBlockerScreenState
     );
   }
 
-  // Granular Limits, Curfews & Social Feeds Section
   Widget _buildLimitsSection(List<AppLimit> limits) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -680,14 +730,45 @@ class _ScreenTimeBlockerScreenState
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('GRANULAR LIMITS & CURFEWS', style: AppTypography.bodySmall),
-            const Icon(Icons.lock_clock_rounded,
-                size: 16, color: AppColors.primaryAccent),
+            IconButton(
+              tooltip: 'Add Custom App Block',
+              icon: const Icon(Icons.add_rounded,
+                  size: 20, color: AppColors.primaryAccent),
+              onPressed: _showAddCustomAppBlockModal,
+            ),
           ],
         ),
         const SizedBox(height: 12),
-
+        if (limits.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Center(
+              child: Column(
+                children: [
+                  const Icon(Icons.lock_outline_rounded,
+                      color: AppColors.textSecondary, size: 28),
+                  const SizedBox(height: 8),
+                  Text('No app limits active.', style: AppTypography.bodySmall),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap + above to protect your attention with caps & curfews.',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ...limits.map((item) {
-          final isReelsTarget = item.appName.toLowerCase().contains('instagram');
+          final isReelsTarget =
+              item.appName.toLowerCase().contains('instagram');
           final isShortsTarget = item.appName.toLowerCase().contains('youtube');
 
           return Container(
@@ -701,13 +782,26 @@ class _ScreenTimeBlockerScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Header & Duration Slider
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      item.appName,
-                      style: AppTypography.h2.copyWith(fontSize: 16),
+                    Row(
+                      children: [
+                        Text(
+                          item.appName,
+                          style: AppTypography.h2.copyWith(fontSize: 16),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded,
+                              size: 18, color: AppColors.textSecondary),
+                          tooltip: 'Remove limit',
+                          onPressed: () async {
+                            final db = ref.read(appDatabaseProvider);
+                            await db.deleteAppLimit(item.id);
+                          },
+                        ),
+                      ],
                     ),
                     Text(
                       '${item.dailyCapMinutes} min cap',
@@ -737,10 +831,7 @@ class _ScreenTimeBlockerScreenState
                     },
                   ),
                 ),
-
                 const Divider(color: AppColors.border, height: 16),
-
-                // Dedicated Social Feed Interception Toggles
                 if (isReelsTarget) ...[
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
@@ -763,7 +854,6 @@ class _ScreenTimeBlockerScreenState
                     },
                   ),
                 ],
-
                 if (isShortsTarget) ...[
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
@@ -786,8 +876,6 @@ class _ScreenTimeBlockerScreenState
                     },
                   ),
                 ],
-
-                // Require Stoic Lockout to Override
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   dense: true,
@@ -808,10 +896,7 @@ class _ScreenTimeBlockerScreenState
                     _updateLimit(item, isEssayLocked: val);
                   },
                 ),
-
                 const SizedBox(height: 10),
-
-                // Curfew Schedule Pickers (Bedtime Start & End)
                 Row(
                   children: [
                     Expanded(
@@ -860,6 +945,293 @@ class _ScreenTimeBlockerScreenState
       ],
     );
   }
+
+  Widget _buildSkeletonCard({required double height}) {
+    return Container(
+      height: height,
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Center(
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation(
+                AppColors.primaryAccent.withAlpha(120)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Add Custom App Block Modal Bottom Sheet
+class _AddCustomBlockSheet extends ConsumerStatefulWidget {
+  final VoidCallback onAdded;
+
+  const _AddCustomBlockSheet({required this.onAdded});
+
+  @override
+  ConsumerState<_AddCustomBlockSheet> createState() =>
+      _AddCustomBlockSheetState();
+}
+
+class _AddCustomBlockSheetState extends ConsumerState<_AddCustomBlockSheet> {
+  final _packageNameController = TextEditingController();
+  final _appNameController = TextEditingController();
+  int _capMinutes = 45;
+  final String _curfewStart = '22:30';
+  final String _curfewEnd = '07:00';
+  bool _isEssayLocked = true;
+  bool _blockShorts = false;
+  List<AppInfoOption> _installedApps = [];
+  String? _selectedPresetPkg;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInstalledApps();
+  }
+
+  Future<void> _loadInstalledApps() async {
+    final service = ref.read(appUsageServiceProvider);
+    final apps = await service.getInstalledAppOptions();
+    if (mounted) {
+      setState(() => _installedApps = apps);
+    }
+  }
+
+  @override
+  void dispose() {
+    _packageNameController.dispose();
+    _appNameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveBlock() async {
+    final pkg = _selectedPresetPkg ?? _packageNameController.text.trim();
+    var name = _appNameController.text.trim();
+    if (pkg.isEmpty) return;
+
+    if (name.isEmpty) {
+      final service = ref.read(appUsageServiceProvider);
+      name = service.getCleanAppName(pkg);
+    }
+
+    final db = ref.read(appDatabaseProvider);
+    final id = 'limit_${DateTime.now().millisecondsSinceEpoch}';
+
+    await db.updateAppLimit(
+      AppLimitsCompanion(
+        id: drift.Value(id),
+        packageName: drift.Value(pkg),
+        appName: drift.Value(name),
+        dailyCapMinutes: drift.Value(_capMinutes),
+        curfewStart: drift.Value(_curfewStart),
+        curfewEnd: drift.Value(_curfewEnd),
+        blockReelsShorts: drift.Value(_blockShorts),
+        isEssayLocked: drift.Value(_isEssayLocked),
+      ),
+    );
+
+    widget.onAdded();
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Container(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: bottomInset + 24,
+      ),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(top: BorderSide(color: AppColors.border, width: 1)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Add App Blocker', style: AppTypography.h1),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded,
+                      color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_installedApps.isNotEmpty) ...[
+              Text('SELECT PRESET APP', style: AppTypography.bodySmall),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    value: _selectedPresetPkg,
+                    isExpanded: true,
+                    dropdownColor: AppColors.surfaceElevated,
+                    style: AppTypography.bodyMedium,
+                    hint: Text('Choose an app or enter below',
+                        style: AppTypography.bodySmall),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Manual Package / Other'),
+                      ),
+                      ..._installedApps.map((a) => DropdownMenuItem<String?>(
+                            value: a.packageName,
+                            child: Text(a.name),
+                          )),
+                    ],
+                    onChanged: (val) {
+                      setState(() {
+                        _selectedPresetPkg = val;
+                        if (val != null) {
+                          final match =
+                              _installedApps.firstWhere((a) => a.packageName == val);
+                          _appNameController.text = match.name;
+                          _packageNameController.text = match.packageName;
+                        }
+                      });
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
+            if (_selectedPresetPkg == null) ...[
+              Text('PACKAGE NAME', style: AppTypography.bodySmall),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _packageNameController,
+                style: AppTypography.bodyMedium,
+                decoration: InputDecoration(
+                  hintText: 'e.g. com.zhiliaoapp.musically',
+                  hintStyle: AppTypography.bodySmall,
+                  filled: true,
+                  fillColor: AppColors.background,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text('APP DISPLAY NAME', style: AppTypography.bodySmall),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _appNameController,
+                style: AppTypography.bodyMedium,
+                decoration: InputDecoration(
+                  hintText: 'e.g. TikTok',
+                  hintStyle: AppTypography.bodySmall,
+                  filled: true,
+                  fillColor: AppColors.background,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('DAILY TIME CAP', style: AppTypography.bodySmall),
+                Text('$_capMinutes minutes',
+                    style: AppTypography.accentMono.copyWith(
+                      color: AppColors.primaryAccent,
+                      fontWeight: FontWeight.bold,
+                    )),
+              ],
+            ),
+            Slider(
+              value: _capMinutes.toDouble(),
+              min: 10,
+              max: 180,
+              divisions: 17,
+              activeColor: AppColors.primaryAccent,
+              onChanged: (val) => setState(() => _capMinutes = val.round()),
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text('Require Stoic Reflection Lockout',
+                  style: AppTypography.bodyMedium),
+              subtitle: Text(
+                  'Typing verification required to override limits',
+                  style: AppTypography.bodySmall.copyWith(fontSize: 11)),
+              value: _isEssayLocked,
+              activeTrackColor: AppColors.primaryAccent,
+              onChanged: (val) => setState(() => _isEssayLocked = val),
+            ),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text('Block Short-form Video Feed',
+                  style: AppTypography.bodyMedium),
+              subtitle: Text(
+                  'Intercepts algorithmic reels/shorts vertical tabs',
+                  style: AppTypography.bodySmall.copyWith(fontSize: 11)),
+              value: _blockShorts,
+              activeTrackColor: AppColors.primaryAccent,
+              onChanged: (val) => setState(() => _blockShorts = val),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _saveBlock,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryAccent,
+                foregroundColor: AppColors.background,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Add Cognitive Defense Shield',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // Custom Painter for Vertical Histogram Usage Bar Chart
@@ -881,12 +1253,13 @@ class ScreenTimeChartPainter extends CustomPainter {
     if (values.isEmpty) return;
 
     final maxVal = math.max(values.reduce(math.max), averageValue) * 1.25;
+    final safeMax = maxVal == 0 ? 10.0 : maxVal;
     final barWidth = (size.width / values.length) * 0.45;
     final slotWidth = size.width / values.length;
     final chartHeight = size.height - 24;
 
     // Draw average dashed line
-    final avgY = chartHeight - (averageValue / maxVal * chartHeight);
+    final avgY = chartHeight - (averageValue / safeMax * chartHeight);
     final avgPaint = Paint()
       ..color = AppColors.primaryAccent.withAlpha(120)
       ..strokeWidth = 1.2
@@ -905,7 +1278,7 @@ class ScreenTimeChartPainter extends CustomPainter {
     // Draw bars
     for (int i = 0; i < values.length; i++) {
       final val = values[i];
-      final barHeight = (val / maxVal) * chartHeight;
+      final barHeight = (val / safeMax) * chartHeight;
       final x = (i * slotWidth) + (slotWidth - barWidth) / 2;
       final y = chartHeight - barHeight;
       final isSelected = i == selectedIndex;

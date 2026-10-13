@@ -220,6 +220,20 @@ class AuthController extends StateNotifier<OrganizaAuthState> {
     );
   }
 
+  Future<bool> refreshVerificationStatus() async {
+    final refreshedUser = await _supabase.refreshSession();
+    if (refreshedUser != null) {
+      final isConfirmed = refreshedUser.emailConfirmedAt != null;
+      state = state.copyWith(user: refreshedUser);
+      return isConfirmed;
+    }
+    return false;
+  }
+
+  Future<void> resendConfirmationEmail(String email) async {
+    await _supabase.resendVerificationEmail(email);
+  }
+
   Future<void> logout() async {
     await _supabase.signOut();
     final prefs = await SharedPreferences.getInstance();

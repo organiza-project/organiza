@@ -9,21 +9,10 @@ void main() {
       supabaseService = SupabaseService();
     });
 
-    test('fetchLeaderboard returns fallback cohort when client is unconfigured', () async {
+    test('fetchLeaderboard returns empty list when client is unconfigured', () async {
       final leaderboard = await supabaseService.fetchLeaderboard();
 
-      expect(leaderboard, isNotEmpty);
-      expect(leaderboard.length, greaterThanOrEqualTo(5));
-
-      // 1st place should be Marcus Aurelius
-      expect(leaderboard.first.username, 'Marcus Aurelius');
-      expect(leaderboard.first.rank, 1);
-      expect(leaderboard.first.xp, greaterThan(3000));
-
-      // Contains current user entry
-      final currentUser = leaderboard.firstWhere((u) => u.isCurrentUser);
-      expect(currentUser.username, contains('You'));
-      expect(currentUser.rank, 4);
+      expect(leaderboard, isEmpty);
     });
 
     test('nudgeFriend succeeds gracefully offline', () async {

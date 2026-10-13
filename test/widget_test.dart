@@ -75,6 +75,7 @@ void main() {
     expect(find.text('Today'), findsOneWidget);
     expect(find.text('Timetable'), findsOneWidget);
     expect(find.text('Journal'), findsOneWidget);
-    expect(find.text('Leaderboard'), findsOneWidget);
+    expect(find.text('Battlepass'), findsOneWidget);
+    expect(find.text('You'), findsOneWidget);
   });
 }

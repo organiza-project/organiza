@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/constants/app_colors.dart';
 import 'features/assistant/presentation/voice_assistant_modal.dart';
+import 'features/gamification/presentation/screens/battlepass_shop_screen.dart';
 import 'features/journal/presentation/screens/journal_screen.dart';
-import 'features/leaderboard/presentation/screens/leaderboard_screen.dart';
+import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/timetable/presentation/screens/timetable_screen.dart';
 import 'features/today/presentation/screens/today_screen.dart';
 
@@ -22,7 +23,8 @@ class _AppShellState extends ConsumerState<AppShell> {
     TodayScreen(),
     TimetableScreen(),
     JournalScreen(),
-    LeaderboardScreen(),
+    BattlepassShopScreen(),
+    ProfileScreen(),
   ];
 
   @override
@@ -69,6 +71,12 @@ class _AppShellState extends ConsumerState<AppShell> {
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: AppColors.surface,
+          selectedItemColor: AppColors.primaryAccent,
+          unselectedItemColor: AppColors.textSecondary,
+          selectedFontSize: 11,
+          unselectedFontSize: 11,
           onTap: (index) {
             setState(() {
               _currentIndex = index;
@@ -77,19 +85,28 @@ class _AppShellState extends ConsumerState<AppShell> {
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.check_circle_outline_rounded),
+              activeIcon: Icon(Icons.check_circle_rounded),
               label: 'Today',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_view_week_rounded),
+              icon: Icon(Icons.table_chart_outlined),
+              activeIcon: Icon(Icons.table_chart_rounded),
               label: 'Timetable',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.book_rounded),
+              icon: Icon(Icons.auto_stories_outlined),
+              activeIcon: Icon(Icons.auto_stories_rounded),
               label: 'Journal',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.emoji_events_rounded),
-              label: 'Leaderboard',
+              icon: Icon(Icons.military_tech_outlined),
+              activeIcon: Icon(Icons.military_tech_rounded),
+              label: 'Battlepass',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline_rounded),
+              activeIcon: Icon(Icons.person_rounded),
+              label: 'You',
             ),
           ],
         ),

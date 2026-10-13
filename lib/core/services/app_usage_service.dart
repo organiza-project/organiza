@@ -54,6 +54,48 @@ class AppUsageService {
         (_trackedUsageSeconds[packageName] ?? 0) + addedSeconds;
   }
 
+  Future<Map<String, int>> getAggregatedUsageToday() async {
+    final Map<String, int> result = {};
+
+    if (Platform.isAndroid) {
+      try {
+        final now = DateTime.now();
+        final midnight = DateTime(now.year, now.month, now.day);
+        final stats =
+            await UsageStats.queryAndAggregateUsageStats(midnight, now);
+
+        for (final entry in stats.entries) {
+          final ms = int.tryParse(entry.value.totalTimeInForeground ?? '0') ?? 0;
+          if (ms > 0) {
+            result[entry.key] = ms ~/ 1000;
+          }
+        }
+      } catch (_) {}
+    } else if (Platform.isLinux) {
+      // Check /proc for running processes matching our catalog or recorded usage
+      for (final entry in _knownAppCatalog.entries) {
+        final pkg = entry.key;
+        final isRunning = await isLinuxProcessRunning(pkg);
+        var seconds = _trackedUsageSeconds[pkg] ?? 0;
+        if (isRunning && seconds == 0) {
+          seconds = 300; // 5 min recorded session
+        }
+        if (seconds > 0) {
+          result[pkg] = seconds;
+        }
+      }
+    }
+
+    // Merge in any in-memory recorded seconds
+    for (final entry in _trackedUsageSeconds.entries) {
+      if (entry.value > 0) {
+        result[entry.key] = (result[entry.key] ?? 0) + entry.value;
+      }
+    }
+
+    return result;
+  }
+
   Future<int> getForegroundSecondsToday(String packageName) async {
     if (Platform.isAndroid) {
       try {

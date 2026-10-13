@@ -35,19 +35,27 @@ class _EssayLockoutDialogState extends State<EssayLockoutDialog> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
 
-  late StoicPassage _passage;
+  late StoicPassage activePassage;
   String _previousText = '';
   String? _pasteWarning;
 
   double _similarity = 0.0;
   int _typedWordCount = 0;
-  int _targetWordCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _passage = widget.initialPassage ?? StoicPassages.getRandom();
-    _targetWordCount = _passage.wordCount;
+    activePassage = widget.initialPassage ??
+        (StoicPassages.all.isNotEmpty
+            ? StoicPassages.all[Random().nextInt(StoicPassages.all.length)]
+            : const StoicPassage(
+                id: 'fallback_marcus',
+                author: 'Marcus Aurelius',
+                title: 'Meditations',
+                category: 'Procrastination',
+                text:
+                    'You could be good today, but instead you choose tomorrow. Concentrate every minute on doing what is in front of you with precise and genuine seriousness.',
+              ));
   }
 
   @override
@@ -59,8 +67,7 @@ class _EssayLockoutDialogState extends State<EssayLockoutDialog> {
 
   void _shufflePassage() {
     setState(() {
-      _passage = StoicPassages.getRandom();
-      _targetWordCount = _passage.wordCount;
+      activePassage = StoicPassages.getRandom();
       _controller.clear();
       _previousText = '';
       _pasteWarning = null;
@@ -100,7 +107,7 @@ class _EssayLockoutDialogState extends State<EssayLockoutDialog> {
 
   void _calculateMetrics(String text) {
     final normInput = _normalize(text);
-    final normTarget = _normalize(_passage.text);
+    final normTarget = _normalize(activePassage.text);
 
     if (normInput.isEmpty) {
       _similarity = 0.0;
@@ -235,7 +242,7 @@ class _EssayLockoutDialogState extends State<EssayLockoutDialog> {
                                 color: AppColors.primaryAccent.withAlpha(60)),
                           ),
                           child: Text(
-                            _passage.category.toUpperCase(),
+                            activePassage.category.toUpperCase(),
                             style: AppTypography.accentMono.copyWith(
                               fontSize: 10,
                               color: AppColors.primaryAccent,
@@ -243,7 +250,7 @@ class _EssayLockoutDialogState extends State<EssayLockoutDialog> {
                           ),
                         ),
                         Text(
-                          '— ${_passage.author}',
+                          '— ${activePassage.author} (${activePassage.title})',
                           style: AppTypography.bodySmall.copyWith(
                             fontWeight: FontWeight.bold,
                             color: AppColors.textPrimary,
@@ -251,13 +258,13 @@ class _EssayLockoutDialogState extends State<EssayLockoutDialog> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     SelectableText(
-                      '"${_passage.text}"',
-                      style: AppTypography.bodyMedium.copyWith(
-                        fontStyle: FontStyle.italic,
-                        height: 1.45,
-                        color: AppColors.textPrimary,
+                      activePassage.text,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        height: 1.5,
                       ),
                     ),
                   ],
@@ -348,7 +355,7 @@ class _EssayLockoutDialogState extends State<EssayLockoutDialog> {
                         ),
                       ),
                       Text(
-                        'Words: $_typedWordCount / $_targetWordCount',
+                        'Words: $_typedWordCount / ${activePassage.text.trim().split(RegExp(r'\s+')).length}',
                         style: AppTypography.bodySmall.copyWith(
                           color: isUnlocked
                               ? AppColors.successGreen
