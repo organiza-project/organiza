@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/network/supabase_service.dart';
+import '../../../gamification/presentation/screens/battlepass_shop_screen.dart';
 import '../../../gamification/presentation/screens/shop_profile_screen.dart';
 import '../../../today/presentation/controllers/today_tasks_controller.dart';
 
@@ -64,6 +65,15 @@ class LeaderboardScreen extends ConsumerWidget {
             ),
           ),
           IconButton(
+            tooltip: 'Season 1 Battlepass',
+            onPressed: () => BattlepassShopScreen.show(context),
+            icon: const Icon(
+              Icons.military_tech_rounded,
+              color: Colors.amber,
+              size: 24,
+            ),
+          ),
+          IconButton(
             tooltip: 'Star Shop & Profile',
             onPressed: () => ShopProfileScreen.show(context),
             icon: Stack(
@@ -72,7 +82,7 @@ class LeaderboardScreen extends ConsumerWidget {
                 const Icon(
                   Icons.storefront_rounded,
                   color: AppColors.primaryAccent,
-                  size: 26,
+                  size: 24,
                 ),
                 Positioned(
                   right: -2,
@@ -85,7 +95,7 @@ class LeaderboardScreen extends ConsumerWidget {
                     ),
                     child: const Icon(
                       Icons.star_rounded,
-                      size: 10,
+                      size: 9,
                       color: Colors.black,
                     ),
                   ),
@@ -127,6 +137,10 @@ class LeaderboardScreen extends ConsumerWidget {
                   // Top-3 Podium (Wireframe #9)
                   if (topThree.length >= 3)
                     _buildPodium(context, topThree),
+                  const SizedBox(height: 18),
+
+                  // 7-Day / 30-Day Discipline Duel Banner
+                  _buildChallengeBanner(context, ref),
                   const SizedBox(height: 20),
 
                   // Header for Cohort / Friends
@@ -496,6 +510,409 @@ class LeaderboardScreen extends ConsumerWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  // 7-Day & 30-Day Discipline Duel Head-to-Head Banner
+  Widget _buildChallengeBanner(BuildContext context, WidgetRef ref) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.surfaceElevated,
+            AppColors.surface,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.primaryAccent.withAlpha(70),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryAccent.withAlpha(35),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.sports_kabaddi_rounded,
+                      color: AppColors.primaryAccent,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'DISCIPLINE DUEL',
+                    style: AppTypography.accentMono.copyWith(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withAlpha(25),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.amber.withAlpha(80)),
+                ),
+                child: Text(
+                  '7-Day Sprint',
+                  style: AppTypography.bodySmall.copyWith(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Head-to-Head Split Comparison Bar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'You: 1,850 XP',
+                style: AppTypography.bodySmall.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryAccent,
+                ),
+              ),
+              Text(
+                'Alex: 1,620 XP',
+                style: AppTypography.bodySmall.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: SizedBox(
+              height: 8,
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 1850,
+                    child: Container(color: AppColors.primaryAccent),
+                  ),
+                  const SizedBox(width: 2),
+                  Expanded(
+                    flex: 1620,
+                    child: Container(color: AppColors.border),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '3 days remaining · Stake: 50 ★',
+                style: AppTypography.bodySmall.copyWith(fontSize: 11),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => _showChallengeModal(context),
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 14),
+                label: const Text('New Duel', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  backgroundColor: AppColors.primaryAccent,
+                  foregroundColor: AppColors.background,
+                  elevation: 0,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Interactive 7-Day & 30-Day Challenge Modal
+  void _showChallengeModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ChallengeModalSheet(),
+    );
+  }
+}
+
+class _ChallengeModalSheet extends StatefulWidget {
+  @override
+  State<_ChallengeModalSheet> createState() => _ChallengeModalSheetState();
+}
+
+class _ChallengeModalSheetState extends State<_ChallengeModalSheet> {
+  final _handleController = TextEditingController();
+  int _selectedDurationDays = 7;
+  int _starWager = 50;
+
+  @override
+  void dispose() {
+    _handleController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border(
+            top: BorderSide(color: AppColors.border, width: 1.5),
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                const Icon(
+                  Icons.sports_kabaddi_rounded,
+                  color: AppColors.primaryAccent,
+                  size: 24,
+                ),
+                const SizedBox(width: 10),
+                Text('Challenge a Spartan Friend', style: AppTypography.h2),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Engage in a head-to-head XP sprint. Highest discipline wins the Star vault prize.',
+              style: AppTypography.bodySmall,
+            ),
+            const SizedBox(height: 18),
+
+            // Friend Handle Input
+            Text('FRIEND HANDLE', style: AppTypography.bodySmall),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _handleController,
+              style: AppTypography.bodyMedium,
+              decoration: InputDecoration(
+                prefixText: '@',
+                prefixStyle: AppTypography.accentMono.copyWith(
+                  color: AppColors.primaryAccent,
+                  fontSize: 16,
+                ),
+                hintText: 'alex_spartan',
+                hintStyle: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.textSecondary.withAlpha(120),
+                ),
+                filled: true,
+                fillColor: AppColors.surfaceElevated,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.primaryAccent),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Duration Selector (7-Day vs 30-Day)
+            Text('CHALLENGE DURATION', style: AppTypography.bodySmall),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedDurationDays = 7),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedDurationDays == 7
+                            ? AppColors.primaryAccent.withAlpha(30)
+                            : AppColors.surfaceElevated,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _selectedDurationDays == 7
+                              ? AppColors.primaryAccent
+                              : AppColors.border,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '7 Days',
+                            style: AppTypography.h2.copyWith(
+                              fontSize: 15,
+                              color: _selectedDurationDays == 7
+                                  ? AppColors.primaryAccent
+                                  : AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'High Intensity Sprint',
+                            style: AppTypography.bodySmall.copyWith(fontSize: 10),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedDurationDays = 30),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedDurationDays == 30
+                            ? AppColors.primaryAccent.withAlpha(30)
+                            : AppColors.surfaceElevated,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _selectedDurationDays == 30
+                              ? AppColors.primaryAccent
+                              : AppColors.border,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '30 Days',
+                            style: AppTypography.h2.copyWith(
+                              fontSize: 15,
+                              color: _selectedDurationDays == 30
+                                  ? AppColors.primaryAccent
+                                  : AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Monthly Endurance Cup',
+                            style: AppTypography.bodySmall.copyWith(fontSize: 10),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            // Star Stake
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('STAR WAGER STAKE', style: AppTypography.bodySmall),
+                Text(
+                  '★ $_starWager Stars',
+                  style: AppTypography.accentMono.copyWith(
+                    fontSize: 13,
+                    color: Colors.amber,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            Slider(
+              value: _starWager.toDouble(),
+              min: 10,
+              max: 200,
+              divisions: 19,
+              activeColor: Colors.amber,
+              inactiveColor: AppColors.surfaceElevated,
+              label: '$_starWager Stars',
+              onChanged: (val) => setState(() => _starWager = val.round()),
+            ),
+            const SizedBox(height: 16),
+
+            // Send Challenge Button
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () {
+                  final handle = _handleController.text.trim();
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        handle.isEmpty
+                            ? 'Issued open $_selectedDurationDays-day Discipline Duel! ⚡'
+                            : 'Challenge sent to @$handle for $_selectedDurationDays days! ⚡',
+                      ),
+                      backgroundColor: AppColors.surfaceElevated,
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryAccent,
+                  foregroundColor: AppColors.background,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Issue Duel Challenge',
+                  style: AppTypography.h2.copyWith(
+                    color: AppColors.background,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -213,4 +213,106 @@ class SupabaseService {
     }
     return true;
   }
+
+  // ==========================================
+  // PURE SUPABASE AUTHENTICATION
+  // ==========================================
+
+  User? get currentUser => client?.auth.currentUser;
+
+  Stream<AuthState>? get authStateChanges => client?.auth.onAuthStateChange;
+
+  /// Check whether a handle is available in public.profiles
+  Future<bool> isUsernameAvailable(String username) async {
+    final cleanHandle = username.trim().replaceAll('@', '');
+    if (cleanHandle.isEmpty) return false;
+
+    final c = client;
+    if (c == null) {
+      // Offline fallback: any reasonable non-empty handle is accepted
+      return cleanHandle.length >= 3;
+    }
+
+    try {
+      final res = await c
+          .from('profiles')
+          .select('id')
+          .eq('username', cleanHandle)
+          .maybeSingle();
+      return res == null;
+    } catch (e) {
+      debugPrint('Organiza: Handle availability check notice: $e');
+      return true;
+    }
+  }
+
+  /// Sign in with pure Supabase email & password
+  Future<AuthResponse?> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    final c = client;
+    if (c == null) {
+      debugPrint('Organiza: Supabase client offline. Using local session fallback.');
+      return null;
+    }
+    return await c.auth.signInWithPassword(
+      email: email.trim(),
+      password: password,
+    );
+  }
+
+  /// Register with pure Supabase email & password, automatically creating public.profiles record
+  Future<AuthResponse?> signUpWithEmail({
+    required String email,
+    required String password,
+    required String username,
+  }) async {
+    final c = client;
+    final cleanHandle = username.trim().replaceAll('@', '');
+
+    if (c == null) {
+      debugPrint('Organiza: Supabase client offline. Using local session fallback.');
+      return null;
+    }
+
+    final response = await c.auth.signUp(
+      email: email.trim(),
+      password: password,
+      data: {'username': cleanHandle},
+    );
+
+    final user = response.user;
+    if (user != null) {
+      try {
+        await c.from('profiles').upsert({
+          'id': user.id,
+          'username': cleanHandle,
+          'total_xp': 0,
+          'total_stars': 0,
+          'level': 1,
+          'level_title': 'Level 1 · Stoic Novice',
+          'streak_days': 1,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint('Organiza: Profile auto-creation notice: $e');
+      }
+    }
+
+    return response;
+  }
+
+  /// Sign out current session
+  Future<void> signOut() async {
+    final c = client;
+    if (c != null) {
+      try {
+        await c.auth.signOut();
+      } catch (e) {
+        debugPrint('Organiza: Sign out notice: $e');
+      }
+    }
+  }
 }

@@ -8,6 +8,7 @@ import '../../../../data/local/app_database.dart';
 import '../../../../data/local/database_provider.dart';
 import '../../../today/presentation/controllers/today_tasks_controller.dart';
 import '../../../today/presentation/widgets/essay_lockout_dialog.dart';
+import 'screen_time_blocker_screen.dart';
 
 final appLimitsStreamProvider = StreamProvider<List<AppLimit>>((ref) {
   final db = ref.watch(appDatabaseProvider);
@@ -18,11 +19,7 @@ class DistractionBlockerScreen extends ConsumerStatefulWidget {
   const DistractionBlockerScreen({super.key});
 
   static Future<void> show(BuildContext context) {
-    return Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const DistractionBlockerScreen(),
-      ),
-    );
+    return ScreenTimeBlockerScreen.show(context);
   }
 
   @override

@@ -9,6 +9,8 @@ import '../../../../data/local/app_database.dart';
 import '../controllers/timetable_controller.dart';
 import '../widgets/add_timetable_modal.dart';
 
+enum TimetableLayout { horizontalMatrix, verticalGrid, agendaList }
+
 class TimetableScreen extends ConsumerStatefulWidget {
   const TimetableScreen({super.key});
 
@@ -18,8 +20,12 @@ class TimetableScreen extends ConsumerStatefulWidget {
 
 class _TimetableScreenState extends ConsumerState<TimetableScreen> {
   static const double _hourHeight = 64.0;
-  final ScrollController _scrollController = ScrollController();
-  bool _isGridView = true;
+  static const double _hourWidth = 100.0;
+
+  final ScrollController _verticalScrollController = ScrollController();
+  final ScrollController _horizontalScrollController = ScrollController();
+
+  TimetableLayout _layout = TimetableLayout.horizontalMatrix;
 
   @override
   void initState() {
@@ -31,31 +37,27 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _verticalScrollController.dispose();
+    _horizontalScrollController.dispose();
     super.dispose();
   }
 
   void _scrollToCurrentTime() {
-    if (!_scrollController.hasClients) return;
     final now = DateTime.now();
-    final targetOffset = math.max(0.0, (now.hour - 1) * _hourHeight);
-    _scrollController.jumpTo(targetOffset);
+    if (_horizontalScrollController.hasClients) {
+      final hOffset = math.max(0.0, (now.hour - 1) * _hourWidth);
+      _horizontalScrollController.jumpTo(hOffset);
+    }
+    if (_verticalScrollController.hasClients) {
+      final vOffset = math.max(0.0, (now.hour - 1) * _hourHeight);
+      _verticalScrollController.jumpTo(vOffset);
+    }
   }
 
   String _formatDisplayDate(DateTime date) {
     const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
@@ -214,7 +216,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Timetable & Schedule', style: AppTypography.h1),
+            Text('Timetable & Matrix', style: AppTypography.h1),
             const SizedBox(height: 2),
             Text(
               _formatDisplayDate(selectedDate),
@@ -223,13 +225,45 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: _isGridView ? 'Switch to Agenda List' : 'Switch to 24-hr Grid',
-            onPressed: () => setState(() => _isGridView = !_isGridView),
-            icon: Icon(
-              _isGridView ? Icons.view_agenda_outlined : Icons.calendar_view_day_rounded,
+          PopupMenuButton<TimetableLayout>(
+            tooltip: 'Change Layout',
+            icon: const Icon(
+              Icons.dashboard_customize_rounded,
               color: AppColors.textSecondary,
             ),
+            onSelected: (l) => setState(() => _layout = l),
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: TimetableLayout.horizontalMatrix,
+                child: Row(
+                  children: [
+                    Icon(Icons.view_column_rounded, size: 18, color: AppColors.primaryAccent),
+                    SizedBox(width: 8),
+                    Text('Horizontal Matrix'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: TimetableLayout.verticalGrid,
+                child: Row(
+                  children: [
+                    Icon(Icons.calendar_view_day_rounded, size: 18, color: AppColors.primaryAccent),
+                    SizedBox(width: 8),
+                    Text('24-Hour Vertical Grid'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: TimetableLayout.agendaList,
+                child: Row(
+                  children: [
+                    Icon(Icons.view_agenda_outlined, size: 18, color: AppColors.primaryAccent),
+                    SizedBox(width: 8),
+                    Text('Agenda List'),
+                  ],
+                ),
+              ),
+            ],
           ),
           IconButton(
             onPressed: () => AddTimetableModal.show(context),
@@ -246,7 +280,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Horizontal Calendar Strip
+            // Top: 14-day horizontal date selector
             _buildCalendarStrip(context, selectedDate),
             const SizedBox(height: 8),
 
@@ -274,10 +308,13 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                     return _buildEmptyState(context);
                   }
 
-                  if (_isGridView) {
-                    return _build24HourVerticalGrid(selectedDate, entries);
-                  } else {
-                    return _buildAgendaList(entries);
+                  switch (_layout) {
+                    case TimetableLayout.horizontalMatrix:
+                      return _buildHorizontalMatrix(selectedDate, entries);
+                    case TimetableLayout.verticalGrid:
+                      return _build24HourVerticalGrid(selectedDate, entries);
+                    case TimetableLayout.agendaList:
+                      return _buildAgendaList(entries);
                   }
                 },
               ),
@@ -288,6 +325,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
     );
   }
 
+  // 14-Day Horizontal Date Selector with Day Abbreviations and Date Circles
   Widget _buildCalendarStrip(BuildContext context, DateTime selectedDate) {
     final today = DateTime.now();
     final startDate = today.subtract(const Duration(days: 3));
@@ -368,7 +406,249 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
     );
   }
 
-  // 24-Hour Visual Vertical Grid (Wireframe Screen 4)
+  // 1. HORIZONTAL TIMETABLE MATRIX (Deliverable for Subagent 3)
+  Widget _buildHorizontalMatrix(
+    DateTime selectedDate,
+    List<TimetableEntry> entries,
+  ) {
+    final now = DateTime.now();
+    final isSelectedToday = selectedDate.year == now.year &&
+        selectedDate.month == now.month &&
+        selectedDate.day == now.day;
+    final currentMinutes = now.hour * 60 + now.minute;
+    final redLineX = (currentMinutes / 60.0) * _hourWidth;
+
+    const accentPalette = [
+      Color(0xFF3B82F6), // Blue
+      Color(0xFF10B981), // Emerald
+      Color(0xFF8B5CF6), // Purple
+      Color(0xFFF59E0B), // Amber
+      Color(0xFFEC4899), // Pink
+      Color(0xFF06B6D4), // Cyan
+    ];
+
+    const totalTrackWidth = 24 * _hourWidth;
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('24-HOUR HORIZONTAL TIMELINE', style: AppTypography.bodySmall),
+                Text(
+                  'Scroll ↔ to browse entire day',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.primaryAccent,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Horizontally Scrollable 24-Hour Track
+          SingleChildScrollView(
+            controller: _horizontalScrollController,
+            scrollDirection: Axis.horizontal,
+            child: Container(
+              width: totalTrackWidth,
+              height: 280,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Stack(
+                children: [
+                  // 24 Hourly columns background & labels
+                  Row(
+                    children: List.generate(24, (hour) {
+                      final hourStr = '${hour.toString().padLeft(2, '0')}:00';
+                      return Container(
+                        width: _hourWidth,
+                        height: double.infinity,
+                        decoration: BoxDecoration(
+                          border: Border(
+                            right: BorderSide(
+                              color: AppColors.border.withAlpha(80),
+                              width: 0.8,
+                            ),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 4,
+                              ),
+                              child: Text(
+                                hourStr,
+                                style: AppTypography.accentMono.copyWith(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ),
+
+                  // Horizontal Cards Placed Proportionally
+                  ...entries.asMap().entries.map((entryItem) {
+                    final index = entryItem.key;
+                    final entry = entryItem.value;
+                    final startMin = _parseTimeToMinutes(entry.startTime);
+                    var endMin = _parseTimeToMinutes(entry.endTime);
+                    if (endMin <= startMin) endMin = startMin + 60;
+
+                    final left = (startMin / 60.0) * _hourWidth;
+                    final cardWidth = math.max(
+                      ((endMin - startMin) / 60.0) * _hourWidth - 6,
+                      76.0,
+                    );
+                    final accentColor =
+                        accentPalette[index % accentPalette.length];
+
+                    // Stack lane calculation (alternate vertical height for overlapping cards)
+                    final top = 36.0 + ((index % 3) * 72.0);
+
+                    return Positioned(
+                      left: left,
+                      top: top,
+                      width: cardWidth,
+                      height: 64,
+                      child: GestureDetector(
+                        onTap: () => _showRescheduleDialog(context, entry),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceElevated,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: accentColor.withAlpha(140),
+                              width: 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(50),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 4,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: accentColor,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      entry.title,
+                                      style: AppTypography.bodySmall.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
+                                        fontSize: 12,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${entry.startTime} – ${entry.endTime}',
+                                style: AppTypography.accentMono.copyWith(
+                                  fontSize: 10,
+                                  color: accentColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+
+                  // Vertical Red Indicator Line Marking Current Real-Time
+                  if (isSelectedToday)
+                    Positioned(
+                      left: redLineX,
+                      top: 0,
+                      bottom: 0,
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.errorRed,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'NOW',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Container(
+                              width: 2,
+                              color: AppColors.errorRed,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+
+          // Agenda list view below for quick glance
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('DAY AGENDA SESSIONS', style: AppTypography.bodySmall),
+                const SizedBox(height: 10),
+                ...entries.map((item) => _buildEventCard(context, item)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 24-Hour Vertical Visual Grid
   Widget _build24HourVerticalGrid(
     DateTime selectedDate,
     List<TimetableEntry> entries,
@@ -381,22 +661,17 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
     final currentLineTop = (currentMinutes / 60.0) * _hourHeight;
 
     const accentPalette = [
-      Color(0xFF3B82F6), // Blue
-      Color(0xFF10B981), // Emerald
-      Color(0xFF8B5CF6), // Purple
-      Color(0xFFF59E0B), // Amber
-      Color(0xFFEC4899), // Pink
-      Color(0xFF06B6D4), // Cyan
+      Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFF8B5CF6),
+      Color(0xFFF59E0B), Color(0xFFEC4899), Color(0xFF06B6D4),
     ];
 
     return SingleChildScrollView(
-      controller: _scrollController,
+      controller: _verticalScrollController,
       padding: const EdgeInsets.only(bottom: 80),
       child: SizedBox(
         height: 24 * _hourHeight,
         child: Stack(
           children: [
-            // Hour slots background lines
             ...List.generate(24, (hour) {
               final top = hour * _hourHeight;
               final hourText = '${hour.toString().padLeft(2, '0')}:00';
@@ -439,7 +714,6 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
               );
             }),
 
-            // Scheduled Event Blocks (Proportionally Placed)
             ...entries.asMap().entries.map((entryItem) {
               final index = entryItem.key;
               final entry = entryItem.value;
@@ -473,13 +747,6 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                         color: accentColor.withAlpha(120),
                         width: 1.2,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(40),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -500,10 +767,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                             children: [
                               Text(
                                 entry.title,
-                                style: AppTypography.h2.copyWith(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: AppTypography.h2.copyWith(fontSize: 13),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -514,65 +778,8 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                                   color: accentColor,
                                 ),
                               ),
-                              if (blockHeight > 50 &&
-                                  entry.locationOrNotes != null &&
-                                  entry.locationOrNotes!.isNotEmpty) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  entry.locationOrNotes!,
-                                  style: AppTypography.bodySmall.copyWith(
-                                    fontSize: 10,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
                             ],
                           ),
-                        ),
-                        PopupMenuButton<String>(
-                          padding: EdgeInsets.zero,
-                          iconSize: 18,
-                          color: AppColors.surfaceElevated,
-                          icon: const Icon(
-                            Icons.more_vert_rounded,
-                            color: AppColors.textSecondary,
-                          ),
-                          onSelected: (val) async {
-                            if (val == 'reschedule') {
-                              await _showRescheduleDialog(context, entry);
-                            } else if (val == 'delete') {
-                              await ref
-                                  .read(timetableControllerProvider)
-                                  .deleteEntry(entry.id);
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'reschedule',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.schedule_rounded,
-                                      size: 16, color: AppColors.primaryAccent),
-                                  SizedBox(width: 8),
-                                  Text('Reschedule'),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.delete_outline_rounded,
-                                      size: 16, color: AppColors.errorRed),
-                                  SizedBox(width: 8),
-                                  Text('Delete',
-                                      style: TextStyle(color: AppColors.errorRed)),
-                                ],
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ),
@@ -581,7 +788,6 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
               );
             }),
 
-            // Current-Time Horizontal Red Line Indicator (Wireframe Screen 4)
             if (isSelectedToday)
               Positioned(
                 top: currentLineTop,
@@ -595,13 +801,6 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                       decoration: const BoxDecoration(
                         color: AppColors.errorRed,
                         shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.errorRed,
-                            blurRadius: 6,
-                            spreadRadius: 1,
-                          ),
-                        ],
                       ),
                     ),
                     Expanded(
@@ -644,7 +843,6 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Time Badge
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
@@ -681,7 +879,6 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
             ),
             const SizedBox(width: 14),
 
-            // Title & Details
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -713,7 +910,6 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                     ),
                     const SizedBox(height: 6),
                   ],
-                  // Recurrence Badge
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -722,9 +918,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      entry.dayOfWeek > 0
-                          ? 'Weekly Recurring'
-                          : 'One-off Event',
+                      entry.dayOfWeek > 0 ? 'Weekly Recurring' : 'One-off Event',
                       style: AppTypography.bodySmall.copyWith(
                         fontSize: 10,
                         color: AppColors.textSecondary,
@@ -735,7 +929,6 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
               ),
             ),
 
-            // Context Actions Menu (Reschedule / Delete)
             PopupMenuButton<String>(
               color: AppColors.surfaceElevated,
               icon: const Icon(
@@ -770,8 +963,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                       Icon(Icons.delete_outline_rounded,
                           size: 16, color: AppColors.errorRed),
                       SizedBox(width: 8),
-                      Text('Delete',
-                          style: TextStyle(color: AppColors.errorRed)),
+                      Text('Delete', style: TextStyle(color: AppColors.errorRed)),
                     ],
                   ),
                 ),
