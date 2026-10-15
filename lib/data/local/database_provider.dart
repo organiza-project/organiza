@@ -6,3 +6,8 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
   ref.onDispose(db.close);
   return db;
 });
+
+final appLimitsStreamProvider = StreamProvider<List<AppLimit>>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  return db.watchAppLimits();
+});

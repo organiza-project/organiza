@@ -234,8 +234,8 @@ class _ScreenTimeBlockerScreenState
 
   @override
   Widget build(BuildContext context) {
-    final db = ref.watch(appDatabaseProvider);
-    final limitsStream = db.watchAppLimits();
+    final limitsAsync = ref.watch(appLimitsStreamProvider);
+    final limits = limitsAsync.value ?? [];
     final totalMinutes =
         _liveUsageList.fold<int>(0, (sum, a) => sum + a.usageMinutes);
 
@@ -271,40 +271,33 @@ class _ScreenTimeBlockerScreenState
           const SizedBox(width: 8),
         ],
       ),
-      body: StreamBuilder<List<AppLimit>>(
-        stream: limitsStream,
-        builder: (context, snapshot) {
-          final limits = snapshot.data ?? [];
+      body: RefreshIndicator(
+        onRefresh: _fetchLiveUsage,
+        color: AppColors.primaryAccent,
+        backgroundColor: AppColors.surface,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+          children: [
+            // Segment Picker: [Week] | [Day] | [Hour]
+            _buildSegmentPicker(),
+            const SizedBox(height: 16),
 
-          return RefreshIndicator(
-            onRefresh: _fetchLiveUsage,
-            color: AppColors.primaryAccent,
-            backgroundColor: AppColors.surface,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-              children: [
-                // Segment Picker: [Week] | [Day] | [Hour]
-                _buildSegmentPicker(),
-                const SizedBox(height: 16),
+            // Date Navigation Header
+            _buildDateNavigationHeader(totalMinutes),
+            const SizedBox(height: 16),
 
-                // Date Navigation Header
-                _buildDateNavigationHeader(totalMinutes),
-                const SizedBox(height: 16),
+            // Vertical Histogram Usage Bar Chart
+            _buildUsageBarChartCard(totalMinutes),
+            const SizedBox(height: 22),
 
-                // Vertical Histogram Usage Bar Chart
-                _buildUsageBarChartCard(totalMinutes),
-                const SizedBox(height: 22),
+            // Most Used Apps & Expandable Categories
+            _buildMostUsedSection(totalMinutes),
+            const SizedBox(height: 24),
 
-                // Most Used Apps & Expandable Categories
-                _buildMostUsedSection(totalMinutes),
-                const SizedBox(height: 24),
-
-                // Granular Limits & Social Feed Toggles
-                _buildLimitsSection(limits),
-              ],
-            ),
-          );
-        },
+            // Granular Limits & Social Feed Toggles
+            _buildLimitsSection(limits),
+          ],
+        ),
       ),
     );
   }

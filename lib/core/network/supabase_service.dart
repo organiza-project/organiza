@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/supabase_config.dart';
+
 final supabaseServiceProvider = Provider<SupabaseService>((ref) {
   return SupabaseService();
 });
@@ -33,38 +35,54 @@ class LeaderboardUser {
 }
 
 class SupabaseService {
-  static const String _defaultUrl = String.fromEnvironment(
-    'SUPABASE_URL',
-    defaultValue: 'https://organiza-cloud-placeholder.supabase.co',
-  );
-
-  static const String _defaultAnonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder_anon_key_for_organiza_offline',
-  );
-
   bool _initialized = false;
   bool get isInitialized => _initialized;
 
   Future<void> initialize({String? url, String? anonKey}) async {
     if (_initialized) return;
 
-    final targetUrl = url ?? _defaultUrl;
-    final targetKey = anonKey ?? _defaultAnonKey;
+    final targetUrl = url ?? SupabaseConfig.defaultUrl;
+    final targetKey = anonKey ?? SupabaseConfig.defaultAnonKey;
+
+    final isUrlValid = targetUrl.startsWith('https://') &&
+        !targetUrl.contains('YOUR_PROJECT_ID');
+    if (!isUrlValid || targetKey.isEmpty || targetKey.contains('YOUR_ANON_KEY')) {
+      debugPrint('Organiza: Supabase not configured with valid credentials. Running in offline/local mode.');
+      _initialized = false;
+      return;
+    }
 
     try {
       await Supabase.initialize(
         url: targetUrl,
         // ignore: deprecated_member_use
         anonKey: targetKey,
+        authOptions: const FlutterAuthClientOptions(
+          authFlowType: AuthFlowType.pkce,
+        ),
         debug: kDebugMode,
       );
       _initialized = true;
       debugPrint('Organiza: Supabase client initialized.');
     } catch (e) {
-      debugPrint('Organiza: Supabase initialization notice (running offline/local mode): $e');
+      debugPrint(
+          'Organiza: Supabase initialization notice (running offline/local mode): $e');
       _initialized = false;
+    }
+  }
+
+  Future<bool> reconfigure(
+      {required String url, required String anonKey}) async {
+    try {
+      if (_initialized) {
+        await Supabase.instance.dispose();
+        _initialized = false;
+      }
+      await initialize(url: url, anonKey: anonKey);
+      return _initialized;
+    } catch (e) {
+      debugPrint('Organiza: Supabase reconfigure error: $e');
+      return false;
     }
   }
 
@@ -74,6 +92,49 @@ class SupabaseService {
       return Supabase.instance.client;
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Server-side RPC for awarding habit completion XP & stars
+  Future<Map<String, dynamic>> completeHabitWithRpc(String habitId) async {
+    final c = client;
+    if (c == null) {
+      return {'success': false, 'error': 'Supabase not connected'};
+    }
+    try {
+      final response = await c.rpc(
+        'complete_habit_and_award_rewards',
+        params: {'p_habit_id': habitId},
+      );
+      if (response is Map) {
+        return Map<String, dynamic>.from(response);
+      }
+      return {'success': true, 'data': response};
+    } catch (e) {
+      debugPrint('Organiza: completeHabitWithRpc notice: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Server-side RPC for purchasing cosmetics via PostgreSQL RLS & stored procedure
+  Future<Map<String, dynamic>> purchaseCosmeticWithRpc(
+      String cosmeticId) async {
+    final c = client;
+    if (c == null) {
+      return {'success': false, 'error': 'Supabase not connected'};
+    }
+    try {
+      final response = await c.rpc(
+        'purchase_cosmetic_item',
+        params: {'p_cosmetic_id': cosmeticId},
+      );
+      if (response is Map) {
+        return Map<String, dynamic>.from(response);
+      }
+      return {'success': true, 'data': response};
+    } catch (e) {
+      debugPrint('Organiza: purchaseCosmeticWithRpc notice: $e');
+      return {'success': false, 'error': e.toString()};
     }
   }
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'core/config/supabase_config.dart';
 import 'core/constants/app_colors.dart';
 import 'core/network/supabase_service.dart';
 import 'core/theme/app_theme.dart';
@@ -12,8 +14,19 @@ import 'shell.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  final prefs = await SharedPreferences.getInstance();
+  final activeUrl = await SupabaseConfig.getActiveUrl(prefs);
+  final activeAnonKey = await SupabaseConfig.getActiveAnonKey(prefs);
+
   final supabaseService = SupabaseService();
-  await supabaseService.initialize();
+  if (SupabaseConfig.isConfigured || SupabaseConfig.hasCustomServer(prefs)) {
+    await supabaseService.initialize(
+      url: activeUrl,
+      anonKey: activeAnonKey,
+    );
+  } else {
+    debugPrint('Organiza: Supabase is not configured. Running offline mode.');
+  }
 
   runApp(
     ProviderScope(

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/network/supabase_service.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
+import '../../../auth/presentation/widgets/custom_server_dialog.dart';
 import '../../../gamification/domain/cosmetics_catalog.dart';
 import '../../../gamification/presentation/screens/battlepass_shop_screen.dart';
 import '../../../today/presentation/controllers/today_tasks_controller.dart';
@@ -724,6 +728,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       : 'Active • Connected',
                   style: AppTypography.bodySmall.copyWith(fontSize: 11),
                 ),
+              ),
+              const Divider(color: AppColors.border, height: 1),
+              ListTile(
+                leading: const Icon(Icons.dns_rounded,
+                    color: AppColors.primaryAccent),
+                title: Text('Server Connection', style: AppTypography.bodyMedium),
+                subtitle: FutureBuilder<String>(
+                  future: SharedPreferences.getInstance().then(
+                    (p) => SupabaseConfig.hasCustomServer(p)
+                        ? (SupabaseConfig.getSavedCustomUrl(p) ?? 'Custom Server')
+                        : 'Default Cloud',
+                  ),
+                  builder: (context, snapshot) => Text(
+                    snapshot.data ?? 'Default Cloud',
+                    style: AppTypography.bodySmall.copyWith(fontSize: 11),
+                  ),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary),
+                onTap: () async {
+                  await CustomServerDialog.show(context);
+                  if (mounted) setState(() {});
+                },
               ),
               const Divider(color: AppColors.border, height: 1),
               ListTile(

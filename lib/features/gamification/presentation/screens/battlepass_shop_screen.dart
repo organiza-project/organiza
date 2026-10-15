@@ -258,6 +258,23 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen>
       return;
     }
 
+    final supabase = ref.read(supabaseServiceProvider);
+    if (supabase.isInitialized && supabase.currentUser != null) {
+      final rpcResult = await supabase.purchaseCosmeticWithRpc(tierId);
+      if (rpcResult['success'] == false && rpcResult['error'] != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Server purchase validation failed: ${rpcResult['error']}'),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
     setState(() {
       _ownedTierIds.add(tierId);
       _equippedTierId = tierId;
@@ -342,6 +359,23 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen>
         ),
       );
       return;
+    }
+
+    final supabase = ref.read(supabaseServiceProvider);
+    if (supabase.isInitialized && supabase.currentUser != null) {
+      final rpcResult = await supabase.purchaseCosmeticWithRpc(item.id);
+      if (rpcResult['success'] == false && rpcResult['error'] != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Server purchase validation failed: ${rpcResult['error']}'),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+        }
+        return;
+      }
     }
 
     setState(() {

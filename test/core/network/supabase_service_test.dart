@@ -28,5 +28,17 @@ void main() {
       );
       expect(result, isFalse);
     });
+
+    test('completeHabitWithRpc returns error gracefully when client is unconfigured', () async {
+      final result = await supabaseService.completeHabitWithRpc('habit_123');
+      expect(result['success'], isFalse);
+      expect(result['error'], contains('not connected'));
+    });
+
+    test('purchaseCosmeticWithRpc returns error gracefully when client is unconfigured', () async {
+      final result = await supabaseService.purchaseCosmeticWithRpc('frame_123');
+      expect(result['success'], isFalse);
+      expect(result['error'], contains('not connected'));
+    });
   });
 }

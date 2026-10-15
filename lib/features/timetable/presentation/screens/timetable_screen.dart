@@ -419,12 +419,12 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
     final redLineX = (currentMinutes / 60.0) * _hourWidth;
 
     const accentPalette = [
-      Color(0xFF3B82F6), // Blue
-      Color(0xFF10B981), // Emerald
-      Color(0xFF8B5CF6), // Purple
-      Color(0xFFF59E0B), // Amber
-      Color(0xFFEC4899), // Pink
-      Color(0xFF06B6D4), // Cyan
+      AppColors.primaryAccent, // Electric Cyan #00B0C3 (Deep Work)
+      AppColors.secondary,     // Mint Green #00CB95 (Health / Fitness)
+      AppColors.accent,        // Deep Cobalt Indigo #20269E (Lecture / Study)
+      Color(0xFFF59E0B),       // Amber (Personal / Tasks)
+      Color(0xFF8B5CF6),       // Purple (Creative / Flow)
+      Color(0xFF06B6D4),       // Cyan (Review / Misc)
     ];
 
     const totalTrackWidth = 24 * _hourWidth;
@@ -661,8 +661,12 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
     final currentLineTop = (currentMinutes / 60.0) * _hourHeight;
 
     const accentPalette = [
-      Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFF8B5CF6),
-      Color(0xFFF59E0B), Color(0xFFEC4899), Color(0xFF06B6D4),
+      AppColors.primaryAccent,
+      AppColors.secondary,
+      AppColors.accent,
+      Color(0xFFF59E0B),
+      Color(0xFF8B5CF6),
+      Color(0xFF06B6D4),
     ];
 
     return SingleChildScrollView(

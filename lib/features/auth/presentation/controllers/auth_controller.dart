@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -144,12 +145,15 @@ class AuthController extends StateNotifier<OrganizaAuthState> {
         return true;
       }
     } on AuthException catch (e) {
+      debugPrint(
+          'Organiza Auth: Sign-in AuthException: ${e.message} (code: ${e.statusCode})');
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: e.message,
       );
       return false;
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('Organiza Auth: Sign-in unexpected error: $e\n$st');
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: 'Login failed: $e',
@@ -194,12 +198,15 @@ class AuthController extends StateNotifier<OrganizaAuthState> {
       );
       return true;
     } on AuthException catch (e) {
+      debugPrint(
+          'Organiza Auth: Sign-up AuthException: ${e.message} (code: ${e.statusCode})');
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: e.message,
       );
       return false;
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('Organiza Auth: Sign-up unexpected error: $e\n$st');
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: 'Sign up failed: $e',

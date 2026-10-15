@@ -172,6 +172,40 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (authState.status == AuthStatus.error &&
+                        authState.errorMessage != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: AppColors.errorRed.withAlpha(25),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.errorRed.withAlpha(120),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.error_outline_rounded,
+                              color: AppColors.errorRed,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                authState.errorMessage!,
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: AppColors.errorRed,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     // Unique Handle Field
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -10,10 +10,6 @@ import '../../../today/presentation/controllers/today_tasks_controller.dart';
 import '../../../today/presentation/widgets/essay_lockout_dialog.dart';
 import 'screen_time_blocker_screen.dart';
 
-final appLimitsStreamProvider = StreamProvider<List<AppLimit>>((ref) {
-  final db = ref.watch(appDatabaseProvider);
-  return db.watchAppLimits();
-});
 
 class DistractionBlockerScreen extends ConsumerStatefulWidget {
   const DistractionBlockerScreen({super.key});

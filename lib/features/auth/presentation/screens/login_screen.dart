@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../controllers/auth_controller.dart';
+import '../widgets/custom_server_dialog.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -149,6 +150,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (authState.status == AuthStatus.error &&
+                        authState.errorMessage != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: AppColors.errorRed.withAlpha(25),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.errorRed.withAlpha(120),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.error_outline_rounded,
+                              color: AppColors.errorRed,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                authState.errorMessage!,
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: AppColors.errorRed,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     // Email Field
                     Text('EMAIL ADDRESS', style: AppTypography.bodySmall),
                     const SizedBox(height: 8),
@@ -285,7 +320,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                             ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
+
+                    // Self-hosted / custom server config
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: () => CustomServerDialog.show(context),
+                        icon: const Icon(
+                          Icons.dns_outlined,
+                          size: 15,
+                          color: AppColors.textSecondary,
+                        ),
+                        label: Text(
+                          'Self-hosted or custom server? Tap to configure',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
 
                     // Switch to Sign Up
                     Row(

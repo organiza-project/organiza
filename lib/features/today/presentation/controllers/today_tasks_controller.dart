@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/network/supabase_service.dart';
 import '../../../../core/services/app_usage_service.dart';
 import '../../../../data/local/app_database.dart';
 import '../../../../data/local/database_provider.dart';
@@ -73,6 +74,15 @@ class TodayTasksController {
       targetSeconds,
       taskXp,
     );
+
+    // If habit is now completed, trigger server-side RPC security validation
+    final currentLog = await (_db.select(_db.dailyLogs)
+          ..where((tbl) =>
+              tbl.taskId.equals(taskId) & tbl.logDate.equals(todayDate)))
+        .getSingleOrNull();
+    if (currentLog != null && currentLog.isCompleted) {
+      _ref.read(supabaseServiceProvider).completeHabitWithRpc(taskId);
+    }
   }
 
   Future<void> setLoggedDuration({
@@ -89,6 +99,10 @@ class TodayTasksController {
       targetSeconds,
       taskXp,
     );
+
+    if (targetSeconds > 0 && durationSeconds >= targetSeconds) {
+      _ref.read(supabaseServiceProvider).completeHabitWithRpc(taskId);
+    }
   }
 
   Future<void> updateHabit({

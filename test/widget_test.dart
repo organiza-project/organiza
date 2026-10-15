@@ -9,8 +9,15 @@ import 'package:organiza/features/today/presentation/controllers/today_tasks_con
 import 'package:organiza/main.dart';
 import 'package:organiza/shell.dart';
 
+import 'package:organiza/data/local/database_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:organiza/core/services/app_usage_service.dart';
+
 class MockAuthController extends AuthController {
   MockAuthController(super.supabase);
+
+  @override
+  Future<void> checkCurrentSession() async {}
 
   void setAuthenticated() {
     state = const OrganizaAuthState(
@@ -27,7 +34,22 @@ class MockAuthController extends AuthController {
   }
 }
 
+class MockAppUsageService extends AppUsageService {
+  @override
+  Future<Map<String, int>> getAggregatedUsageToday() async => {};
+
+  @override
+  Future<int> getForegroundSecondsToday(String packageName) async => 0;
+
+  @override
+  Future<List<AppInfoOption>> getInstalledAppOptions() async => [];
+}
+
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('App displays LoginScreen when unauthenticated by default',
       (tester) async {
     await tester.pumpWidget(
@@ -64,18 +86,22 @@ void main() {
               .overrideWith((ref) => Stream.value([])),
           journalEntriesStreamProvider
               .overrideWith((ref) => Stream.value([])),
+          appLimitsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+          appUsageServiceProvider.overrideWithValue(MockAppUsageService()),
         ],
         child: const OrganizaApp(),
       ),
     );
 
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(AppShell), findsOneWidget);
     expect(find.text("Today's Focus & Habits"), findsOneWidget);
-    expect(find.text('Today'), findsOneWidget);
-    expect(find.text('Timetable'), findsOneWidget);
-    expect(find.text('Journal'), findsOneWidget);
-    expect(find.text('Battlepass'), findsOneWidget);
-    expect(find.text('You'), findsOneWidget);
+    expect(find.text('Today'), findsWidgets);
+    expect(find.text('Timetable'), findsWidgets);
+    expect(find.text('Detox'), findsWidgets);
+    expect(find.text('Journal'), findsWidgets);
+    expect(find.text('You'), findsWidgets);
   });
 }
