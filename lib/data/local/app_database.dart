@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import 'tables/app_limits_table.dart';
+import 'tables/app_usage_table.dart';
 import 'tables/daily_logs_table.dart';
 import 'tables/journal_entries_table.dart';
 import 'tables/tasks_table.dart';
@@ -35,13 +36,20 @@ class TodayScheduleResult {
 }
 
 @DriftDatabase(
-  tables: [Tasks, DailyLogs, AppLimits, TimetableEntries, JournalEntries],
+  tables: [
+    Tasks,
+    DailyLogs,
+    AppLimits,
+    TimetableEntries,
+    JournalEntries,
+    AppUsageTable,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -56,6 +64,9 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 4) {
             await m.addColumn(dailyLogs, dailyLogs.stars);
+          }
+          if (from < 5) {
+            await m.createTable(appUsageTable);
           }
         },
       );
@@ -204,6 +215,106 @@ class AppDatabase extends _$AppDatabase {
     return select(dailyLogs).watch().map((rows) {
       return rows.fold<int>(0, (sum, row) => sum + row.stars);
     });
+  }
+
+  Stream<int> watchTotalXp() {
+    return select(dailyLogs).watch().map((rows) {
+      return rows.fold<int>(0, (sum, row) => sum + row.xpAwarded);
+    });
+  }
+
+  Stream<int> watchCurrentStreak() {
+    return select(dailyLogs).watch().map((rows) {
+      final completedDates = rows
+          .where((r) => r.isCompleted || r.durationLoggedSeconds > 0)
+          .map((r) => r.logDate)
+          .toSet();
+      if (completedDates.isEmpty) return 0;
+      int streak = 0;
+      var check = DateTime.now();
+      final todayStr =
+          '${check.year}-${check.month.toString().padLeft(2, '0')}-${check.day.toString().padLeft(2, '0')}';
+      if (!completedDates.contains(todayStr)) {
+        check = check.subtract(const Duration(days: 1));
+      }
+      while (true) {
+        final dateStr =
+            '${check.year}-${check.month.toString().padLeft(2, '0')}-${check.day.toString().padLeft(2, '0')}';
+        if (completedDates.contains(dateStr)) {
+          streak++;
+          check = check.subtract(const Duration(days: 1));
+        } else {
+          break;
+        }
+      }
+      return streak;
+    });
+  }
+
+  Stream<List<AppUsageTableData>> watchTodayUsage(String date) {
+    return (select(appUsageTable)
+          ..where((tbl) => tbl.usageDate.equals(date))
+          ..orderBy([(tbl) => OrderingTerm.desc(tbl.totalSeconds)]))
+        .watch();
+  }
+
+  Future<void> incrementUsage(
+    String packageName,
+    String appName,
+    String date,
+    int addedSeconds,
+  ) async {
+    final compositeId = '${date}_$packageName';
+    final existing = await (select(appUsageTable)
+          ..where((tbl) => tbl.id.equals(compositeId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (update(appUsageTable)..where((tbl) => tbl.id.equals(compositeId)))
+          .write(
+        AppUsageTableCompanion(
+          totalSeconds: Value(existing.totalSeconds + addedSeconds),
+          lastActiveTime: Value(DateTime.now()),
+        ),
+      );
+    } else {
+      await into(appUsageTable).insert(
+        AppUsageTableCompanion(
+          id: Value(compositeId),
+          packageName: Value(packageName),
+          appName: Value(appName),
+          usageDate: Value(date),
+          totalSeconds: Value(addedSeconds),
+          lastActiveTime: Value(DateTime.now()),
+        ),
+      );
+    }
+  }
+
+  Future<void> setAppUsage(
+    String packageName,
+    String appName,
+    String date,
+    int totalSeconds,
+  ) async {
+    final compositeId = '${date}_$packageName';
+    await into(appUsageTable).insertOnConflictUpdate(
+      AppUsageTableCompanion(
+        id: Value(compositeId),
+        packageName: Value(packageName),
+        appName: Value(appName),
+        usageDate: Value(date),
+        totalSeconds: Value(totalSeconds),
+        lastActiveTime: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  Future<Map<String, int>> getTodayUsageMap(String date) async {
+    final rows = await (select(appUsageTable)
+          ..where((tbl) => tbl.usageDate.equals(date)))
+        .get();
+    return {for (final r in rows) r.packageName: r.totalSeconds};
   }
 
   Stream<List<AppLimit>> watchAppLimits() {

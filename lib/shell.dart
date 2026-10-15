@@ -7,6 +7,7 @@ import 'features/assistant/presentation/voice_assistant_modal.dart';
 import 'features/blocker/presentation/screens/screen_time_blocker_screen.dart';
 import 'features/gamification/presentation/screens/battlepass_shop_screen.dart';
 import 'features/journal/presentation/screens/journal_screen.dart';
+import 'features/profile/presentation/controllers/profile_controller.dart';
 import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/timetable/presentation/screens/timetable_screen.dart';
 import 'features/today/presentation/screens/today_screen.dart';
@@ -161,6 +162,11 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   Widget _buildDesktopTopBar() {
+    final userProfile = ref.watch(profileControllerProvider);
+    final streak = userProfile.currentStreak;
+    final level = userProfile.level;
+    final streakActive = streak > 0;
+
     return Container(
       height: 58,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -201,7 +207,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             ),
           ),
           const Spacer(),
-          // Top Bar Controls: Voice, Notification, Streak, Profile
+          // Top Bar Controls: Voice, Notification, Streak, Level Badge
           IconButton(
             tooltip: 'Notifications',
             onPressed: () {},
@@ -211,16 +217,45 @@ class _AppShellState extends ConsumerState<AppShell> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.secondary.withAlpha(25),
+              color: streakActive ? AppColors.secondary.withAlpha(25) : AppColors.surfaceElevated,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.secondary.withAlpha(80)),
+              border: Border.all(
+                color: streakActive ? AppColors.secondary.withAlpha(80) : AppColors.border,
+              ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.local_fire_department_rounded, size: 16, color: AppColors.secondary),
+                Icon(
+                  Icons.local_fire_department_rounded,
+                  size: 16,
+                  color: streakActive ? AppColors.secondary : AppColors.textSecondary,
+                ),
                 const SizedBox(width: 4),
-                Text('21d', style: AppTypography.accentMono.copyWith(fontSize: 12, color: AppColors.secondary)),
+                Text(
+                  '${streak}d',
+                  style: AppTypography.accentMono.copyWith(
+                    fontSize: 12,
+                    color: streakActive ? AppColors.secondary : AppColors.textSecondary,
+                  ),
+                ),
               ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.primaryAccent.withAlpha(25),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.primaryAccent.withAlpha(80)),
+            ),
+            child: Text(
+              'Lvl $level',
+              style: AppTypography.accentMono.copyWith(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primaryAccent,
+              ),
             ),
           ),
         ],

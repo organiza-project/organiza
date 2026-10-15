@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/network/supabase_service.dart';
+import '../../../profile/presentation/controllers/profile_controller.dart';
 import '../../../today/presentation/controllers/today_tasks_controller.dart';
 import '../../domain/cosmetics_catalog.dart';
 
@@ -48,9 +49,10 @@ class BattlepassShopScreen extends ConsumerStatefulWidget {
 
 class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen>
     with SingleTickerProviderStateMixin {
-  static const int _userLevel = 14;
-  static const int _currentXp = 1850;
-  static const int _nextTierXp = 2000;
+  int get _userLevel => ref.watch(profileControllerProvider).level;
+  int get _currentXp => ref.watch(profileControllerProvider).xpInCurrentLevel;
+  int get _nextTierXp => ref.watch(profileControllerProvider).xpNeededForNextLevel;
+  String get _userMoniker => ref.watch(profileControllerProvider).moniker;
 
   late TabController _tabController;
 
@@ -750,12 +752,12 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Spartan Adept · Level $_userLevel',
+                      '$_userMoniker · Level $_userLevel',
                       style: AppTypography.h2.copyWith(fontSize: 17),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Next Tier Unlock at Level 16 (Tier 9)',
+                      _getNextTierSubtitle(_userLevel),
                       style: AppTypography.bodySmall.copyWith(fontSize: 11),
                     ),
                   ],
@@ -788,6 +790,15 @@ class _BattlepassShopScreenState extends ConsumerState<BattlepassShopScreen>
         ],
       ),
     );
+  }
+
+  String _getNextTierSubtitle(int level) {
+    for (final t in _tiers) {
+      if (t.requiredLevel > level) {
+        return 'Next Tier Unlock at Level ${t.requiredLevel} (Tier ${t.tierNumber})';
+      }
+    }
+    return 'All Battlepass Tiers Unlocked';
   }
 
   Widget _buildHorizontalTierTrack(int totalStars) {

@@ -2844,6 +2844,440 @@ class JournalEntriesCompanion extends UpdateCompanion<JournalEntry> {
   }
 }
 
+class $AppUsageTableTable extends AppUsageTable
+    with TableInfo<$AppUsageTableTable, AppUsageTableData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AppUsageTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _packageNameMeta = const VerificationMeta(
+    'packageName',
+  );
+  @override
+  late final GeneratedColumn<String> packageName = GeneratedColumn<String>(
+    'package_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _appNameMeta = const VerificationMeta(
+    'appName',
+  );
+  @override
+  late final GeneratedColumn<String> appName = GeneratedColumn<String>(
+    'app_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _usageDateMeta = const VerificationMeta(
+    'usageDate',
+  );
+  @override
+  late final GeneratedColumn<String> usageDate = GeneratedColumn<String>(
+    'usage_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _totalSecondsMeta = const VerificationMeta(
+    'totalSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> totalSeconds = GeneratedColumn<int>(
+    'total_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastActiveTimeMeta = const VerificationMeta(
+    'lastActiveTime',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastActiveTime =
+      GeneratedColumn<DateTime>(
+        'last_active_time',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    packageName,
+    appName,
+    usageDate,
+    totalSeconds,
+    lastActiveTime,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'app_usage_table';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AppUsageTableData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('package_name')) {
+      context.handle(
+        _packageNameMeta,
+        packageName.isAcceptableOrUnknown(
+          data['package_name']!,
+          _packageNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_packageNameMeta);
+    }
+    if (data.containsKey('app_name')) {
+      context.handle(
+        _appNameMeta,
+        appName.isAcceptableOrUnknown(data['app_name']!, _appNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_appNameMeta);
+    }
+    if (data.containsKey('usage_date')) {
+      context.handle(
+        _usageDateMeta,
+        usageDate.isAcceptableOrUnknown(data['usage_date']!, _usageDateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_usageDateMeta);
+    }
+    if (data.containsKey('total_seconds')) {
+      context.handle(
+        _totalSecondsMeta,
+        totalSeconds.isAcceptableOrUnknown(
+          data['total_seconds']!,
+          _totalSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_active_time')) {
+      context.handle(
+        _lastActiveTimeMeta,
+        lastActiveTime.isAcceptableOrUnknown(
+          data['last_active_time']!,
+          _lastActiveTimeMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AppUsageTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AppUsageTableData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      packageName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}package_name'],
+      )!,
+      appName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}app_name'],
+      )!,
+      usageDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}usage_date'],
+      )!,
+      totalSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}total_seconds'],
+      )!,
+      lastActiveTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_active_time'],
+      ),
+    );
+  }
+
+  @override
+  $AppUsageTableTable createAlias(String alias) {
+    return $AppUsageTableTable(attachedDatabase, alias);
+  }
+}
+
+class AppUsageTableData extends DataClass
+    implements Insertable<AppUsageTableData> {
+  final String id;
+  final String packageName;
+  final String appName;
+  final String usageDate;
+  final int totalSeconds;
+  final DateTime? lastActiveTime;
+  const AppUsageTableData({
+    required this.id,
+    required this.packageName,
+    required this.appName,
+    required this.usageDate,
+    required this.totalSeconds,
+    this.lastActiveTime,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['package_name'] = Variable<String>(packageName);
+    map['app_name'] = Variable<String>(appName);
+    map['usage_date'] = Variable<String>(usageDate);
+    map['total_seconds'] = Variable<int>(totalSeconds);
+    if (!nullToAbsent || lastActiveTime != null) {
+      map['last_active_time'] = Variable<DateTime>(lastActiveTime);
+    }
+    return map;
+  }
+
+  AppUsageTableCompanion toCompanion(bool nullToAbsent) {
+    return AppUsageTableCompanion(
+      id: Value(id),
+      packageName: Value(packageName),
+      appName: Value(appName),
+      usageDate: Value(usageDate),
+      totalSeconds: Value(totalSeconds),
+      lastActiveTime: lastActiveTime == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastActiveTime),
+    );
+  }
+
+  factory AppUsageTableData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AppUsageTableData(
+      id: serializer.fromJson<String>(json['id']),
+      packageName: serializer.fromJson<String>(json['packageName']),
+      appName: serializer.fromJson<String>(json['appName']),
+      usageDate: serializer.fromJson<String>(json['usageDate']),
+      totalSeconds: serializer.fromJson<int>(json['totalSeconds']),
+      lastActiveTime: serializer.fromJson<DateTime?>(json['lastActiveTime']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'packageName': serializer.toJson<String>(packageName),
+      'appName': serializer.toJson<String>(appName),
+      'usageDate': serializer.toJson<String>(usageDate),
+      'totalSeconds': serializer.toJson<int>(totalSeconds),
+      'lastActiveTime': serializer.toJson<DateTime?>(lastActiveTime),
+    };
+  }
+
+  AppUsageTableData copyWith({
+    String? id,
+    String? packageName,
+    String? appName,
+    String? usageDate,
+    int? totalSeconds,
+    Value<DateTime?> lastActiveTime = const Value.absent(),
+  }) => AppUsageTableData(
+    id: id ?? this.id,
+    packageName: packageName ?? this.packageName,
+    appName: appName ?? this.appName,
+    usageDate: usageDate ?? this.usageDate,
+    totalSeconds: totalSeconds ?? this.totalSeconds,
+    lastActiveTime: lastActiveTime.present
+        ? lastActiveTime.value
+        : this.lastActiveTime,
+  );
+  AppUsageTableData copyWithCompanion(AppUsageTableCompanion data) {
+    return AppUsageTableData(
+      id: data.id.present ? data.id.value : this.id,
+      packageName: data.packageName.present
+          ? data.packageName.value
+          : this.packageName,
+      appName: data.appName.present ? data.appName.value : this.appName,
+      usageDate: data.usageDate.present ? data.usageDate.value : this.usageDate,
+      totalSeconds: data.totalSeconds.present
+          ? data.totalSeconds.value
+          : this.totalSeconds,
+      lastActiveTime: data.lastActiveTime.present
+          ? data.lastActiveTime.value
+          : this.lastActiveTime,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AppUsageTableData(')
+          ..write('id: $id, ')
+          ..write('packageName: $packageName, ')
+          ..write('appName: $appName, ')
+          ..write('usageDate: $usageDate, ')
+          ..write('totalSeconds: $totalSeconds, ')
+          ..write('lastActiveTime: $lastActiveTime')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    packageName,
+    appName,
+    usageDate,
+    totalSeconds,
+    lastActiveTime,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AppUsageTableData &&
+          other.id == this.id &&
+          other.packageName == this.packageName &&
+          other.appName == this.appName &&
+          other.usageDate == this.usageDate &&
+          other.totalSeconds == this.totalSeconds &&
+          other.lastActiveTime == this.lastActiveTime);
+}
+
+class AppUsageTableCompanion extends UpdateCompanion<AppUsageTableData> {
+  final Value<String> id;
+  final Value<String> packageName;
+  final Value<String> appName;
+  final Value<String> usageDate;
+  final Value<int> totalSeconds;
+  final Value<DateTime?> lastActiveTime;
+  final Value<int> rowid;
+  const AppUsageTableCompanion({
+    this.id = const Value.absent(),
+    this.packageName = const Value.absent(),
+    this.appName = const Value.absent(),
+    this.usageDate = const Value.absent(),
+    this.totalSeconds = const Value.absent(),
+    this.lastActiveTime = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AppUsageTableCompanion.insert({
+    required String id,
+    required String packageName,
+    required String appName,
+    required String usageDate,
+    this.totalSeconds = const Value.absent(),
+    this.lastActiveTime = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       packageName = Value(packageName),
+       appName = Value(appName),
+       usageDate = Value(usageDate);
+  static Insertable<AppUsageTableData> custom({
+    Expression<String>? id,
+    Expression<String>? packageName,
+    Expression<String>? appName,
+    Expression<String>? usageDate,
+    Expression<int>? totalSeconds,
+    Expression<DateTime>? lastActiveTime,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (packageName != null) 'package_name': packageName,
+      if (appName != null) 'app_name': appName,
+      if (usageDate != null) 'usage_date': usageDate,
+      if (totalSeconds != null) 'total_seconds': totalSeconds,
+      if (lastActiveTime != null) 'last_active_time': lastActiveTime,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AppUsageTableCompanion copyWith({
+    Value<String>? id,
+    Value<String>? packageName,
+    Value<String>? appName,
+    Value<String>? usageDate,
+    Value<int>? totalSeconds,
+    Value<DateTime?>? lastActiveTime,
+    Value<int>? rowid,
+  }) {
+    return AppUsageTableCompanion(
+      id: id ?? this.id,
+      packageName: packageName ?? this.packageName,
+      appName: appName ?? this.appName,
+      usageDate: usageDate ?? this.usageDate,
+      totalSeconds: totalSeconds ?? this.totalSeconds,
+      lastActiveTime: lastActiveTime ?? this.lastActiveTime,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (packageName.present) {
+      map['package_name'] = Variable<String>(packageName.value);
+    }
+    if (appName.present) {
+      map['app_name'] = Variable<String>(appName.value);
+    }
+    if (usageDate.present) {
+      map['usage_date'] = Variable<String>(usageDate.value);
+    }
+    if (totalSeconds.present) {
+      map['total_seconds'] = Variable<int>(totalSeconds.value);
+    }
+    if (lastActiveTime.present) {
+      map['last_active_time'] = Variable<DateTime>(lastActiveTime.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AppUsageTableCompanion(')
+          ..write('id: $id, ')
+          ..write('packageName: $packageName, ')
+          ..write('appName: $appName, ')
+          ..write('usageDate: $usageDate, ')
+          ..write('totalSeconds: $totalSeconds, ')
+          ..write('lastActiveTime: $lastActiveTime, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2854,6 +3288,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $JournalEntriesTable journalEntries = $JournalEntriesTable(this);
+  late final $AppUsageTableTable appUsageTable = $AppUsageTableTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2864,6 +3299,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     appLimits,
     timetableEntries,
     journalEntries,
+    appUsageTable,
   ];
 }
 
@@ -4473,6 +4909,235 @@ typedef $$JournalEntriesTableProcessedTableManager =
       JournalEntry,
       PrefetchHooks Function()
     >;
+typedef $$AppUsageTableTableCreateCompanionBuilder =
+    AppUsageTableCompanion Function({
+      required String id,
+      required String packageName,
+      required String appName,
+      required String usageDate,
+      Value<int> totalSeconds,
+      Value<DateTime?> lastActiveTime,
+      Value<int> rowid,
+    });
+typedef $$AppUsageTableTableUpdateCompanionBuilder =
+    AppUsageTableCompanion Function({
+      Value<String> id,
+      Value<String> packageName,
+      Value<String> appName,
+      Value<String> usageDate,
+      Value<int> totalSeconds,
+      Value<DateTime?> lastActiveTime,
+      Value<int> rowid,
+    });
+
+class $$AppUsageTableTableFilterComposer
+    extends Composer<_$AppDatabase, $AppUsageTableTable> {
+  $$AppUsageTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get packageName => $composableBuilder(
+    column: $table.packageName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get appName => $composableBuilder(
+    column: $table.appName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get usageDate => $composableBuilder(
+    column: $table.usageDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get totalSeconds => $composableBuilder(
+    column: $table.totalSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastActiveTime => $composableBuilder(
+    column: $table.lastActiveTime,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AppUsageTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $AppUsageTableTable> {
+  $$AppUsageTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get packageName => $composableBuilder(
+    column: $table.packageName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get appName => $composableBuilder(
+    column: $table.appName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get usageDate => $composableBuilder(
+    column: $table.usageDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get totalSeconds => $composableBuilder(
+    column: $table.totalSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastActiveTime => $composableBuilder(
+    column: $table.lastActiveTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AppUsageTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AppUsageTableTable> {
+  $$AppUsageTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get packageName => $composableBuilder(
+    column: $table.packageName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get appName =>
+      $composableBuilder(column: $table.appName, builder: (column) => column);
+
+  GeneratedColumn<String> get usageDate =>
+      $composableBuilder(column: $table.usageDate, builder: (column) => column);
+
+  GeneratedColumn<int> get totalSeconds => $composableBuilder(
+    column: $table.totalSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastActiveTime => $composableBuilder(
+    column: $table.lastActiveTime,
+    builder: (column) => column,
+  );
+}
+
+class $$AppUsageTableTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AppUsageTableTable,
+          AppUsageTableData,
+          $$AppUsageTableTableFilterComposer,
+          $$AppUsageTableTableOrderingComposer,
+          $$AppUsageTableTableAnnotationComposer,
+          $$AppUsageTableTableCreateCompanionBuilder,
+          $$AppUsageTableTableUpdateCompanionBuilder,
+          (
+            AppUsageTableData,
+            BaseReferences<
+              _$AppDatabase,
+              $AppUsageTableTable,
+              AppUsageTableData
+            >,
+          ),
+          AppUsageTableData,
+          PrefetchHooks Function()
+        > {
+  $$AppUsageTableTableTableManager(_$AppDatabase db, $AppUsageTableTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AppUsageTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AppUsageTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AppUsageTableTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> packageName = const Value.absent(),
+                Value<String> appName = const Value.absent(),
+                Value<String> usageDate = const Value.absent(),
+                Value<int> totalSeconds = const Value.absent(),
+                Value<DateTime?> lastActiveTime = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AppUsageTableCompanion(
+                id: id,
+                packageName: packageName,
+                appName: appName,
+                usageDate: usageDate,
+                totalSeconds: totalSeconds,
+                lastActiveTime: lastActiveTime,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String packageName,
+                required String appName,
+                required String usageDate,
+                Value<int> totalSeconds = const Value.absent(),
+                Value<DateTime?> lastActiveTime = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AppUsageTableCompanion.insert(
+                id: id,
+                packageName: packageName,
+                appName: appName,
+                usageDate: usageDate,
+                totalSeconds: totalSeconds,
+                lastActiveTime: lastActiveTime,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AppUsageTableTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AppUsageTableTable,
+      AppUsageTableData,
+      $$AppUsageTableTableFilterComposer,
+      $$AppUsageTableTableOrderingComposer,
+      $$AppUsageTableTableAnnotationComposer,
+      $$AppUsageTableTableCreateCompanionBuilder,
+      $$AppUsageTableTableUpdateCompanionBuilder,
+      (
+        AppUsageTableData,
+        BaseReferences<_$AppDatabase, $AppUsageTableTable, AppUsageTableData>,
+      ),
+      AppUsageTableData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4487,4 +5152,6 @@ class $AppDatabaseManager {
       $$TimetableEntriesTableTableManager(_db, _db.timetableEntries);
   $$JournalEntriesTableTableManager get journalEntries =>
       $$JournalEntriesTableTableManager(_db, _db.journalEntries);
+  $$AppUsageTableTableTableManager get appUsageTable =>
+      $$AppUsageTableTableTableManager(_db, _db.appUsageTable);
 }

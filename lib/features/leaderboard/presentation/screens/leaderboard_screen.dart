@@ -6,12 +6,19 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/network/supabase_service.dart';
 import '../../../gamification/presentation/screens/battlepass_shop_screen.dart';
 import '../../../gamification/presentation/screens/shop_profile_screen.dart';
+import '../../../social/presentation/widgets/duel_challenge_card.dart';
 import '../../../today/presentation/controllers/today_tasks_controller.dart';
 
 final leaderboardUsersProvider =
     FutureProvider.autoDispose<List<LeaderboardUser>>((ref) async {
   final supabase = ref.watch(supabaseServiceProvider);
   return supabase.fetchLeaderboard();
+});
+
+final userChallengesProvider =
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final supabase = ref.watch(supabaseServiceProvider);
+  return supabase.fetchChallenges();
 });
 
 class LeaderboardScreen extends ConsumerWidget {
@@ -514,145 +521,112 @@ class LeaderboardScreen extends ConsumerWidget {
     );
   }
 
-  // 7-Day & 30-Day Discipline Duel Head-to-Head Banner
+  // 7-Day & 30-Day Discipline Duel Head-to-Head Section
   Widget _buildChallengeBanner(BuildContext context, WidgetRef ref) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.surfaceElevated,
-            AppColors.surface,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.primaryAccent.withAlpha(70),
-          width: 1.2,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryAccent.withAlpha(35),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.sports_kabaddi_rounded,
-                      color: AppColors.primaryAccent,
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'DISCIPLINE DUEL',
-                    style: AppTypography.accentMono.copyWith(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withAlpha(25),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.amber.withAlpha(80)),
-                ),
-                child: Text(
-                  '7-Day Sprint',
-                  style: AppTypography.bodySmall.copyWith(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amber,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+    final challengesAsync = ref.watch(userChallengesProvider);
 
-          // Head-to-Head Split Comparison Bar
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'You: 1,850 XP',
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primaryAccent,
-                ),
-              ),
-              Text(
-                'Alex: 1,620 XP',
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: SizedBox(
-              height: 8,
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 1850,
-                    child: Container(color: AppColors.primaryAccent),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryAccent.withAlpha(35),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(width: 2),
-                  Expanded(
-                    flex: 1620,
-                    child: Container(color: AppColors.border),
+                  child: const Icon(
+                    Icons.sports_kabaddi_rounded,
+                    color: AppColors.primaryAccent,
+                    size: 18,
                   ),
-                ],
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'DISCIPLINE DUELS',
+                  style: AppTypography.accentMono.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ],
+            ),
+            ElevatedButton.icon(
+              onPressed: () => _showChallengeModal(context),
+              icon: const Icon(Icons.add_circle_outline_rounded, size: 14),
+              label: const Text('New Duel',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                backgroundColor: AppColors.primaryAccent,
+                foregroundColor: AppColors.background,
+                elevation: 0,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        challengesAsync.when(
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: CircularProgressIndicator(color: AppColors.primaryAccent),
+            ),
           ),
-          const SizedBox(height: 12),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '3 days remaining · Stake: 50 ★',
-                style: AppTypography.bodySmall.copyWith(fontSize: 11),
-              ),
-              ElevatedButton.icon(
-                onPressed: () => _showChallengeModal(context),
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 14),
-                label: const Text('New Duel', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  backgroundColor: AppColors.primaryAccent,
-                  foregroundColor: AppColors.background,
-                  elevation: 0,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+          error: (err, stack) => const SizedBox.shrink(),
+          data: (challenges) {
+            if (challenges.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.shield_outlined,
+                        color: AppColors.textSecondary, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('No Active Duels',
+                              style: AppTypography.bodyMedium
+                                  .copyWith(fontWeight: FontWeight.bold)),
+                          Text(
+                            'Challenge a comrade to a 7-day or 30-day XP sprint!',
+                            style: AppTypography.bodySmall.copyWith(fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return Column(
+              children: challenges
+                  .map((c) => DuelChallengeCard(
+                        challenge: c,
+                        onRefresh: () => ref.invalidate(userChallengesProvider),
+                      ))
+                  .toList(),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -667,15 +641,19 @@ class LeaderboardScreen extends ConsumerWidget {
   }
 }
 
-class _ChallengeModalSheet extends StatefulWidget {
+class _ChallengeModalSheet extends ConsumerStatefulWidget {
+  const _ChallengeModalSheet();
+
   @override
-  State<_ChallengeModalSheet> createState() => _ChallengeModalSheetState();
+  ConsumerState<_ChallengeModalSheet> createState() =>
+      _ChallengeModalSheetState();
 }
 
-class _ChallengeModalSheetState extends State<_ChallengeModalSheet> {
+class _ChallengeModalSheetState extends ConsumerState<_ChallengeModalSheet> {
   final _handleController = TextEditingController();
   int _selectedDurationDays = 7;
   int _starWager = 50;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -881,20 +859,7 @@ class _ChallengeModalSheetState extends State<_ChallengeModalSheet> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: () {
-                  final handle = _handleController.text.trim();
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        handle.isEmpty
-                            ? 'Issued open $_selectedDurationDays-day Discipline Duel! ⚡'
-                            : 'Challenge sent to @$handle for $_selectedDurationDays days! ⚡',
-                      ),
-                      backgroundColor: AppColors.surfaceElevated,
-                    ),
-                  );
-                },
+                onPressed: _isSubmitting ? null : _submitChallenge,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryAccent,
                   foregroundColor: AppColors.background,
@@ -902,18 +867,96 @@ class _ChallengeModalSheetState extends State<_ChallengeModalSheet> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text(
-                  'Issue Duel Challenge',
-                  style: AppTypography.h2.copyWith(
-                    color: AppColors.background,
-                    fontSize: 15,
-                  ),
-                ),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.background,
+                        ),
+                      )
+                    : Text(
+                        'Issue Duel Challenge ⚔️',
+                        style: AppTypography.h2.copyWith(
+                          color: AppColors.background,
+                          fontSize: 15,
+                        ),
+                      ),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _submitChallenge() async {
+    final handle = _handleController.text.trim().replaceAll('@', '');
+    if (handle.isEmpty) return;
+
+    setState(() => _isSubmitting = true);
+    final supabase = ref.read(supabaseServiceProvider);
+    final client = supabase.client;
+
+    if (client == null) {
+      setState(() => _isSubmitting = false);
+      return;
+    }
+
+    try {
+      final target = await client
+          .from('profiles')
+          .select('id, username')
+          .eq('username', handle)
+          .maybeSingle();
+
+      if (target == null) {
+        setState(() => _isSubmitting = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Spartan @$handle not found on Organiza network.'),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+        }
+        return;
+      }
+
+      final success = await supabase.createChallenge(
+        opponentId: target['id'] as String,
+        durationDays: _selectedDurationDays,
+        wagerStars: _starWager,
+      );
+
+      setState(() => _isSubmitting = false);
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ref.invalidate(userChallengesProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? 'Challenge dispatched to @$handle for $_selectedDurationDays days! ⚔️'
+                  : 'Could not send challenge.',
+            ),
+            backgroundColor:
+                success ? AppColors.successGreen : AppColors.errorRed,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _isSubmitting = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Notice: $e'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      }
+    }
   }
 }

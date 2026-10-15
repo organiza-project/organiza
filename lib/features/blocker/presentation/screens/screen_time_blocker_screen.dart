@@ -439,7 +439,7 @@ class _ScreenTimeBlockerScreenState
                 size: 36, color: AppColors.textSecondary),
             const SizedBox(height: 12),
             Text(
-              'No distraction metrics recorded yet today.',
+              'No active screen time logged today.',
               textAlign: TextAlign.center,
               style: AppTypography.bodyMedium.copyWith(
                 color: AppColors.textSecondary,
@@ -448,9 +448,27 @@ class _ScreenTimeBlockerScreenState
             ),
             const SizedBox(height: 6),
             Text(
-              'Active app time from Android or linked habits will stream here.',
+              'Your tracked apps will appear here as you use them.',
               textAlign: TextAlign.center,
               style: AppTypography.bodySmall.copyWith(fontSize: 11),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 24,
+              child: Row(
+                children: [
+                  Text('0m',
+                      style: AppTypography.accentMono.copyWith(
+                          fontSize: 10, color: AppColors.textSecondary)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      height: 1,
+                      color: AppColors.border,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

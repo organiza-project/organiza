@@ -11,7 +11,8 @@ import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../auth/presentation/widgets/custom_server_dialog.dart';
 import '../../../gamification/domain/cosmetics_catalog.dart';
 import '../../../gamification/presentation/screens/battlepass_shop_screen.dart';
-import '../../../today/presentation/controllers/today_tasks_controller.dart';
+import '../../../social/presentation/widgets/duel_challenge_dialog.dart';
+import '../controllers/profile_controller.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -23,6 +24,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _friendSearchController = TextEditingController();
   List<Map<String, dynamic>> _friends = [];
+  List<Map<String, dynamic>> _pendingRequests = [];
   bool _isLoadingFriends = false;
   bool _isAddingFriend = false;
 
@@ -40,13 +42,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Future<void> _loadFriends() async {
     setState(() => _isLoadingFriends = true);
-    final friends = await ref.read(supabaseServiceProvider).fetchFriends();
+    final supabase = ref.read(supabaseServiceProvider);
+    final friends = await supabase.fetchFriends();
+    final pending = await supabase.fetchPendingFriendRequests();
     if (mounted) {
       setState(() {
         _friends = friends;
+        _pendingRequests = pending;
         _isLoadingFriends = false;
       });
     }
+  }
+
+  Future<void> _respondToRequest(String id, bool accept) async {
+    final supabase = ref.read(supabaseServiceProvider);
+    await supabase.respondToFriendRequest(id, accept);
+    _loadFriends();
   }
 
   void _showAddFriendDialog() {
@@ -171,7 +182,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final user = authState.user;
-    final totalStars = ref.watch(totalStarsStreamProvider).valueOrNull ?? 65;
+    final profile = ref.watch(profileControllerProvider);
+    final totalStars = profile.stars;
+    final totalXp = profile.totalXp;
+    final currentStreak = profile.currentStreak;
+    final userLevel = profile.level;
+    final userMoniker = profile.moniker;
+
     final username = authState.username ??
         (user?.userMetadata?['username'] as String?) ??
         'Spartan Initiate';
@@ -207,6 +224,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 banner: activeBanner,
                 frame: activeFrame,
                 effect: activeEffect,
+                level: userLevel,
+                moniker: userMoniker,
               ),
 
               const SizedBox(height: 16),
@@ -214,7 +233,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               // Stats Row: Streak, Star Vault, Total XP
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: _buildStatsRow(totalStars),
+                child: _buildStatsRow(
+                  streak: currentStreak,
+                  totalStars: totalStars,
+                  totalXp: totalXp,
+                ),
               ),
 
               const SizedBox(height: 20),
@@ -253,6 +276,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required CosmeticItem banner,
     required CosmeticItem frame,
     required CosmeticItem effect,
+    required int level,
+    required String moniker,
   }) {
     return Container(
       margin: const EdgeInsets.all(16),
@@ -340,7 +365,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     border: Border.all(color: AppColors.border),
                   ),
                   child: Text(
-                    'LVL 14 · Spartan Adept',
+                    'LVL $level · $moniker',
                     style: AppTypography.accentMono.copyWith(
                       fontSize: 11,
                       color: Colors.amber,
@@ -439,15 +464,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _buildStatsRow(int totalStars) {
+  Widget _buildStatsRow({
+    required int streak,
+    required int totalStars,
+    required int totalXp,
+  }) {
     return Row(
       children: [
         Expanded(
           child: _buildStatCard(
             title: 'Current Streak',
-            value: '14 Days',
+            value: '$streak ${streak == 1 ? "Day" : "Days"}',
             icon: Icons.local_fire_department_rounded,
-            iconColor: Colors.deepOrangeAccent,
+            iconColor: streak > 0 ? Colors.deepOrangeAccent : AppColors.textSecondary,
           ),
         ),
         const SizedBox(width: 10),
@@ -463,7 +492,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         Expanded(
           child: _buildStatCard(
             title: 'Total XP',
-            value: '1,850 XP',
+            value: '$totalXp XP',
             icon: Icons.bolt_rounded,
             iconColor: AppColors.primaryAccent,
           ),
@@ -571,9 +600,111 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildFriendsSection() {
+    final currentUserId = ref.read(supabaseServiceProvider).currentUser?.id;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Pending Friend Requests Banner / List
+        if (_pendingRequests.isNotEmpty) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('INCOMING FRIEND REQUESTS',
+                  style: AppTypography.bodySmall
+                      .copyWith(color: AppColors.primaryAccent)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryAccent.withAlpha(30),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${_pendingRequests.length} pending',
+                  style: AppTypography.accentMono.copyWith(
+                    fontSize: 10,
+                    color: AppColors.primaryAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ..._pendingRequests.map((req) {
+            final reqId = req['id'] as String;
+            final profile = req['profiles'] as Map<String, dynamic>? ?? {};
+            final reqName = profile['username'] as String? ?? 'Spartan';
+            final reqStreak = profile['streak_days'] as int? ?? 1;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: AppColors.primaryAccent.withAlpha(100), width: 1.2),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: AppColors.surfaceElevated,
+                    child: Text(
+                      reqName.isNotEmpty ? reqName[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryAccent,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('@$reqName',
+                            style: AppTypography.bodyMedium
+                                .copyWith(fontWeight: FontWeight.bold)),
+                        Text('$reqStreak-day streak',
+                            style: AppTypography.bodySmall.copyWith(fontSize: 10)),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => _respondToRequest(reqId, false),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Decline', style: TextStyle(fontSize: 11)),
+                  ),
+                  const SizedBox(width: 6),
+                  ElevatedButton(
+                    onPressed: () => _respondToRequest(reqId, true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryAccent,
+                      foregroundColor: AppColors.background,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Accept',
+                        style: TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 16),
+        ],
+
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -643,6 +774,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             final friendXp = profile['total_xp'] as int? ?? 0;
             final friendStreak = profile['streak_days'] as int? ?? 1;
 
+            final targetFriendId = (profile['id'] as String?) ??
+                (f['friend_id'] == currentUserId
+                    ? (f['user_id'] as String? ?? '')
+                    : (f['friend_id'] as String? ?? ''));
+
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -685,16 +821,46 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             const SizedBox(width: 3),
                             Text(
                               '$friendStreak-day streak',
-                              style: AppTypography.bodySmall.copyWith(fontSize: 11),
+                              style:
+                                  AppTypography.bodySmall.copyWith(fontSize: 11),
                             ),
                           ],
                         ),
                       ],
                     ),
                   ),
-                  Text(
-                    '$friendXp XP',
-                    style: AppTypography.accentMono.copyWith(fontSize: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '$friendXp XP',
+                        style: AppTypography.accentMono.copyWith(fontSize: 12),
+                      ),
+                      const SizedBox(height: 4),
+                      if (targetFriendId.isNotEmpty)
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            DuelChallengeDialog.show(
+                              context,
+                              friendId: targetFriendId,
+                              friendName: friendName,
+                            );
+                          },
+                          icon: const Icon(Icons.military_tech_rounded, size: 12),
+                          label: const Text('Duel ⚔️',
+                              style: TextStyle(
+                                  fontSize: 10, fontWeight: FontWeight.bold)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                                color: AppColors.primaryAccent),
+                            foregroundColor: AppColors.primaryAccent,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),

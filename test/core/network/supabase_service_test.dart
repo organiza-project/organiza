@@ -40,5 +40,39 @@ void main() {
       expect(result['success'], isFalse);
       expect(result['error'], contains('not connected'));
     });
+
+    test('fetchPendingFriendRequests returns empty list when unconfigured', () async {
+      final requests = await supabaseService.fetchPendingFriendRequests();
+      expect(requests, isEmpty);
+    });
+
+    test('respondToFriendRequest returns false gracefully when unconfigured', () async {
+      final result = await supabaseService.respondToFriendRequest('req_123', true);
+      expect(result, isFalse);
+    });
+
+    test('createChallenge returns false gracefully when unconfigured', () async {
+      final result = await supabaseService.createChallenge(
+        opponentId: 'u2',
+        durationDays: 7,
+        wagerStars: 25,
+      );
+      expect(result, isFalse);
+    });
+
+    test('fetchChallenges returns empty list when unconfigured', () async {
+      final challenges = await supabaseService.fetchChallenges();
+      expect(challenges, isEmpty);
+    });
+
+    test('acceptChallenge returns false gracefully when unconfigured', () async {
+      final result = await supabaseService.acceptChallenge('ch_123');
+      expect(result, isFalse);
+    });
+
+    test('declineChallenge returns false gracefully when unconfigured', () async {
+      final result = await supabaseService.declineChallenge('ch_123');
+      expect(result, isFalse);
+    });
   });
 }

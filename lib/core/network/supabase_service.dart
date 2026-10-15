@@ -209,8 +209,68 @@ class SupabaseService {
     return const [];
   }
 
-  /// Fetch live friends for current user from public.friendships
+  /// Fetch live accepted friends for current user from public.friendships
+  /// Queries both directions: user_id = auth.uid() OR friend_id = auth.uid()
   Future<List<Map<String, dynamic>>> fetchFriends() async {
+    final c = client;
+    final user = currentUser;
+    if (c == null || user == null) return [];
+
+    try {
+      // Outgoing accepted
+      final outgoing = await c
+          .from('friendships')
+          .select(
+              'id, friend_id, status, profiles:friend_id(id, username, total_xp, streak_days, avatar_frame, banner_url, name_effect)')
+          .eq('user_id', user.id)
+          .eq('status', 'accepted');
+
+      // Incoming accepted
+      final incoming = await c
+          .from('friendships')
+          .select(
+              'id, user_id, status, profiles:user_id(id, username, total_xp, streak_days, avatar_frame, banner_url, name_effect)')
+          .eq('friend_id', user.id)
+          .eq('status', 'accepted');
+
+      final List<Map<String, dynamic>> result = [];
+      final Set<String> seenFriendIds = {};
+
+      for (final row in outgoing as List) {
+        final prof = row['profiles'] as Map<String, dynamic>?;
+        final fId = row['friend_id'] as String;
+        if (prof != null && !seenFriendIds.contains(fId)) {
+          seenFriendIds.add(fId);
+          result.add({
+            'id': row['id'],
+            'friend_id': fId,
+            'status': row['status'],
+            'profiles': prof,
+          });
+        }
+      }
+      for (final row in incoming as List) {
+        final prof = row['profiles'] as Map<String, dynamic>?;
+        final fId = row['user_id'] as String;
+        if (prof != null && !seenFriendIds.contains(fId)) {
+          seenFriendIds.add(fId);
+          result.add({
+            'id': row['id'],
+            'friend_id': fId,
+            'status': row['status'],
+            'profiles': prof,
+          });
+        }
+      }
+      return result;
+    } catch (e) {
+      debugPrint('Organiza: Fetch friendships notice: $e');
+      return [];
+    }
+  }
+
+  /// Fetch incoming pending friend requests for current user
+  Future<List<Map<String, dynamic>>> fetchPendingFriendRequests() async {
     final c = client;
     final user = currentUser;
     if (c == null || user == null) return [];
@@ -218,17 +278,39 @@ class SupabaseService {
     try {
       final res = await c
           .from('friendships')
-          .select('id, friend_id, status, profiles:friend_id(id, username, total_xp, streak_days, avatar_frame, name_effect)')
-          .eq('user_id', user.id);
+          .select(
+              'id, user_id, status, created_at, profiles:user_id(id, username, total_xp, streak_days, avatar_frame, banner_url, name_effect)')
+          .eq('friend_id', user.id)
+          .eq('status', 'pending');
 
       return List<Map<String, dynamic>>.from(res as List);
     } catch (e) {
-      debugPrint('Organiza: Fetch friendships notice: $e');
+      debugPrint('Organiza: Fetch pending friendships notice: $e');
       return [];
     }
   }
 
-  /// Add a friend by exact @username
+  /// Respond to an incoming friend request (accept or decline)
+  Future<bool> respondToFriendRequest(String friendshipId, bool accept) async {
+    final c = client;
+    if (c == null) return false;
+
+    try {
+      if (accept) {
+        await c
+            .from('friendships')
+            .update({'status': 'accepted'}).eq('id', friendshipId);
+      } else {
+        await c.from('friendships').delete().eq('id', friendshipId);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Organiza: Respond to friend request notice: $e');
+      return false;
+    }
+  }
+
+  /// Add a friend by exact @username with status: pending
   Future<bool> addFriendByUsername(String username) async {
     final clean = username.trim().replaceAll('@', '');
     if (clean.isEmpty) return false;
@@ -246,16 +328,99 @@ class SupabaseService {
 
       if (target == null) return false;
       final friendId = target['id'] as String;
+      if (friendId == user.id) return false; // Cannot friend self
 
       await c.from('friendships').upsert({
         'user_id': user.id,
         'friend_id': friendId,
-        'status': 'accepted',
+        'status': 'pending',
         'created_at': DateTime.now().toIso8601String(),
       });
       return true;
     } catch (e) {
       debugPrint('Organiza: Add friend notice: $e');
+      return false;
+    }
+  }
+
+  // ==========================================
+  // 7-DAY & 30-DAY DUEL CHALLENGES
+  // ==========================================
+
+  Future<bool> createChallenge({
+    required String opponentId,
+    required int durationDays,
+    int wagerStars = 0,
+  }) async {
+    final c = client;
+    final user = currentUser;
+    if (c == null || user == null) return false;
+
+    final now = DateTime.now();
+    final endDate = now.add(Duration(days: durationDays));
+
+    try {
+      await c.from('challenges').insert({
+        'creator_id': user.id,
+        'opponent_id': opponentId,
+        'duration_days': durationDays,
+        'wager_stars': wagerStars,
+        'start_date': now.toIso8601String(),
+        'end_date': endDate.toIso8601String(),
+        'status': 'pending',
+        'creator_xp_earned': 0,
+        'opponent_xp_earned': 0,
+        'created_at': now.toIso8601String(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Organiza: Create challenge notice: $e');
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchChallenges() async {
+    final c = client;
+    final user = currentUser;
+    if (c == null || user == null) return [];
+
+    try {
+      final res = await c
+          .from('challenges')
+          .select(
+              '*, creator:creator_id(id, username, avatar_frame, total_xp), opponent:opponent_id(id, username, avatar_frame, total_xp)')
+          .or('creator_id.eq.${user.id},opponent_id.eq.${user.id}')
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(res as List);
+    } catch (e) {
+      debugPrint('Organiza: Fetch challenges notice: $e');
+      return [];
+    }
+  }
+
+  Future<bool> acceptChallenge(String challengeId) async {
+    final c = client;
+    if (c == null) return false;
+    try {
+      await c
+          .from('challenges')
+          .update({'status': 'active'}).eq('id', challengeId);
+      return true;
+    } catch (e) {
+      debugPrint('Organiza: Accept challenge notice: $e');
+      return false;
+    }
+  }
+
+  Future<bool> declineChallenge(String challengeId) async {
+    final c = client;
+    if (c == null) return false;
+    try {
+      await c.from('challenges').delete().eq('id', challengeId);
+      return true;
+    } catch (e) {
+      debugPrint('Organiza: Decline challenge notice: $e');
       return false;
     }
   }

@@ -3,12 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/network/supabase_service.dart';
 import '../../../../data/local/app_database.dart';
 import '../../../blocker/presentation/screens/distraction_blocker_screen.dart';
+import '../../../social/presentation/widgets/duel_challenge_card.dart';
 import '../controllers/today_tasks_controller.dart';
 import '../widgets/create_task_modal.dart';
 import '../widgets/essay_lockout_dialog.dart';
 import '../widgets/task_progress_card.dart';
+
+final activeDuelChallengesProvider =
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final supabase = ref.watch(supabaseServiceProvider);
+  final all = await supabase.fetchChallenges();
+  return all.where((c) => c['status'] == 'active').toList();
+});
 
 class TodayScreen extends ConsumerWidget {
   const TodayScreen({super.key});
@@ -270,6 +279,29 @@ class TodayScreen extends ConsumerWidget {
                 },
                 orElse: () => const SizedBox.shrink(),
               ),
+            ),
+
+            // Active Duel Challenge Card (if in active head-to-head sprint)
+            Consumer(
+              builder: (context, ref, _) {
+                final challengesAsync = ref.watch(activeDuelChallengesProvider);
+                return challengesAsync.maybeWhen(
+                  data: (challenges) {
+                    if (challenges.isEmpty) return const SizedBox.shrink();
+                    final c = challenges.first;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 4.0),
+                      child: DuelChallengeCard(
+                        challenge: c,
+                        onRefresh: () =>
+                            ref.invalidate(activeDuelChallengesProvider),
+                      ),
+                    );
+                  },
+                  orElse: () => const SizedBox.shrink(),
+                );
+              },
             ),
 
             // Tasks List

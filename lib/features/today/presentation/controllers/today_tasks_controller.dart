@@ -16,7 +16,8 @@ String formatTodayDate([DateTime? date]) {
 }
 
 final appUsageServiceProvider = Provider<AppUsageService>((ref) {
-  return AppUsageService();
+  final db = ref.watch(appDatabaseProvider);
+  return AppUsageService(db);
 });
 
 final todayDateProvider = StateProvider<String>((ref) {

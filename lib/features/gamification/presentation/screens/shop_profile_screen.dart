@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/network/supabase_service.dart';
+import '../../../profile/presentation/controllers/profile_controller.dart';
 import '../../../today/presentation/controllers/today_tasks_controller.dart';
 
 class ShopItem {
@@ -177,11 +178,14 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
   Future<void> _syncWithSupabase(int earnedXp, int totalStars) async {
     setState(() => _isSyncing = true);
     final supabase = ref.read(supabaseServiceProvider);
+    final profile = ref.read(profileControllerProvider);
+    final level = profile.level;
+    final moniker = profile.moniker;
 
     final success = await supabase.syncProfileStats(
       totalXp: earnedXp,
       totalStars: totalStars,
-      levelTitle: 'Level 14 - Focus Adept',
+      levelTitle: 'Level $level - $moniker',
     );
 
     if (mounted) {
@@ -205,6 +209,12 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
     final totalStarsAsync = ref.watch(totalStarsStreamProvider);
     final totalStars = totalStarsAsync.valueOrNull ?? 65;
     final earnedXp = ref.watch(todayEarnedXpProvider);
+    final profile = ref.watch(profileControllerProvider);
+    final level = profile.level;
+    final moniker = profile.moniker;
+    final curXp = profile.xpInCurrentLevel;
+    final nextXp = profile.xpNeededForNextLevel;
+    final progress = (curXp / (nextXp == 0 ? 1 : nextXp)).clamp(0.0, 1.0);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -278,12 +288,12 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Level 14 · Focus Adept',
+                              'Level $level · $moniker',
                               style: AppTypography.h2.copyWith(fontSize: 17),
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Ranked #4 among cohort Spartans',
+                              'Ranked among cohort Spartans',
                               style: AppTypography.bodySmall,
                             ),
                           ],
@@ -296,14 +306,14 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('LEVEL PROGRESSION', style: AppTypography.bodySmall),
-                      Text('1,850 / 2,000 XP', style: AppTypography.accentMono),
+                      Text('$curXp / $nextXp XP', style: AppTypography.accentMono),
                     ],
                   ),
                   const SizedBox(height: 6),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
-                      value: 0.925,
+                      value: progress,
                       minHeight: 8,
                       backgroundColor: AppColors.surfaceElevated,
                       valueColor: const AlwaysStoppedAnimation(
