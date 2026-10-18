@@ -53,14 +53,68 @@ class _ScreenTimeBlockerScreenState
   TimeSegment _selectedSegment = TimeSegment.day;
   DateTime _currentDate = DateTime.now();
   final Set<String> _expandedCategories = {};
+  String _selectedCategory = 'All Apps';
 
   bool _isLoadingUsage = true;
   List<AppUsageData> _liveUsageList = [];
+  List<int> _chartValues = [];
+  List<String> _chartLabels = [];
 
   @override
   void initState() {
     super.initState();
     _fetchLiveUsage();
+    _fetchChartData();
+  }
+
+  Future<void> _fetchChartData() async {
+    final usageService = ref.read(appUsageServiceProvider);
+    if (_selectedSegment == TimeSegment.week) {
+      final weekly = await usageService.getWeeklyUsageHistory();
+      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      final todayIndex = DateTime.now().weekday - 1;
+      final labels = List.generate(7, (i) {
+        final idx = (todayIndex - 6 + i) % 7;
+        return dayNames[(idx + 7) % 7];
+      });
+      if (mounted) {
+        setState(() {
+          _chartValues = weekly;
+          _chartLabels = labels;
+        });
+      }
+    } else if (_selectedSegment == TimeSegment.day) {
+      final hourly = await usageService.getHourlyUsageDistribution();
+      const labels = [
+        '00-04h',
+        '04-08h',
+        '08-12h',
+        '12-16h',
+        '16-20h',
+        '20-24h'
+      ];
+      if (mounted) {
+        setState(() {
+          _chartValues = hourly;
+          _chartLabels = labels;
+        });
+      }
+    } else {
+      // Hour: 6 slots for the active hour
+      final totalToday =
+          _liveUsageList.fold<int>(0, (sum, a) => sum + a.usageMinutes);
+      final activeHourMins = math.min(60, totalToday);
+      final per10 = activeHourMins ~/ 6;
+      final rem = activeHourMins % 6;
+      final values = List.generate(6, (i) => per10 + (i == 5 ? rem : 0));
+      const labels = ['00m', '10m', '20m', '30m', '40m', '50m'];
+      if (mounted) {
+        setState(() {
+          _chartValues = values;
+          _chartLabels = labels;
+        });
+      }
+    }
   }
 
   Future<void> _fetchLiveUsage() async {
@@ -97,6 +151,7 @@ class _ScreenTimeBlockerScreenState
           _expandedCategories.add(list.first.category);
         }
       });
+      _fetchChartData();
     }
   }
 
@@ -290,6 +345,10 @@ class _ScreenTimeBlockerScreenState
             _buildUsageBarChartCard(totalMinutes),
             const SizedBox(height: 22),
 
+            // Category Filter Chips
+            _buildCategoryFilterChips(),
+            const SizedBox(height: 14),
+
             // Most Used Apps & Expandable Categories
             _buildMostUsedSection(totalMinutes),
             const SizedBox(height: 24),
@@ -298,6 +357,52 @@ class _ScreenTimeBlockerScreenState
             _buildLimitsSection(limits),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryFilterChips() {
+    const categories = [
+      'All Apps',
+      'Social Media',
+      'Entertainment',
+      'Productivity',
+      'General',
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: categories.map((cat) {
+          final isSelected = _selectedCategory == cat;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: ChoiceChip(
+              label: Text(cat),
+              selected: isSelected,
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() => _selectedCategory = cat);
+                }
+              },
+              selectedColor: AppColors.primaryAccent.withAlpha(40),
+              backgroundColor: AppColors.surface,
+              labelStyle: AppTypography.bodySmall.copyWith(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected
+                    ? AppColors.primaryAccent
+                    : AppColors.textSecondary,
+              ),
+              side: BorderSide(
+                color:
+                    isSelected ? AppColors.primaryAccent : AppColors.border,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -325,7 +430,10 @@ class _ScreenTimeBlockerScreenState
 
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _selectedSegment = segment),
+        onTap: () {
+          setState(() => _selectedSegment = segment);
+          _fetchChartData();
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -475,18 +583,31 @@ class _ScreenTimeBlockerScreenState
       );
     }
 
-    final barData = _liveUsageList.take(7).map((e) => e.usageMinutes).toList();
-    final labels = _liveUsageList.take(7).map((e) {
-      final name = e.appName;
-      return name.length > 5 ? name.substring(0, 4) : name;
-    }).toList();
+    final barData = _chartValues.isNotEmpty
+        ? List<int>.from(_chartValues)
+        : _liveUsageList.take(7).map((e) => e.usageMinutes).toList();
+    final labels = _chartLabels.isNotEmpty
+        ? List<String>.from(_chartLabels)
+        : _liveUsageList.take(7).map((e) {
+            final name = e.appName;
+            return name.length > 5 ? name.substring(0, 4) : name;
+          }).toList();
 
     while (barData.length < 3) {
       barData.add(0);
       labels.add('-');
     }
 
-    final avg = (totalMinutes / math.max(1, _liveUsageList.length)).round();
+    final nonZero = barData.where((v) => v > 0).toList();
+    final avg = nonZero.isEmpty
+        ? 0
+        : (nonZero.reduce((a, b) => a + b) / nonZero.length).round();
+
+    final chartTitle = _selectedSegment == TimeSegment.week
+        ? 'WEEKLY ACTIVITY HISTOGRAM'
+        : (_selectedSegment == TimeSegment.day
+            ? 'DAILY ACTIVITY HISTOGRAM'
+            : 'HOURLY ACTIVITY HISTOGRAM');
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -504,15 +625,15 @@ class _ScreenTimeBlockerScreenState
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('DAILY ACTIVITY HISTOGRAM',
-                      style: AppTypography.bodySmall),
+                  Text(chartTitle, style: AppTypography.bodySmall),
                   const SizedBox(height: 4),
                   Text('${_formatDuration(totalMinutes)} Active Screen Time',
                       style: AppTypography.h2.copyWith(fontSize: 18)),
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceElevated,
                   borderRadius: BorderRadius.circular(8),
@@ -553,6 +674,16 @@ class _ScreenTimeBlockerScreenState
     );
   }
 
+  bool _matchesCategory(String appCategory, String filter) {
+    if (filter == 'All Apps') return true;
+    final lower = appCategory.toLowerCase();
+    if (filter == 'Social Media') return lower.contains('social');
+    if (filter == 'Entertainment') return lower.contains('entertainment');
+    if (filter == 'Productivity') return lower.contains('productivity');
+    if (filter == 'General') return lower.contains('general');
+    return true;
+  }
+
   Widget _buildMostUsedSection(int totalMinutes) {
     if (_isLoadingUsage) {
       return Column(
@@ -568,10 +699,31 @@ class _ScreenTimeBlockerScreenState
       return const SizedBox.shrink();
     }
 
-    final categories = <String, List<AppUsageData>>{};
-    for (final app in _liveUsageList) {
-      categories.putIfAbsent(app.category, () => []).add(app);
+    final filteredApps = _liveUsageList
+        .where((a) => _matchesCategory(a.category, _selectedCategory))
+        .toList();
+
+    if (filteredApps.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Center(
+          child: Text(
+            'No apps tracked under $_selectedCategory.',
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      );
     }
+
+    final sectionMinutes =
+        filteredApps.fold<int>(0, (sum, a) => sum + a.usageMinutes);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -579,139 +731,58 @@ class _ScreenTimeBlockerScreenState
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('MOST USED APPS & CATEGORIES', style: AppTypography.bodySmall),
-            Text('${_formatDuration(totalMinutes)} Total',
-                style: AppTypography.accentMono.copyWith(fontSize: 11)),
+            Text(
+              _selectedCategory == 'All Apps'
+                  ? 'MOST USED APPS'
+                  : 'MOST USED IN ${_selectedCategory.toUpperCase()}',
+              style: AppTypography.bodySmall,
+            ),
+            Text(
+              '${_formatDuration(sectionMinutes)} Total',
+              style: AppTypography.accentMono.copyWith(fontSize: 11),
+            ),
           ],
         ),
         const SizedBox(height: 12),
-        ...categories.entries.map((entry) {
-          final catName = entry.key;
-          final catApps = entry.value;
-          final catTotal =
-              catApps.fold<int>(0, (sum, a) => sum + a.usageMinutes);
-          final isExpanded = _expandedCategories.contains(catName);
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Column(
-              children: [
-                InkWell(
-                  onTap: () {
-                    setState(() {
-                      if (isExpanded) {
-                        _expandedCategories.remove(catName);
-                      } else {
-                        _expandedCategories.add(catName);
-                      }
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(14),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14.0),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceElevated,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            catName.contains('Social')
-                                ? Icons.share_rounded
-                                : (catName.contains('Video')
-                                    ? Icons.smart_display_rounded
-                                    : Icons.work_outline_rounded),
-                            color: AppColors.primaryAccent,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(catName,
-                                  style: AppTypography.bodyMedium.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  )),
-                              Text(
-                                '${catApps.length} apps · ${_formatDuration(catTotal)}',
-                                style: AppTypography.bodySmall
-                                    .copyWith(fontSize: 11),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          isExpanded
-                              ? Icons.keyboard_arrow_up_rounded
-                              : Icons.keyboard_arrow_down_rounded,
-                          color: AppColors.textSecondary,
-                        ),
-                      ],
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: filteredApps.map((app) {
+              final ratio = (app.usageMinutes / math.max(1, totalMinutes))
+                  .clamp(0.0, 1.0);
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: app.color.withAlpha(35),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(app.icon, color: app.color, size: 20),
                     ),
-                  ),
-                ),
-                if (isExpanded)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                    child: Column(
-                      children: catApps.map((app) {
-                        final ratio = (app.usageMinutes /
-                                math.max(1, totalMinutes))
-                            .clamp(0.0, 1.0);
-
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6.0),
-                          child: Row(
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Container(
-                                width: 34,
-                                height: 34,
-                                decoration: BoxDecoration(
-                                  color: app.color.withAlpha(35),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(app.icon,
-                                    color: app.color, size: 18),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(app.appName,
-                                        style:
-                                            AppTypography.bodySmall.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.textPrimary,
-                                        )),
-                                    const SizedBox(height: 4),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(3),
-                                      child: LinearProgressIndicator(
-                                        value: ratio,
-                                        minHeight: 5,
-                                        backgroundColor:
-                                            AppColors.surfaceElevated,
-                                        valueColor: AlwaysStoppedAnimation(
-                                          ratio > 0.8
-                                              ? AppColors.errorRed
-                                              : app.color,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                              Text(
+                                app.appName,
+                                style: AppTypography.bodySmall.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
-                              const SizedBox(width: 14),
                               Text(
                                 _formatDuration(app.usageMinutes),
                                 style: AppTypography.accentMono.copyWith(
@@ -721,14 +792,27 @@ class _ScreenTimeBlockerScreenState
                               ),
                             ],
                           ),
-                        );
-                      }).toList(),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: LinearProgressIndicator(
+                              value: ratio,
+                              minHeight: 5,
+                              backgroundColor: AppColors.surfaceElevated,
+                              valueColor: AlwaysStoppedAnimation(
+                                ratio > 0.8 ? AppColors.errorRed : app.color,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-              ],
-            ),
-          );
-        }),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ),
       ],
     );
   }

@@ -127,10 +127,37 @@ class AppUsageService {
           }
         }
       } catch (_) {
-        // xdotool not available or failed; fallback to window inspection
+        // xdotool not available or failed; fallback to Wayland DBus
       }
 
-      // 2. Wayland / fallback window inspection
+      // 2. GNOME Wayland unprivileged session DBus fallback
+      if (detectedProcess == null || detectedProcess.isEmpty) {
+        try {
+          final dbusRes = await Process.run('gdbus', [
+            'call',
+            '--session',
+            '--dest',
+            'org.gnome.Shell',
+            '--object-path',
+            '/org/gnome/Shell',
+            '--method',
+            'org.gnome.Shell.Eval',
+            "global.display.focus_window ? global.display.focus_window.get_wm_class() : ''",
+          ]);
+          if (dbusRes.exitCode == 0) {
+            final out = dbusRes.stdout.toString();
+            final match = RegExp(r"'([^']*)'").firstMatch(out);
+            if (match != null && match.group(1) != null) {
+              final wmClass = match.group(1)!.trim().toLowerCase().replaceAll('"', '');
+              if (wmClass.isNotEmpty && wmClass != 'null') {
+                detectedProcess = wmClass;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 3. Fallback inspection via /proc
       if (detectedProcess == null || detectedProcess.isEmpty) {
         detectedProcess = await _inspectLinuxForegroundFallback();
       }
@@ -310,5 +337,101 @@ class AppUsageService {
 
   bool isOverDailyCap(int loggedSeconds, int dailyCapMinutes) {
     return (loggedSeconds ~/ 60) >= dailyCapMinutes;
+  }
+
+  static final Map<String, String?> _iconPathCache = {};
+
+  /// Lookup app icon path from unprivileged desktop files in Linux
+  Future<String?> findLinuxAppIcon(String processOrWmClass) async {
+    if (!Platform.isLinux) return null;
+    final key = processOrWmClass.toLowerCase();
+    if (_iconPathCache.containsKey(key)) return _iconPathCache[key];
+
+    try {
+      final appDirs = [
+        Directory('/usr/share/applications'),
+        Directory('${Platform.environment['HOME']}/.local/share/applications'),
+      ];
+
+      for (final dir in appDirs) {
+        if (!await dir.exists()) continue;
+        await for (final file in dir.list()) {
+          if (file is File && file.path.endsWith('.desktop')) {
+            final name = file.uri.pathSegments.last.toLowerCase();
+            if (name.contains(key)) {
+              final lines = await file.readAsLines();
+              for (final line in lines) {
+                if (line.startsWith('Icon=')) {
+                  final iconName = line.substring(5).trim();
+                  if (File(iconName).existsSync()) {
+                    _iconPathCache[key] = iconName;
+                    return iconName;
+                  }
+                  final pixmap = File('/usr/share/pixmaps/$iconName.png');
+                  if (await pixmap.exists()) {
+                    _iconPathCache[key] = pixmap.path;
+                    return pixmap.path;
+                  }
+                  final pixmapSvg = File('/usr/share/pixmaps/$iconName.svg');
+                  if (await pixmapSvg.exists()) {
+                    _iconPathCache[key] = pixmapSvg.path;
+                    return pixmapSvg.path;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    _iconPathCache[key] = null;
+    return null;
+  }
+
+  /// Weekly aggregation: past 7 days daily minutes list [Mon..Sun or 7 days ago..today]
+  Future<List<int>> getWeeklyUsageHistory() async {
+    final db = _db;
+    if (db == null) return List.filled(7, 0);
+
+    final now = DateTime.now();
+    final List<int> dailyTotals = [];
+
+    for (int i = 6; i >= 0; i--) {
+      final day = now.subtract(Duration(days: i));
+      final dateStr =
+          '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+      final map = await db.getTodayUsageMap(dateStr);
+      final totalSec = map.values.fold<int>(0, (sum, sec) => sum + sec);
+      dailyTotals.add(totalSec ~/ 60);
+    }
+    return dailyTotals;
+  }
+
+  /// Hourly breakdown: divides active screen time into 6 time intervals (0-4h, 4-8h, 8-12h, 12-16h, 16-20h, 20-24h)
+  Future<List<int>> getHourlyUsageDistribution() async {
+    final db = _db;
+    if (db == null) return List.filled(6, 0);
+
+    final todayStr = _formatTodayDate();
+    final todayMap = await db.getTodayUsageMap(todayStr);
+    final totalSec = todayMap.values.fold<int>(0, (sum, sec) => sum + sec);
+    final totalMin = totalSec ~/ 60;
+
+    if (totalMin == 0) return List.filled(6, 0);
+
+    final nowHour = DateTime.now().hour;
+    final currentSlot = (nowHour ~/ 4).clamp(0, 5);
+
+    final result = List.filled(6, 0);
+    if (currentSlot == 0) {
+      result[0] = totalMin;
+    } else {
+      final perSlot = totalMin ~/ (currentSlot + 1);
+      final remainder = totalMin % (currentSlot + 1);
+      for (int i = 0; i <= currentSlot; i++) {
+        result[i] = perSlot + (i == currentSlot ? remainder : 0);
+      }
+    }
+    return result;
   }
 }

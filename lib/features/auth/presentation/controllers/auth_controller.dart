@@ -237,6 +237,15 @@ class AuthController extends StateNotifier<OrganizaAuthState> {
     return false;
   }
 
+  Future<bool> verifyOtp({required String email, required String token}) async {
+    final verified = await _supabase.verifyOtp(email: email, token: token);
+    if (verified) {
+      await refreshVerificationStatus();
+      return true;
+    }
+    return false;
+  }
+
   Future<void> resendConfirmationEmail(String email) async {
     await _supabase.resendVerificationEmail(email);
   }

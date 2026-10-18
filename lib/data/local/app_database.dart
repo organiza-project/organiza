@@ -317,6 +317,18 @@ class AppDatabase extends _$AppDatabase {
     return {for (final r in rows) r.packageName: r.totalSeconds};
   }
 
+  Future<List<AppUsageTableData>> getUsageForDateRange(
+    String startDate,
+    String endDate,
+  ) async {
+    return (select(appUsageTable)
+          ..where((tbl) =>
+              tbl.usageDate.isBiggerOrEqualValue(startDate) &
+              tbl.usageDate.isSmallerOrEqualValue(endDate))
+          ..orderBy([(tbl) => OrderingTerm.asc(tbl.usageDate)]))
+        .get();
+  }
+
   Stream<List<AppLimit>> watchAppLimits() {
     return select(appLimits).watch();
   }

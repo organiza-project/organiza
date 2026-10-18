@@ -310,37 +310,89 @@ class SupabaseService {
     }
   }
 
-  /// Add a friend by exact @username with status: pending
-  Future<bool> addFriendByUsername(String username) async {
+  /// Send a friend request by exact @username with RPC and graceful fallback
+  Future<({bool success, String message})> sendFriendRequest(String username) async {
     final clean = username.trim().replaceAll('@', '');
-    if (clean.isEmpty) return false;
+    if (clean.isEmpty) {
+      return (success: false, message: 'Please enter a valid @username');
+    }
 
     final c = client;
     final user = currentUser;
-    if (c == null || user == null) return false;
+    if (c == null || user == null) {
+      return (
+        success: false,
+        message: 'Supabase offline: Friend requests require active cloud sync.',
+      );
+    }
 
     try {
+      // 1. Try PostgreSQL RPC send_friend_request if available
+      try {
+        final rpcRes = await c.rpc('send_friend_request', params: {
+          'target_username': clean,
+        });
+        if (rpcRes != null) {
+          if (rpcRes is Map && rpcRes['success'] == false) {
+            return (
+              success: false,
+              message: rpcRes['error'] as String? ?? 'Unable to send friend request',
+            );
+          }
+          return (success: true, message: 'Friend request sent to @$clean');
+        }
+      } catch (_) {
+        // RPC not defined; fallback to direct table operation
+      }
+
+      // 2. Query target profile
       final target = await c
           .from('profiles')
           .select('id, username')
           .eq('username', clean)
           .maybeSingle();
 
-      if (target == null) return false;
-      final friendId = target['id'] as String;
-      if (friendId == user.id) return false; // Cannot friend self
+      if (target == null) {
+        return (success: false, message: 'User @$clean not found');
+      }
 
-      await c.from('friendships').upsert({
+      final friendId = target['id'] as String;
+      if (friendId == user.id) {
+        return (success: false, message: 'You cannot send a friend request to yourself');
+      }
+
+      // 3. Check for existing relationship
+      final existing = await c
+          .from('friendships')
+          .select('id, status')
+          .or('and(user_id.eq.${user.id},friend_id.eq.$friendId),and(user_id.eq.$friendId,friend_id.eq.${user.id})')
+          .maybeSingle();
+
+      if (existing != null) {
+        return (
+          success: false,
+          message: 'Relationship already exists with @$clean',
+        );
+      }
+
+      await c.from('friendships').insert({
         'user_id': user.id,
         'friend_id': friendId,
         'status': 'pending',
         'created_at': DateTime.now().toIso8601String(),
       });
-      return true;
+
+      return (success: true, message: 'Friend request sent to @$clean');
     } catch (e) {
-      debugPrint('Organiza: Add friend notice: $e');
-      return false;
+      debugPrint('Organiza: Send friend request error: $e');
+      return (success: false, message: 'Failed to send request: $e');
     }
+  }
+
+  /// Add a friend by exact @username with status: pending (compatibility helper)
+  Future<bool> addFriendByUsername(String username) async {
+    final result = await sendFriendRequest(username);
+    return result.success;
   }
 
   // ==========================================
@@ -566,6 +618,23 @@ class SupabaseService {
         type: OtpType.signup,
         email: email.trim(),
       );
+    }
+  }
+
+  /// Verify 6-digit OTP code for email signup confirmation
+  Future<bool> verifyOtp({required String email, required String token}) async {
+    final c = client;
+    if (c == null) return false;
+    try {
+      final res = await c.auth.verifyOTP(
+        email: email.trim(),
+        token: token.trim(),
+        type: OtpType.signup,
+      );
+      return res.user != null;
+    } catch (e) {
+      debugPrint('Organiza: OTP verification notice: $e');
+      return false;
     }
   }
 

@@ -15,6 +15,8 @@ class UserProfile {
   final String avatarFrame;
   final String bannerUrl;
   final String nameEffect;
+  final String? customAvatarUrl;
+  final String? customBannerUrl;
 
   const UserProfile({
     required this.id,
@@ -27,6 +29,8 @@ class UserProfile {
     this.avatarFrame = 'frame_stoic_laurel',
     this.bannerUrl = 'banner_deep_space',
     this.nameEffect = 'effect_clean_white',
+    this.customAvatarUrl,
+    this.customBannerUrl,
   });
 
   static String getTitleForLevel(int level) {
@@ -68,6 +72,8 @@ class UserProfile {
     String? avatarFrame,
     String? bannerUrl,
     String? nameEffect,
+    String? customAvatarUrl,
+    String? customBannerUrl,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -80,6 +86,8 @@ class UserProfile {
       avatarFrame: avatarFrame ?? this.avatarFrame,
       bannerUrl: bannerUrl ?? this.bannerUrl,
       nameEffect: nameEffect ?? this.nameEffect,
+      customAvatarUrl: customAvatarUrl ?? this.customAvatarUrl,
+      customBannerUrl: customBannerUrl ?? this.customBannerUrl,
     );
   }
 }
@@ -103,6 +111,7 @@ final userProfileProvider = Provider<UserProfile>((ref) {
   final localStreak = ref.watch(userStreakStreamProvider).valueOrNull ?? 0;
 
   final username = authState.username ??
+      (user?.userMetadata?['display_name'] as String?) ??
       (user?.userMetadata?['username'] as String?) ??
       (authState.isGuest ? 'Spartan Guest' : 'Disciplined Spartan');
 
@@ -112,6 +121,8 @@ final userProfileProvider = Provider<UserProfile>((ref) {
       (user?.userMetadata?['banner_url'] as String?) ?? 'banner_deep_space';
   final effect =
       (user?.userMetadata?['name_effect'] as String?) ?? 'effect_clean_white';
+  final customAvatar = user?.userMetadata?['avatar_url'] as String?;
+  final customBanner = user?.userMetadata?['banner_url_custom'] as String?;
 
   final level = UserProfile.calculateLevel(localXp);
   final levelTitle = 'Level $level · ${UserProfile.getTitleForLevel(level)}';
@@ -127,6 +138,8 @@ final userProfileProvider = Provider<UserProfile>((ref) {
     avatarFrame: frame,
     bannerUrl: banner,
     nameEffect: effect,
+    customAvatarUrl: customAvatar,
+    customBannerUrl: customBanner,
   );
 });
 

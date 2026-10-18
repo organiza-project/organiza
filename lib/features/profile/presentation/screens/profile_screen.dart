@@ -13,6 +13,7 @@ import '../../../gamification/domain/cosmetics_catalog.dart';
 import '../../../gamification/presentation/screens/battlepass_shop_screen.dart';
 import '../../../social/presentation/widgets/duel_challenge_dialog.dart';
 import '../controllers/profile_controller.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -226,6 +227,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 effect: activeEffect,
                 level: userLevel,
                 moniker: userMoniker,
+                customAvatarUrl: profile.customAvatarUrl,
+                customBannerUrl: profile.customBannerUrl,
               ),
 
               const SizedBox(height: 16),
@@ -278,7 +281,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required CosmeticItem effect,
     required int level,
     required String moniker,
+    String? customAvatarUrl,
+    String? customBannerUrl,
   }) {
+    final hasCustomBanner = customBannerUrl != null && customBannerUrl.isNotEmpty;
+    final hasCustomAvatar = customAvatarUrl != null && customAvatarUrl.isNotEmpty;
+
     return Container(
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -298,21 +306,48 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 height: 140,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      banner.primaryColor,
-                      banner.secondaryColor ?? banner.primaryColor.withAlpha(120),
-                      AppColors.surface,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  gradient: hasCustomBanner
+                      ? null
+                      : LinearGradient(
+                          colors: [
+                            banner.primaryColor,
+                            banner.secondaryColor ?? banner.primaryColor.withAlpha(120),
+                            AppColors.surface,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                  image: hasCustomBanner
+                      ? DecorationImage(
+                          image: NetworkImage(customBannerUrl),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
                 ),
-                child: Center(
-                  child: Icon(
-                    banner.icon,
-                    size: 64,
-                    color: Colors.white.withAlpha(25),
+                child: hasCustomBanner
+                    ? null
+                    : Center(
+                        child: Icon(
+                          banner.icon,
+                          size: 64,
+                          color: Colors.white.withAlpha(25),
+                        ),
+                      ),
+              ),
+
+              // Settings Gear Icon (Top Right)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(120),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    tooltip: 'Settings & Open Source',
+                    icon: const Icon(Icons.settings_rounded, color: Colors.white, size: 20),
+                    onPressed: () => SettingsScreen.show(context),
                   ),
                 ),
               ),
@@ -340,14 +375,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   child: CircleAvatar(
                     backgroundColor: AppColors.surfaceElevated,
-                    child: Text(
-                      username.isNotEmpty ? username[0].toUpperCase() : 'S',
-                      style: AppTypography.h1.copyWith(
-                        fontSize: 32,
-                        color: frame.primaryColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    backgroundImage: hasCustomAvatar ? NetworkImage(customAvatarUrl) : null,
+                    child: hasCustomAvatar
+                        ? null
+                        : Text(
+                            username.isNotEmpty ? username[0].toUpperCase() : 'S',
+                            style: AppTypography.h1.copyWith(
+                              fontSize: 32,
+                              color: frame.primaryColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -915,6 +953,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     color: AppColors.textSecondary),
                 onTap: () async {
                   await CustomServerDialog.show(context);
+                  if (mounted) setState(() {});
+                },
+              ),
+              const Divider(color: AppColors.border, height: 1),
+              ListTile(
+                leading: const Icon(Icons.settings_suggest_rounded,
+                    color: AppColors.primaryAccent),
+                title: Text('Settings, Groq & Legal', style: AppTypography.bodyMedium),
+                subtitle: Text(
+                  'Display name, AI engine key, MIT open source & legal terms',
+                  style: AppTypography.bodySmall.copyWith(fontSize: 11),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary),
+                onTap: () async {
+                  await SettingsScreen.show(context);
                   if (mounted) setState(() {});
                 },
               ),
