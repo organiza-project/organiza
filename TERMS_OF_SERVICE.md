@@ -1,34 +1,45 @@
 # Organiza Terms of Service
 
-**Effective Date:** October 18, 2026  
-**License:** MIT License — Open Source Productivity Engine
-
-Welcome to **Organiza**, the gamified Stoic productivity and discipline engine. By using Organiza, you agree to these Terms of Service.
+**Effective Date:** October 24, 2026  
+**License:** MIT License  
+**Contact:** legal@organiza.app  
+**Public Repository:** https://github.com/organiza-project/organiza  
 
 ---
 
 ## 1. Acceptance of Terms
-Organiza is distributed as free, open-source software under the terms of the MIT License. You may run, inspect, modify, fork, and self-host the application freely in accordance with the license.
+
+Organiza is distributed as free, open-source software under the MIT License. By installing, running, or accessing the application, you agree to these Terms of Service.
 
 ---
 
 ## 2. User Accounts & Fair Play
-- **Unique Handles:** You are responsible for maintaining the security of your account and your unique `@username`.
-- **Friendly Competition:** In Social Duels and Leaderboards, any exploitation of simulated clock drifts, automated habit tampering, or abusive friend spam is contrary to the Stoic ethos of Organiza and may result in social feature suspension on public community instances.
-- **Self-Hosting Exemption:** Self-hosted instances operate under the policies set by their respective administrators.
+
+- **Authentication**: You are responsible for maintaining the confidentiality of your authentication credentials and email access.
+- **Handles**: Usernames must not impersonate other individuals, infringe registered trademarks, or contain hate speech.
+- **Fair Play in Gamification**: Exploitation of simulated system clock drift, automated bot manipulation of habit completions, or abusive friend spamming violates the integrity of the community duels and leaderboards.
 
 ---
 
-## 3. Screen Time Blocker & Digital Habit Enforcement
-- Organiza includes optional digital defense mechanisms, such as Stoic Essay Lockouts and app usage limits.
-- You acknowledge that these mechanisms are designed as behavioral discipline aids. You maintain full ultimate authority over your device's operating system settings.
+## 3. Distraction Blocker & Device Authority
+
+- Organiza offers behavioral habit modification aids, including scheduled curfews, daily application limits, and Stoic essay unlocks.
+- These tools are intended as self-discipline aids. You acknowledge that you retain ultimate control and administrative authority over your operating system, and that Organiza is not liable for device interactions or limitations imposed by operating systems.
 
 ---
 
-## 4. Disclaimer of Warranty & Limitation of Liability
-The software is provided "AS IS", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement. In no event shall the authors or copyright holders be liable for any claim, damages, or other liability.
+## 4. Self-Hosting & API Usage
+
+- When self-hosting or providing your own third-party API keys (e.g. Groq or Gemini), you are solely responsible for compliance with the terms and rate limits of those respective providers.
 
 ---
 
-## 5. Changes to Terms
-Because Organiza is community-driven, updates to these terms will be published directly within the source repository and bundled within new application releases.
+## 5. Disclaimer of Warranty & Limitation of Liability
+
+The software is provided "AS IS", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement. In no event shall the authors or copyright holders be liable for any claim, damages, or other liability arising from the use of the software.
+
+---
+
+## 6. Termination & Account Deletion
+
+You may terminate this agreement at any time by deleting your cloud account through the in-app Settings interface and removing the software from your devices.

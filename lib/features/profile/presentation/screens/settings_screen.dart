@@ -4,11 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:flutter/services.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/constants/legal_docs.dart';
 import '../../../../core/network/supabase_service.dart';
+import '../../../../data/local/database_provider.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../auth/presentation/widgets/custom_server_dialog.dart';
 import '../controllers/profile_controller.dart';
 import 'diagnostics_screen.dart';
@@ -114,6 +117,156 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         const SnackBar(
           content: Text('Groq API Key saved to local storage.'),
           backgroundColor: AppColors.primaryAccent,
+        ),
+      );
+    }
+  }
+
+  Future<void> _exportPersonalData() async {
+    try {
+      final db = ref.read(appDatabaseProvider);
+      final data = await db.exportAllLocalData();
+      final jsonString = const JsonEncoder.withIndent('  ').convert(data);
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Text('Export Personal Data', style: AppTypography.h2),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 320,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'JSON export generated (${(jsonString.length / 1024).toStringAsFixed(1)} KB, Schema v${data['schemaVersion']}).',
+                  style: AppTypography.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: SingleChildScrollView(
+                      child: SelectableText(
+                        jsonString,
+                        style: AppTypography.accentMono.copyWith(fontSize: 10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.copy_rounded, size: 16),
+              label: const Text('Copy to Clipboard'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryAccent,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: jsonString));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Export data copied to clipboard!'),
+                    backgroundColor: AppColors.successGreen,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Export failed: $e'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    }
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: AppColors.errorRed),
+            const SizedBox(width: 8),
+            Text('Delete Account?', style: AppTypography.h2),
+          ],
+        ),
+        content: Text(
+          'This action is permanent and IRREVOCABLE.\n\n'
+          '• Your cloud profile, friends, and active duel wagers will be deleted.\n'
+          '• All local SQLite tasks, timetable events, habits, essays, and screen time logs will be purged.\n'
+          '• You will be immediately signed out.',
+          style: AppTypography.bodySmall.copyWith(height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.errorRed,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Permanently Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final supabase = ref.read(supabaseServiceProvider);
+      if (supabase.isInitialized && supabase.currentUser != null) {
+        await supabase.deleteAccount();
+      }
+
+      final db = ref.read(appDatabaseProvider);
+      await db.wipeAllLocalData();
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      await ref.read(authControllerProvider.notifier).logout();
+
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account and all local data have been completely wiped.'),
+          backgroundColor: AppColors.primaryAccent,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error during account deletion: $e'),
+          backgroundColor: AppColors.errorRed,
         ),
       );
     }
@@ -590,7 +743,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Section 4: Open Source & Legal
+          // Section 4: Data Privacy & Account
+          Text('DATA PRIVACY & ACCOUNT', style: AppTypography.bodySmall),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.file_download_outlined,
+                      color: AppColors.primaryAccent),
+                  title: Text('Export Personal Data', style: AppTypography.bodyMedium),
+                  subtitle: Text('Export local SQLite tasks, timetable, logs & usage as JSON',
+                      style: AppTypography.bodySmall.copyWith(fontSize: 11)),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      color: AppColors.textSecondary),
+                  onTap: _exportPersonalData,
+                ),
+                const Divider(color: AppColors.border, height: 1),
+                ListTile(
+                  leading: const Icon(Icons.delete_forever_rounded,
+                      color: AppColors.errorRed),
+                  title: Text('Delete Account & Wipe Data',
+                      style: AppTypography.bodyMedium.copyWith(color: AppColors.errorRed)),
+                  subtitle: Text('Irrevocably erase cloud profile and wipe local SQLite storage',
+                      style: AppTypography.bodySmall.copyWith(fontSize: 11)),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      color: AppColors.errorRed),
+                  onTap: _confirmDeleteAccount,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Section 5: Open Source & Legal
           Text('OPEN SOURCE & LEGAL', style: AppTypography.bodySmall),
           const SizedBox(height: 10),
           Container(

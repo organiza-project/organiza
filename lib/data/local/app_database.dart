@@ -574,6 +574,39 @@ class AppDatabase extends _$AppDatabase {
         .get();
     return [...t.map((e) => e.title), ...k.map((e) => e.title)];
   }
+
+  /// Irrevocably purges all local tables for account deletion or GDPR wipe
+  Future<void> wipeAllLocalData() async {
+    await transaction(() async {
+      await delete(tasks).go();
+      await delete(dailyLogs).go();
+      await delete(appLimits).go();
+      await delete(timetableEntries).go();
+      await delete(journalEntries).go();
+      await delete(appUsageTable).go();
+    });
+  }
+
+  /// Exports entire local database to machine-readable JSON format
+  Future<Map<String, dynamic>> exportAllLocalData() async {
+    final allTasks = await select(tasks).get();
+    final allLogs = await select(dailyLogs).get();
+    final allTimetable = await select(timetableEntries).get();
+    final allJournals = await select(journalEntries).get();
+    final allLimits = await select(appLimits).get();
+    final allUsage = await select(appUsageTable).get();
+
+    return {
+      'schemaVersion': schemaVersion,
+      'exportedAt': DateTime.now().toUtc().toIso8601String(),
+      'tasks': allTasks.map((t) => t.toJson()).toList(),
+      'dailyLogs': allLogs.map((l) => l.toJson()).toList(),
+      'timetableEntries': allTimetable.map((e) => e.toJson()).toList(),
+      'journalEntries': allJournals.map((j) => j.toJson()).toList(),
+      'appLimits': allLimits.map((a) => a.toJson()).toList(),
+      'usageSnapshots': allUsage.map((u) => u.toJson()).toList(),
+    };
+  }
 }
 
 LazyDatabase _openConnection() {

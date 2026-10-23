@@ -648,6 +648,27 @@ class SupabaseService {
     return null;
   }
 
+  /// Permanently deletes the current authenticated user's account and all associated cloud data via RPC
+  Future<bool> deleteAccount() async {
+    final c = client;
+    if (c == null || currentUser == null) return false;
+    try {
+      await c.rpc('delete_user_account');
+      await signOut();
+      return true;
+    } catch (e) {
+      debugPrint('Organiza: Delete account error: $e');
+      try {
+        await c.from('profiles').delete().eq('id', currentUser!.id);
+        await signOut();
+        return true;
+      } catch (fallbackErr) {
+        debugPrint('Organiza: Delete account fallback error: $fallbackErr');
+        return false;
+      }
+    }
+  }
+
   /// Sign out current session
   Future<void> signOut() async {
     final c = client;
