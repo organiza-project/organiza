@@ -3347,7 +3347,7 @@ final class $$TasksTableReferences
   static MultiTypedResultKey<$DailyLogsTable, List<DailyLog>>
   _dailyLogsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.dailyLogs,
-    aliasName: 'tasks__id__daily_logs__task_id',
+    aliasName: $_aliasNameGenerator(db.tasks.id, db.dailyLogs.taskId),
   );
 
   $$DailyLogsTableProcessedTableManager get dailyLogsRefs {
@@ -3811,8 +3811,9 @@ final class $$DailyLogsTableReferences
     extends BaseReferences<_$AppDatabase, $DailyLogsTable, DailyLog> {
   $$DailyLogsTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static $TasksTable _taskIdTable(_$AppDatabase db) =>
-      db.tasks.createAlias('daily_logs__task_id__tasks__id');
+  static $TasksTable _taskIdTable(_$AppDatabase db) => db.tasks.createAlias(
+    $_aliasNameGenerator(db.dailyLogs.taskId, db.tasks.id),
+  );
 
   $$TasksTableProcessedTableManager get taskId {
     final $_column = $_itemColumn<String>('task_id')!;

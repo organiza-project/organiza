@@ -1,0 +1,8 @@
+# Android Release Signing Configuration Example
+# Copy this file to android/key.properties and replace with actual keystore values
+# NEVER commit key.properties or .jks files to version control!
+
+storePassword=YOUR_STORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=organiza-upload
+storeFile=../upload-keystore.jks
