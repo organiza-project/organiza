@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>app.organiza.organiza</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Organiza</name>
+  <summary>Offline-first productivity, focus tracking, and discipline architecture</summary>
+  <description>
+    <p>
+      Organiza is an offline-first productivity platform combining task management,
+      daily timetable scheduling, deep-work reflection journaling, and unprivileged
+      active-window screen time analytics.
+    </p>
+    <p>
+      Features:
+    </p>
+    <ul>
+      <li>Local SQLite database with pre-migration snapshot backups and zero cloud lock-in.</li>
+      <li>Unprivileged desktop usage tracking via X11 and GNOME Wayland D-Bus.</li>
+      <li>Distraction blocker with Stoic friction essays and custom curfews.</li>
+      <li>Battlepass gamification and cohort duels with verifiable wager settlements.</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">app.organiza.organiza.desktop</launchable>
+  <url type="homepage">https://organiza.app</url>
+  <url type="bugtracker">https://github.com/organiza-project/organiza/issues</url>
+  <provides>
+    <binary>organiza</binary>
+  </provides>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="1.0.0" date="2026-10-24">
+      <description>
+        <p>Initial stable production release with multi-platform local core, offline drift SQLite, and Supabase cloud sync.</p>
+      </description>
+    </release>
+  </releases>
+</component>

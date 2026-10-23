@@ -1,0 +1,22 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Organiza
+GenericName=Productivity & Focus Tracker
+Comment=Master time, curb distractions, and forge discipline with offline-first habit tracking
+Exec=organiza %u
+Icon=app.organiza.organiza
+Terminal=false
+StartupNotify=true
+Categories=Utility;Office;ProjectManagement;
+MimeType=x-scheme-handler/organiza;x-scheme-handler/app.organiza.organiza;
+Keywords=productivity;focus;habits;calendar;stoic;pomodoro;time;tracker;
+Actions=NewTask;Diagnostics;
+
+[Desktop Action NewTask]
+Name=New Task
+Exec=organiza --action=new_task
+
+[Desktop Action Diagnostics]
+Name=Open Diagnostics
+Exec=organiza --action=diagnostics
