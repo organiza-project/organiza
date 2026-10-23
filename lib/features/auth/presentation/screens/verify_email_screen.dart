@@ -66,8 +66,12 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   Future<void> _verifyOtp() async {
     final token = _currentOtp.trim();
     if (token.length < 6) {
-      // Check verification via session if code isn't fully typed
-      _checkVerificationStatus();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Incomplete code: Please enter all 6 digits of the OTP code.'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
       return;
     }
 
@@ -334,7 +338,18 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                   ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
+
+        // Session check fallback button
+        TextButton.icon(
+          onPressed: _isChecking ? null : _checkVerificationStatus,
+          icon: const Icon(Icons.link_rounded, size: 16, color: AppColors.primaryAccent),
+          label: Text(
+            'I clicked the magic link in email',
+            style: AppTypography.bodySmall.copyWith(color: AppColors.primaryAccent),
+          ),
+        ),
+        const SizedBox(height: 12),
 
         // Use a different email / Back to login
         TextButton(

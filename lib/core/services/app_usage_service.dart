@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:usage_stats/usage_stats.dart';
 
 import '../../data/local/app_database.dart';
@@ -70,12 +71,54 @@ class AppUsageService {
     'obsidian': 'Obsidian',
   };
 
+  static const String prefTrackingConsentKey = 'app_tracking_consent_granted';
+
+  bool _isTrackingEnabled = false;
+  bool _isPolling = false;
+
+  bool get isTrackingEnabled => _isTrackingEnabled;
+  bool get isPolling => _isPolling;
+
   AppUsageService([this._db]) {
+    initTrackingConsent();
+  }
+
+  Future<void> initTrackingConsent([SharedPreferences? prefs]) async {
+    try {
+      final p = prefs ?? await SharedPreferences.getInstance();
+      _isTrackingEnabled = p.getBool(prefTrackingConsentKey) ?? false;
+      if (_isTrackingEnabled) {
+        _startNativeTracking();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> enableTracking([SharedPreferences? prefs]) async {
+    _isTrackingEnabled = true;
+    try {
+      final p = prefs ?? await SharedPreferences.getInstance();
+      await p.setBool(prefTrackingConsentKey, true);
+    } catch (_) {}
     _startNativeTracking();
+  }
+
+  Future<void> disableTracking([SharedPreferences? prefs]) async {
+    _isTrackingEnabled = false;
+    _linuxPollTimer?.cancel();
+    _linuxPollTimer = null;
+    try {
+      final p = prefs ?? await SharedPreferences.getInstance();
+      await p.setBool(prefTrackingConsentKey, false);
+    } catch (_) {}
+  }
+
+  Future<int> purgeUsageHistory() async {
+    return await _db?.purgeUsageHistory() ?? 0;
   }
 
   void dispose() {
     _linuxPollTimer?.cancel();
+    _linuxPollTimer = null;
   }
 
   String _formatTodayDate() {
@@ -87,6 +130,7 @@ class AppUsageService {
   }
 
   void _startNativeTracking() {
+    if (!_isTrackingEnabled) return;
     if (Platform.isLinux && _db != null) {
       _startLinuxWindowPoller();
     } else if (Platform.isAndroid && _db != null) {
@@ -104,18 +148,21 @@ class AppUsageService {
 
   /// Polls the active Linux window and increments SQLite usage if a focused app is detected
   Future<void> pollActiveLinuxWindow() async {
-    if (!Platform.isLinux || _db == null) return;
+    if (!Platform.isLinux || _db == null || !_isTrackingEnabled) return;
+    if (_isPolling) return;
 
+    _isPolling = true;
+    final stopwatch = Stopwatch()..start();
     try {
       String? detectedProcess;
 
-      // 1. Try xdotool (works on X11 and XWayland)
+      // 1. Try xdotool (works on X11 and XWayland) with timeout
       try {
         final res = await Process.run(
           'xdotool',
           ['getactivewindow', 'getwindowpid'],
           environment: {'DISPLAY': Platform.environment['DISPLAY'] ?? ':0'},
-        );
+        ).timeout(const Duration(seconds: 2));
         if (res.exitCode == 0) {
           final pidStr = res.stdout.toString().trim();
           final pid = int.tryParse(pidStr);
@@ -127,10 +174,10 @@ class AppUsageService {
           }
         }
       } catch (_) {
-        // xdotool not available or failed; fallback to Wayland DBus
+        // xdotool not available or timed out; fallback to Wayland DBus
       }
 
-      // 2. GNOME Wayland unprivileged session DBus fallback
+      // 2. GNOME Wayland unprivileged session DBus fallback with timeout
       if (detectedProcess == null || detectedProcess.isEmpty) {
         try {
           final dbusRes = await Process.run('gdbus', [
@@ -143,7 +190,7 @@ class AppUsageService {
             '--method',
             'org.gnome.Shell.Eval',
             "global.display.focus_window ? global.display.focus_window.get_wm_class() : ''",
-          ]);
+          ]).timeout(const Duration(seconds: 2));
           if (dbusRes.exitCode == 0) {
             final out = dbusRes.stdout.toString();
             final match = RegExp(r"'([^']*)'").firstMatch(out);
@@ -169,10 +216,19 @@ class AppUsageService {
 
         final cleanName = getCleanAppName(detectedProcess);
         final todayStr = _formatTodayDate();
-        await _db.incrementUsage(detectedProcess, cleanName, todayStr, 5);
+        await _db.incrementDailyUsage(detectedProcess, cleanName, todayStr, 5);
+
+        if (kDebugMode) {
+          debugPrint(
+              'Organiza: Linux tracked "$cleanName" ($detectedProcess) in ${stopwatch.elapsedMilliseconds}ms');
+        }
       }
     } catch (e) {
-      debugPrint('Organiza: Linux usage poll error (gracefully handled): $e');
+      if (kDebugMode) {
+        debugPrint('Organiza: Linux usage poll notice: $e');
+      }
+    } finally {
+      _isPolling = false;
     }
   }
 
@@ -195,7 +251,7 @@ class AppUsageService {
   /// Sync Android usage from UsageStatsManager into SQLite
   Future<void> syncAndroidUsage() async {
     final db = _db;
-    if (!Platform.isAndroid || db == null) return;
+    if (!Platform.isAndroid || db == null || !_isTrackingEnabled) return;
 
     try {
       final now = DateTime.now();
@@ -208,11 +264,13 @@ class AppUsageService {
         final seconds = ms ~/ 1000;
         if (seconds > 0) {
           final cleanName = getCleanAppName(entry.key);
-          await db.setAppUsage(entry.key, cleanName, todayStr, seconds);
+          await db.recordDailyUsageSnapshot(entry.key, cleanName, todayStr, seconds);
         }
       }
     } catch (e) {
-      debugPrint('Organiza: Android UsageStats sync notice: $e');
+      if (kDebugMode) {
+        debugPrint('Organiza: Android UsageStats sync notice: $e');
+      }
     }
   }
 

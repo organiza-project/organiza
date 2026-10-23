@@ -11,6 +11,7 @@ import '../../../../core/constants/legal_docs.dart';
 import '../../../../core/network/supabase_service.dart';
 import '../../../auth/presentation/widgets/custom_server_dialog.dart';
 import '../controllers/profile_controller.dart';
+import 'diagnostics_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -562,6 +563,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onTap: () async {
                 await CustomServerDialog.show(context);
                 if (mounted) setState(() {});
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: ListTile(
+              leading: const Icon(Icons.monitor_heart_outlined,
+                  color: AppColors.primaryAccent),
+              title: Text('System Diagnostics', style: AppTypography.bodyMedium),
+              subtitle: Text('Observable sync, schema version, queue depth & backend status',
+                  style: AppTypography.bodySmall.copyWith(fontSize: 11)),
+              trailing: const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.textSecondary),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DiagnosticsScreen()),
+                );
               },
             ),
           ),

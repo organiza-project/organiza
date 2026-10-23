@@ -55,6 +55,10 @@ class AppDatabase extends _$AppDatabase {
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
         onUpgrade: (m, from, to) async {
+          if (from > to) {
+            throw StateError(
+                'Unsupported downgrade attempt from schema $from to schema $to');
+          }
           if (from < 2) {
             await m.createTable(timetableEntries);
             await m.createTable(journalEntries);
@@ -258,7 +262,7 @@ class AppDatabase extends _$AppDatabase {
         .watch();
   }
 
-  Future<void> incrementUsage(
+  Future<void> incrementDailyUsage(
     String packageName,
     String appName,
     String date,
@@ -291,7 +295,16 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
-  Future<void> setAppUsage(
+  /// Backward-compatible alias for incrementDailyUsage
+  Future<void> incrementUsage(
+    String packageName,
+    String appName,
+    String date,
+    int addedSeconds,
+  ) =>
+      incrementDailyUsage(packageName, appName, date, addedSeconds);
+
+  Future<void> recordDailyUsageSnapshot(
     String packageName,
     String appName,
     String date,
@@ -308,6 +321,20 @@ class AppDatabase extends _$AppDatabase {
         lastActiveTime: Value(DateTime.now()),
       ),
     );
+  }
+
+  /// Backward-compatible alias for recordDailyUsageSnapshot
+  Future<void> setAppUsage(
+    String packageName,
+    String appName,
+    String date,
+    int totalSeconds,
+  ) =>
+      recordDailyUsageSnapshot(packageName, appName, date, totalSeconds);
+
+  /// Purges all local usage records upon user request for privacy compliance
+  Future<int> purgeUsageHistory() {
+    return delete(appUsageTable).go();
   }
 
   Future<Map<String, int>> getTodayUsageMap(String date) async {
@@ -553,6 +580,14 @@ LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationSupportDirectory();
     final file = File(p.join(dbFolder.path, 'app.sqlite'));
+    if (await file.exists()) {
+      try {
+        final backupFile = File(p.join(dbFolder.path, 'app.sqlite.backup'));
+        await file.copy(backupFile.path);
+      } catch (_) {
+        // Non-fatal backup notice
+      }
+    }
     return NativeDatabase.createInBackground(file);
   });
 }
