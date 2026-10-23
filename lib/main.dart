@@ -7,12 +7,14 @@ import 'core/constants/app_colors.dart';
 import 'core/network/supabase_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/controllers/auth_controller.dart';
+import 'core/services/crash_reporter.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/screens/verify_email_screen.dart';
 import 'shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await CrashReporter.initialize();
 
   final prefs = await SharedPreferences.getInstance();
   final activeUrl = await SupabaseConfig.getActiveUrl(prefs);

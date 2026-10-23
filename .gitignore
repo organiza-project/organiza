@@ -2,6 +2,7 @@
 .dart_tool/
 .packages
 build/
+dist/
 
 # Directory created by dartdoc
 doc/api/
