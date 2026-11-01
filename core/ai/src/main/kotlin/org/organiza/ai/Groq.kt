@@ -1,8 +1,10 @@
 package org.organiza.ai
 
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.UUID
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -50,11 +52,14 @@ public class HttpReply(public val status: Int, public val body: String)
 
 public fun interface HttpTransport {
     /** Throws [IOException] when the server cannot be reached. */
-    public fun post(url: String, headers: Map<String, String>, body: String): HttpReply
+    public fun post(url: String, headers: Map<String, String>, body: ByteArray): HttpReply
 }
 
+public fun HttpTransport.post(url: String, headers: Map<String, String>, body: String): HttpReply =
+    post(url, headers, body.toByteArray())
+
 public class UrlConnectionTransport : HttpTransport {
-    override fun post(url: String, headers: Map<String, String>, body: String): HttpReply {
+    override fun post(url: String, headers: Map<String, String>, body: ByteArray): HttpReply {
         val connection = URL(url).openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "POST"
@@ -64,7 +69,7 @@ public class UrlConnectionTransport : HttpTransport {
             // A redirect would carry the Authorization header to a host nobody chose.
             connection.instanceFollowRedirects = false
             headers.forEach(connection::setRequestProperty)
-            connection.outputStream.use { it.write(body.toByteArray()) }
+            connection.outputStream.use { it.write(body) }
             val status = connection.responseCode
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
             return HttpReply(status, stream?.use { it.readBytes().decodeToString() }.orEmpty())
@@ -78,12 +83,15 @@ public class UrlConnectionTransport : HttpTransport {
     }
 }
 
-public class GroqEndpoint private constructor(internal val chatUrl: String) {
+public class GroqEndpoint private constructor(baseUrl: String) {
+    internal val chatUrl = "$baseUrl/openai/v1/chat/completions"
+    internal val transcriptionUrl = "$baseUrl/openai/v1/audio/transcriptions"
+
     public companion object {
-        public val PRODUCTION: GroqEndpoint = GroqEndpoint("https://api.groq.com/openai/v1/chat/completions")
+        public val PRODUCTION: GroqEndpoint = GroqEndpoint("https://api.groq.com")
 
         /** A local stand-in server. Only tests and debug builds may use this. */
-        public fun forTesting(baseUrl: String): GroqEndpoint = GroqEndpoint("$baseUrl/openai/v1/chat/completions")
+        public fun forTesting(baseUrl: String): GroqEndpoint = GroqEndpoint(baseUrl)
     }
 }
 
@@ -113,11 +121,60 @@ public class GroqClient(
     public fun complete(key: ApiKey, prompt: Prompt): AiResult<String> {
         val headers = mapOf("Authorization" to "Bearer ${key.value}", "Content-Type" to "application/json")
         val reply = try {
-            transport.post(endpoint.chatUrl, headers, requestBody(prompt))
+            transport.post(endpoint.chatUrl, headers, requestBody(prompt).toByteArray())
         } catch (_: IOException) {
             return AiResult.Failed(AiFailure.OFFLINE)
         }
         return if (reply.status == OK) readContent(reply.body) else AiResult.Failed(failureFor(reply))
+    }
+
+    /** Sends a WAV recording to Whisper. Audio cannot be sanitized first (ADR-0010). */
+    public fun transcribe(key: ApiKey, wav: ByteArray): AiResult<String> {
+        val boundary = "organiza-" + UUID.randomUUID()
+        val headers = mapOf(
+            "Authorization" to "Bearer ${key.value}",
+            "Content-Type" to "multipart/form-data; boundary=$boundary",
+        )
+        val reply = try {
+            transport.post(endpoint.transcriptionUrl, headers, multipart(boundary, wav))
+        } catch (_: IOException) {
+            return AiResult.Failed(AiFailure.OFFLINE)
+        }
+        if (reply.status != OK) return AiResult.Failed(failureFor(reply))
+        val text = runCatching {
+            ((Json.parseToJsonElement(reply.body) as JsonObject)["text"] as JsonPrimitive).takeIf { it.isString }?.content
+        }.getOrNull()
+        return text?.let { AiResult.Ok(it) } ?: AiResult.Failed(AiFailure.MALFORMED)
+    }
+
+    /** Asks the model to restate [transcript] in the command grammar. Null means it could not. */
+    public fun rewriteCommand(key: ApiKey, transcript: SanitizedText, habits: List<SanitizedText>): AiResult<String?> =
+        when (val reply = complete(key, Prompts.voiceCommandRewrite(transcript, habits))) {
+            is AiResult.Failed -> reply
+            is AiResult.Ok -> AiResult.Ok(
+                runCatching {
+                    ((Json.parseToJsonElement(reply.value) as JsonObject)["command"] as JsonPrimitive)
+                        .takeIf { it.isString }?.content
+                }.getOrNull(),
+            )
+        }
+
+    private fun multipart(boundary: String, wav: ByteArray): ByteArray {
+        val bytes = ByteArrayOutputStream()
+        fun field(name: String, value: String) {
+            bytes.write("--$boundary\r\nContent-Disposition: form-data; name=\"$name\"\r\n\r\n$value\r\n".toByteArray())
+        }
+        field("model", TRANSCRIPTION_MODEL)
+        field("response_format", "json")
+        field("temperature", "0")
+        field("prompt", TRANSCRIPTION_HINT)
+        bytes.write(
+            ("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"speech.wav\"\r\n" +
+                "Content-Type: audio/wav\r\n\r\n").toByteArray(),
+        )
+        bytes.write(wav)
+        bytes.write("\r\n--$boundary--\r\n".toByteArray())
+        return bytes.toByteArray()
     }
 
     private fun requestBody(prompt: Prompt): String = buildJsonObject {
@@ -162,6 +219,11 @@ public class GroqClient(
     public companion object {
         /** Hosted model IDs retire often. Check Groq's deprecations page before changing this. */
         public const val DEFAULT_MODEL: String = "openai/gpt-oss-20b"
+        private const val TRANSCRIPTION_MODEL = "whisper-large-v3-turbo"
+
+        // A fixed hint with no user data, which steers Whisper towards command vocabulary.
+        private const val TRANSCRIPTION_HINT = "Add a habit. Mark habit as done. Remove the habit. " +
+            "Schedule focus tomorrow at 9 for 1 hour. Cancel the session."
         private const val OK = 200
         private const val CAPACITY = 498
         private const val TEMPERATURE = 0.3

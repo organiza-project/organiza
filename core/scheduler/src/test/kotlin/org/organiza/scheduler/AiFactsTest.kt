@@ -3,11 +3,14 @@ package org.organiza.scheduler
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import org.organiza.ai.BusyBlock
+import org.organiza.ai.Sanitizer
 import org.organiza.domain.port.Capability
+import org.organiza.storage.HabitStore
 import org.organiza.storage.Migrations
 import org.organiza.storage.RuleStore
 import org.organiza.storage.SessionSource
@@ -67,5 +70,18 @@ class AiFactsTest {
             listOf(BusyBlock(DayOfWeek.MONDAY, 540, 60, "#focus")),
             facts.busy(monday, monday.plus(Duration.ofDays(7)), ZoneOffset.UTC),
         )
+    }
+
+    @Test
+    fun `habit facts count met days and sanitize names`() {
+        val habits = HabitStore(db)
+        val day = LocalDate.of(2026, 11, 2)
+        habits.add("h", "Run with Sarah Connor", monday)
+        habits.mark("h", day, true)
+        habits.mark("h", day.plusDays(1), false)
+        val fact = facts.habits(day, day.plusDays(7), Sanitizer()).single()
+        assertEquals("Run with [NAME]", fact.name.value)
+        assertEquals(1, fact.daysMet)
+        assertEquals(7, fact.daysTotal)
     }
 }

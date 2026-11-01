@@ -154,6 +154,9 @@ public class SessionScheduler(
         db.transaction { finishAll(sessions.inState(SessionState.ACTIVE)) }
     }
 
+    public fun isStrictRunning(): Boolean =
+        sessions.inState(SessionState.ACTIVE).any { it.ruleId?.let(rules::find)?.strict == true }
+
     /** Saves a rule, unless a running strict session depends on it. */
     public fun saveRule(rule: StoredRule): RuleEdit = editRule(rule.id) { rules.save(rule, clock.now()) }
 

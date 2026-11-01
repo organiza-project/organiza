@@ -39,8 +39,8 @@ public class FakeHttpTransport : HttpTransport {
         failure = error
     }
 
-    override fun post(url: String, headers: Map<String, String>, body: String): HttpReply {
-        recorded += Request(url, headers, body)
+    override fun post(url: String, headers: Map<String, String>, body: ByteArray): HttpReply {
+        recorded += Request(url, headers, String(body, Charsets.ISO_8859_1))
         failure?.let { throw it }
         return checkNotNull(reply)
     }
