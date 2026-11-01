@@ -39,6 +39,7 @@ Options rejected and why.
 | 0007 | Android enforcement pipeline | Accepted | 2026-11-01 |
 | 0008 | Encrypted storage and deterministic calendar scheduling | Accepted | 2026-11-01 |
 | 0009 | BYOK AI pipeline and on-device sanitizer | Accepted | 2026-11-01 |
+| 0010 | Voice commands through Groq Whisper | Accepted | 2026-11-01 |
 
 ---
 
@@ -389,3 +390,47 @@ free text can still reach Groq, which the design limits by keeping free text sho
 On-device NER model: large, and weak across languages. Sending titles after sanitizing: more
 useful suggestions, but it makes the sanitizer the only protection. Storing the key in the
 database: the key would then be protected only by the database key, not directly by Keystore.
+
+---
+
+## ADR-0010: Voice commands through Groq Whisper
+
+- **Status:** Accepted
+- **Date:** 2026-11-01
+- **Deciders:** jackforce
+
+### Context
+The user asked for dictated commands to add, remove and mark habits and to change the
+schedule, using their Groq key and naming Wispr Flow. Wispr Flow is a separate company's
+product and is not hosted by Groq. Groq hosts Whisper speech-to-text.
+
+### Decision
+- **Transcription** uses Groq's `whisper-large-v3-turbo` with the user's own key. Using Wispr
+  Flow would add a second cloud vendor and a second key for no functional gain.
+- **This is a stated exception to the sanitizer rule.** Audio cannot be sanitized on the device,
+  so a recording reaches Groq as spoken. The exposure is limited as follows: voice is off until
+  the user agrees to a notice, recording only runs while the talk button is held in the open app,
+  each recording is capped at 30 seconds and held only in memory, and neither audio nor
+  transcripts are stored or logged.
+- **Silence never leaves the device.** Whisper invents text for silence (a silent clip returned
+  "Thank you."), so an on-device level check rejects it before any upload.
+- **A local grammar decides what can happen.** Transcripts go to a deterministic parser. Only if
+  that fails, the sanitized transcript goes to the chat model, which may only rewrite it into the
+  same grammar. The result goes back through the local parser, so a model reply cannot express any
+  action the grammar lacks.
+- **Every command needs confirmation.** Real Whisper heard "Add a habit" as "Add a hobbit" in
+  testing, so the parsed command is shown first and applied only on a tap.
+- **Voice has no extra power.** Removing a habit archives it and keeps its history. A running
+  session cannot be cancelled by voice, and while a strict session runs the schedule cannot be
+  changed by voice either.
+- Times without am or pm resolve deterministically: 7 to 11 mean morning, 12 means noon, and 1 to
+  6 mean afternoon.
+
+### Consequences
+Dictation needs a network connection and a Groq key, and blocking does not depend on it. The
+grammar is English; other languages rely on the model rewrite.
+
+### Alternatives Considered
+Android's on-device recognizer: better for privacy, but only on Android 12+ and only where a
+language pack is present. It is a good option to add later. Letting the model return actions
+directly: more flexible, but its output would then decide what runs.

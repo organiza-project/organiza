@@ -7,5 +7,6 @@ dependencies {
     api(project(":core:calendar"))
     api(project(":core:enforcement"))
     api(project(":core:storage"))
+    api(project(":core:voice"))
     testImplementation(project(":core:testing"))
 }
