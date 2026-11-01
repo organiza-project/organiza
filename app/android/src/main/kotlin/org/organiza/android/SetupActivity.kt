@@ -33,6 +33,12 @@ class SetupActivity : Activity() {
             setText("30")
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
+        val apiKey = EditText(this).apply {
+            hint = "Groq API key"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        val goal = EditText(this).apply { hint = "Your goal this week" }
+        val reason = EditText(this).apply { hint = "Why do you need to leave this session?" }
         val strict = CheckBox(this).apply { text = "Strict (guards Organiza's settings pages)" }
         val shortForm = CheckBox(this).apply { text = "Block Shorts and Reels" }
         val column = LinearLayout(this).apply {
@@ -64,13 +70,37 @@ class SetupActivity : Activity() {
                 refreshSoon()
             })
             addView(button("Import calendar (.ics)") { pickCalendar() })
+            addView(TextView(this@SetupActivity).apply { text = AI_NOTICE })
+            addView(apiKey)
+            addView(button("Save API key") {
+                app.saveApiKey(apiKey.text.toString())
+                apiKey.text.clear()
+            })
+            addView(button("Remove API key") { app.clearApiKey() })
+            addView(button("Weekly review") { app.requestWeeklyReview() })
+            addView(goal)
+            addView(button("Suggest a schedule") { app.requestSchedule(goal.text.toString()) })
+            addView(reason)
+            addView(button("Ask the gatekeeper") { app.askGatekeeper(reason.text.toString(), 30) })
         }
         setContentView(ScrollView(this).apply { addView(column) })
     }
 
+    private val poll = object : Runnable {
+        override fun run() {
+            refresh()
+            status.postDelayed(this, POLL_MS)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
-        refresh()
+        poll.run()
+    }
+
+    override fun onPause() {
+        status.removeCallbacks(poll)
+        super.onPause()
     }
 
     /** Storage work is asynchronous, so the result shows a moment later. */
@@ -127,5 +157,9 @@ class SetupActivity : Activity() {
         const val PADDING = 48
         const val REQUEST_CALENDAR = 1
         const val REFRESH_DELAY_MS = 400L
+        const val POLL_MS = 1000L
+        const val AI_NOTICE = "AI is optional and uses your own Groq key. Goals and answers you type are sent to " +
+            "Groq after names, links and numbers are removed where detected, which may not catch everything. " +
+            "App and website history is never sent."
     }
 }

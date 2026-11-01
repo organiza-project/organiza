@@ -16,13 +16,22 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.util.concurrent.Executors
+import org.organiza.ai.AiCoach
+import org.organiza.ai.AiResult
+import org.organiza.ai.ApiKey
+import org.organiza.ai.GroqClient
+import org.organiza.ai.GroqEndpoint
+import org.organiza.ai.Sanitizer
+import org.organiza.ai.UrlConnectionTransport
 import org.organiza.calendar.IcsCalendar
+import org.organiza.domain.Parsed
 import org.organiza.domain.port.Capability
 import org.organiza.domain.port.Clock
 import org.organiza.domain.port.EnforcementCapabilities
 import org.organiza.enforcement.ActiveSession
 import org.organiza.enforcement.SessionPolicy
 import org.organiza.enforcement.TamperMonitor
+import org.organiza.scheduler.AiFacts
 import org.organiza.scheduler.ManualRequest
 import org.organiza.scheduler.RuleEdit
 import org.organiza.scheduler.SessionScheduler
@@ -52,6 +61,11 @@ class OrganizaApp : Application(), EnforcementCapabilities {
 
     // Storage and everything that touches it run on this one thread, away from the main thread.
     private val storageThread = Executors.newSingleThreadExecutor()
+
+    // AI calls can take many seconds, so they must not hold up enforcement work.
+    private val aiThread = Executors.newSingleThreadExecutor()
+    private val apiKeys by lazy { KeystoreApiKeyStore(this) }
+    internal var aiEndpoint: GroqEndpoint = GroqEndpoint.PRODUCTION
     private val main by lazy { Handler(Looper.getMainLooper()) }
     private var storage: Storage? = null
     private val monitor by lazy { TamperMonitor(this, clock) }
@@ -63,6 +77,7 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         val scheduler = SessionScheduler(db, clock)
         val sessions = SessionStore(db)
         val tamper = TamperStore(db)
+        val aiFacts = AiFacts(db)
     }
 
     override fun onCreate() {
@@ -212,6 +227,67 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         reconcile()
     }
 
+    fun saveApiKey(raw: String) = onAiThread {
+        statusMessage = when (val parsed = ApiKey.parse(raw)) {
+            is Parsed.Valid -> {
+                apiKeys.save(parsed.value)
+                "API key saved"
+            }
+            is Parsed.Invalid -> "That does not look like an API key"
+        }
+    }
+
+    fun clearApiKey() = onAiThread {
+        apiKeys.clear()
+        statusMessage = "API key removed"
+    }
+
+    fun requestWeeklyReview() = onStorageThread {
+        val facts = storage?.aiFacts ?: return@onStorageThread
+        val now = clock.now()
+        val week = facts.weekly(now.minus(WEEK), now)
+        onAiThread {
+            statusMessage = when (val result = coach().weeklyReview(week)) {
+                is AiResult.Ok -> "Weekly review: ${result.value.summary}\n" + result.value.suggestions.joinToString("\n")
+                is AiResult.Failed -> "Weekly review failed: ${result.failure}"
+            }
+        }
+    }
+
+    fun requestSchedule(goal: String) = onStorageThread {
+        val facts = storage?.aiFacts ?: return@onStorageThread
+        val now = clock.now()
+        val busy = facts.busy(now, now.plus(WEEK), ZoneId.systemDefault())
+        onAiThread {
+            statusMessage = when (val result = coach().suggestSchedule(goal, busy)) {
+                is AiResult.Ok -> "Suggested (not applied): " + result.value.blocks.joinToString { block ->
+                    "${block.day} ${block.startMinute / 60}:${"%02d".format(block.startMinute % 60)} " +
+                        "for ${block.minutes} min, ${block.label}"
+                }
+                is AiResult.Failed -> "Schedule suggestion failed: ${result.failure}"
+            }
+        }
+    }
+
+    /** Shows the gatekeeper's decision. A grant does not end the session (ADR-0009). */
+    fun askGatekeeper(request: String, minutesLeft: Long) = onAiThread {
+        val decision = coach().gatekeeper(minutesLeft, request)
+        statusMessage = "Gatekeeper: granted=${decision.granted} reason=${decision.reason} failure=${decision.failure}"
+    }
+
+    private fun coach() = AiCoach(apiKeys, GroqClient(UrlConnectionTransport(), aiEndpoint), Sanitizer())
+
+    private fun onAiThread(work: () -> Unit) {
+        aiThread.execute {
+            try {
+                work()
+            } catch (failure: RuntimeException) {
+                Log.e(TAG, "ai work failed: ${failure.javaClass.simpleName}")
+                statusMessage = "AI error"
+            }
+        }
+    }
+
     /** Called whenever the OS may have taken a capability away. */
     fun checkTamper() = onStorageThread {
         val active = storage ?: return@onStorageThread
@@ -235,7 +311,7 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         Log.i(
             "OrganizaDebug",
             "capabilities=$capabilities tamper=$tamper storageFailure=$failure " +
-                "active=${session.current != SessionPolicy.IDLE} message=$statusMessage",
+                "active=${session.current != SessionPolicy.IDLE} message=${statusMessage?.replace('\n', ' ')}",
         )
     }
 
@@ -247,6 +323,7 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         private const val REQUEST_INTERVAL_MS = 5_000L
         private const val TAMPER_GRACE_MS = 5_000L
         private val CALENDAR_WINDOW: Duration = Duration.ofDays(60)
+        private val WEEK: Duration = Duration.ofDays(7)
 
         fun from(context: Context): OrganizaApp = context.applicationContext as OrganizaApp
 

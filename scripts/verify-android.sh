@@ -225,6 +225,65 @@ check "stopping is refused" "cannot be stopped early" "$state"
 check "the session is still active" "active=true" "$state"
 session stop
 
+echo "--- byok ai pipeline"
+# Everything goes to a local stand-in server on this machine, never to the real Groq API.
+FAKE_DIR=$(mktemp -d)
+python3 scripts/fake-groq.py 18080 "$FAKE_DIR/requests.log" "$FAKE_DIR/mode" &
+fake_pid=$!
+trap 'kill "$fake_pid" 2>/dev/null' EXIT
+sleep 1
+broadcast() { shell am broadcast -n "$RECEIVER" --es command "$@" >/dev/null; }
+b64() { printf '%s' "$1" | base64 -w0; }
+sent() { cat "$FAKE_DIR/requests.log" 2>/dev/null; }
+test_key="gsk_verify_$(date +%s)_not_a_real_key"
+leaky='Prep for Sarah Connor, jane@clinic.example, 415-555-2671, https://x.example/private'
+broadcast aiendpoint --es url http://10.0.2.2:18080; sleep 1
+broadcast clearkey; sleep 1
+broadcast aireview; sleep 3
+check "no key means no call" "NO_KEY" "$(debug_state)"
+check "control: nothing was sent without a key" "0" "$(sent | wc -l)"
+broadcast savekey --es key "$test_key"; sleep 2
+check "the key is saved" "API key saved" "$(debug_state)"
+check "the key file exists" "groq.key" "$(in_app "ls no_backup")"
+check "the key is not stored in the clear" "0" "$(in_app "cat no_backup/* databases/* | grep -c gsk_verify")"
+check_not "the key is not logged" "gsk_verify" "$("$ADB" logcat -d | tr -d '\r' | grep -F "$test_key" | grep -v 'savekey')"
+session start --es packages com.instagram.android --es domains secretsite.example
+echo grant > "$FAKE_DIR/mode"
+broadcast aireview; sleep 3
+check "weekly review reads the model reply" "Weekly review: " "$(debug_state)"
+broadcast aischedule --es base64 "$(b64 "$leaky")"; sleep 3
+check "schedule suggestions are shown, not applied" "Suggested (not applied)" "$(debug_state)"
+check "the key is sent as a bearer token" "Bearer $test_key" "$(sent)"
+check_not "the model is not retired" "llama" "$(sent)"
+for secret in Sarah Connor jane clinic 415-555 x.example instagram secretsite "$test_key\"model"; do
+  check_not "request bodies do not contain $secret" "$secret" "$(sent | grep '^BODY')"
+done
+check "control: the request log holds bodies" "focusMinutes" "$(sent | grep '^BODY')"
+broadcast aigate --es base64 "$(b64 "$leaky")"; sleep 3
+state=$(debug_state)
+check "a grant is reported" "granted=true" "$state"
+check "a grant does not end the session" "active=true" "$state"
+echo garbage > "$FAKE_DIR/mode"
+broadcast aigate --es base64 "$(b64 'please')"; sleep 3
+check "a malformed reply is a denial" "granted=false" "$(debug_state)"
+echo error > "$FAKE_DIR/mode"
+broadcast aigate --es base64 "$(b64 'please')"; sleep 3
+check "a server error is a denial" "failure=SERVER" "$(debug_state)"
+kill "$fake_pid" 2>/dev/null; sleep 1
+broadcast aigate --es base64 "$(b64 'please')"; sleep 4
+state=$(debug_state)
+check "being offline is a denial" "granted=false failure" "${state/reason=null /}"
+check "offline is reported" "failure=OFFLINE" "$state"
+session stop
+broadcast aiendpoint --es url http://10.0.2.2:18080
+kill_now; sleep 4
+broadcast aiendpoint --es url http://10.0.2.2:1; sleep 1
+broadcast aireview; sleep 4
+check "the key survives a process kill" "failure" "$(debug_state | tr 'A-Z' 'a-z')"
+check_not "control: it is not reported as missing" "NO_KEY" "$(debug_state)"
+broadcast clearkey; sleep 1
+check_not "removing the key deletes the file" "groq.key" "$(in_app "ls no_backup")"
+
 echo "--- uninstall protection"
 check "admin blocks uninstall" "DELETE_FAILED" "$(shell pm uninstall "$APP")"
 

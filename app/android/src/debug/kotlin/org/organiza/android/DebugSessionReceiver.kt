@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Base64
 import java.time.Duration
+import org.organiza.ai.GroqEndpoint
 import org.organiza.scheduler.ManualRequest
 import org.organiza.storage.StoredRule
 
@@ -46,10 +47,19 @@ class DebugSessionReceiver : BroadcastReceiver() {
                     domains = input.blockList.domains,
                 ),
             )
+            "aiendpoint" -> app.aiEndpoint = GroqEndpoint.forTesting(intent.getStringExtra("url").orEmpty())
+            "savekey" -> app.saveApiKey(intent.getStringExtra("key").orEmpty())
+            "clearkey" -> app.clearApiKey()
+            "aireview" -> app.requestWeeklyReview()
+            "aischedule" -> app.requestSchedule(decoded(intent))
+            "aigate" -> app.askGatekeeper(decoded(intent), 30)
             "ics" -> app.importCalendar(
                 Base64.decode(intent.getStringExtra("base64").orEmpty(), Base64.DEFAULT).decodeToString(),
             )
         }
         app.logStatus()
     }
+
+    private fun decoded(intent: Intent): String =
+        Base64.decode(intent.getStringExtra("base64").orEmpty(), Base64.DEFAULT).decodeToString()
 }

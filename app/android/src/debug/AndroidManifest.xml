@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
+    <!-- Lets the verify script reach its local stand-in server. Debug only. -->
+    <application android:networkSecurityConfig="@xml/debug_network">
         <!-- Debug only. DUMP is held by adb shell and not by ordinary apps (ADR-0007). -->
         <receiver
             android:name=".DebugSessionReceiver"
