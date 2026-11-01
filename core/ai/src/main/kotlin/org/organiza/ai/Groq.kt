@@ -1,0 +1,170 @@
+package org.organiza.ai
+
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import org.organiza.domain.InvalidReason
+import org.organiza.domain.Parsed
+
+/** A user's own API key. Deliberately not a data class, so it never prints its value. */
+public class ApiKey private constructor(public val value: String) {
+    override fun toString(): String = "ApiKey(redacted)"
+
+    override fun equals(other: Any?): Boolean = other is ApiKey && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    public companion object {
+        private const val MAX_LENGTH = 512
+
+        public fun parse(raw: String): Parsed<ApiKey> {
+            val trimmed = raw.trim()
+            return when {
+                trimmed.isEmpty() -> Parsed.Invalid(InvalidReason.BLANK)
+                trimmed.length > MAX_LENGTH -> Parsed.Invalid(InvalidReason.TOO_LONG)
+                trimmed.any { it.isWhitespace() || it.isISOControl() } -> Parsed.Invalid(InvalidReason.MALFORMED)
+                else -> Parsed.Valid(ApiKey(trimmed))
+            }
+        }
+    }
+}
+
+/** Key storage. Android: sealed by a Keystore key (ADR-0009). */
+public interface ApiKeyStore {
+    public fun save(key: ApiKey)
+
+    public fun load(): ApiKey?
+
+    public fun clear()
+}
+
+public class HttpReply(public val status: Int, public val body: String)
+
+public fun interface HttpTransport {
+    /** Throws [IOException] when the server cannot be reached. */
+    public fun post(url: String, headers: Map<String, String>, body: String): HttpReply
+}
+
+public class UrlConnectionTransport : HttpTransport {
+    override fun post(url: String, headers: Map<String, String>, body: String): HttpReply {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = "POST"
+            connection.doOutput = true
+            connection.connectTimeout = TIMEOUT_MS
+            connection.readTimeout = TIMEOUT_MS
+            // A redirect would carry the Authorization header to a host nobody chose.
+            connection.instanceFollowRedirects = false
+            headers.forEach(connection::setRequestProperty)
+            connection.outputStream.use { it.write(body.toByteArray()) }
+            val status = connection.responseCode
+            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+            return HttpReply(status, stream?.use { it.readBytes().decodeToString() }.orEmpty())
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private companion object {
+        const val TIMEOUT_MS = 30_000
+    }
+}
+
+public class GroqEndpoint private constructor(internal val chatUrl: String) {
+    public companion object {
+        public val PRODUCTION: GroqEndpoint = GroqEndpoint("https://api.groq.com/openai/v1/chat/completions")
+
+        /** A local stand-in server. Only tests and debug builds may use this. */
+        public fun forTesting(baseUrl: String): GroqEndpoint = GroqEndpoint("$baseUrl/openai/v1/chat/completions")
+    }
+}
+
+public enum class AiFailure {
+    NO_KEY,
+    INVALID_KEY,
+    RATE_LIMITED,
+    MODEL_UNAVAILABLE,
+    BAD_REQUEST,
+    SERVER,
+    OFFLINE,
+    MALFORMED,
+}
+
+public sealed interface AiResult<out T> {
+    public data class Ok<T>(val value: T) : AiResult<T>
+
+    public data class Failed(val failure: AiFailure) : AiResult<Nothing>
+}
+
+/** Sends a [Prompt] to Groq. There is no way to send anything else (ADR-0009). */
+public class GroqClient(
+    private val transport: HttpTransport,
+    private val endpoint: GroqEndpoint,
+    private val model: String = DEFAULT_MODEL,
+) {
+    public fun complete(key: ApiKey, prompt: Prompt): AiResult<String> {
+        val headers = mapOf("Authorization" to "Bearer ${key.value}", "Content-Type" to "application/json")
+        val reply = try {
+            transport.post(endpoint.chatUrl, headers, requestBody(prompt))
+        } catch (_: IOException) {
+            return AiResult.Failed(AiFailure.OFFLINE)
+        }
+        return if (reply.status == OK) readContent(reply.body) else AiResult.Failed(failureFor(reply))
+    }
+
+    private fun requestBody(prompt: Prompt): String = buildJsonObject {
+        put("model", model)
+        put("temperature", TEMPERATURE)
+        put("max_completion_tokens", prompt.maxTokens)
+        put("response_format", buildJsonObject { put("type", "json_object") })
+        put(
+            "messages",
+            buildJsonArray {
+                add(message("system", prompt.system))
+                add(message("user", prompt.user))
+            },
+        )
+    }.toString()
+
+    private fun message(role: String, content: String) = buildJsonObject {
+        put("role", role)
+        put("content", content)
+    }
+
+    private fun readContent(body: String): AiResult<String> {
+        val content = runCatching {
+            val choices = Json.parseToJsonElement(body) as JsonObject
+            val first = (choices["choices"] as JsonArray).first() as JsonObject
+            val message = first["message"] as JsonObject
+            (message["content"] as JsonPrimitive).takeIf { it.isString }?.content
+        }.getOrNull()
+        return content?.let { AiResult.Ok(it) } ?: AiResult.Failed(AiFailure.MALFORMED)
+    }
+
+    private fun failureFor(reply: HttpReply): AiFailure = when (reply.status) {
+        401, 403 -> AiFailure.INVALID_KEY
+        404 -> AiFailure.MODEL_UNAVAILABLE
+        429 -> AiFailure.RATE_LIMITED
+        400 -> if (MODEL_GONE.containsMatchIn(reply.body)) AiFailure.MODEL_UNAVAILABLE else AiFailure.BAD_REQUEST
+        CAPACITY -> AiFailure.SERVER
+        in 400..499 -> AiFailure.BAD_REQUEST
+        else -> AiFailure.SERVER
+    }
+
+    public companion object {
+        /** Hosted model IDs retire often. Check Groq's deprecations page before changing this. */
+        public const val DEFAULT_MODEL: String = "openai/gpt-oss-20b"
+        private const val OK = 200
+        private const val CAPACITY = 498
+        private const val TEMPERATURE = 0.3
+        private val MODEL_GONE = Regex("""model.*(decommission|not found|does not exist)""", RegexOption.IGNORE_CASE)
+    }
+}

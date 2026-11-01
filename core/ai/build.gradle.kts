@@ -3,5 +3,7 @@ plugins {
 }
 
 dependencies {
+    api(project(":core:domain"))
     implementation(libs.kotlinx.serialization.json)
+    testImplementation(project(":core:testing"))
 }

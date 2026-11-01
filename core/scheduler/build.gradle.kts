@@ -3,6 +3,7 @@ plugins {
 }
 
 dependencies {
+    api(project(":core:ai"))
     api(project(":core:calendar"))
     api(project(":core:enforcement"))
     api(project(":core:storage"))
