@@ -1,4 +1,5 @@
 [versions]
+agp = "9.0.1"
 kotlin = "2.3.0"
 junit = "5.13.4"
 sqlite-jdbc = "3.54.1.0"
@@ -10,4 +11,5 @@ junit-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
 
 [plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
