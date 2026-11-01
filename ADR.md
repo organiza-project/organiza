@@ -38,6 +38,7 @@ Options rejected and why.
 | 0006 | Challenge commitments are not zero-knowledge proofs | Accepted | 2026-11-01 |
 | 0007 | Android enforcement pipeline | Accepted | 2026-11-01 |
 | 0008 | Encrypted storage and deterministic calendar scheduling | Accepted | 2026-11-01 |
+| 0009 | BYOK AI pipeline and on-device sanitizer | Accepted | 2026-11-01 |
 
 ---
 
@@ -337,3 +338,54 @@ and credentials in the keystore, so it gets its own ADR.
 Room: adds annotation processing and would hide the tested SQL artifact. Reading Android's
 calendar provider: needs a sensitive permission and exposes titles of every event.
 AlarmManager exact alarms: restricted, and unnecessary while the phone is not in use.
+
+---
+
+## ADR-0009: BYOK AI pipeline and on-device sanitizer
+
+- **Status:** Accepted
+- **Date:** 2026-11-01
+- **Deciders:** jackforce
+
+### Context
+AI features send text to a third party using the user's own Groq key. CLAUDE.md requires
+every outbound prompt to pass an on-device sanitizer. Regex and heuristics cannot catch
+every name or identifier, so the sanitizer cannot be the only protection.
+
+### Decision
+- **Minimise first, sanitize second.** Prompts are built from structured facts: durations,
+  counts, hours of the day, tags and habit names. App names, domains, URLs, event titles and
+  descriptions are never inputs. Only short user-written text, such as goals, tags, habit
+  names and a gatekeeper answer, is free text, and it always goes through the sanitizer.
+- **The compiler enforces the route.** `SanitizedText` and `Prompt` have internal
+  constructors, and `GroqClient` accepts only a `Prompt`. Raw text cannot reach it without
+  going through `Sanitizer`.
+- **Sanitizer scope.** Deterministic rules remove URLs, bare domains, package names, emails,
+  IP addresses, phone numbers, long digit runs and handles. Names are caught by context
+  ("with", "call", titles, relations) and by a user-supplied list of private terms. There is
+  no NER model and no contacts permission: a model adds size and the permission adds risk.
+  Coverage is best-effort, particularly for names in non-Latin scripts and names with no
+  context, and the UI should say so.
+- **Key handling.** The key is sealed with AES-256-GCM by a non-exportable Android Keystore
+  key, in `noBackupFilesDir`. `ApiKey.toString()` is redacted. The key is sent only in the
+  `Authorization` header, and neither keys nor prompts are logged.
+- **Endpoint and model.** The host is fixed to `api.groq.com` over HTTPS in release builds.
+  The default model is `openai/gpt-oss-20b`, because Groq's deprecations page lists older
+  Llama IDs as past shutdown. The model is a parameter, and "model unavailable" is its own
+  error, because hosted model IDs change often.
+- **Model output is untrusted.** Replies must parse into a strict shape or they become a typed
+  failure. Schedule suggestions are only shown, and never applied automatically.
+- **The gatekeeper fails closed.** No key, no network, a server error or a malformed reply all
+  count as a denial, so going offline is not a way out.
+- **A gatekeeper grant changes nothing yet.** ADR-0008 says strict sessions cannot be stopped
+  early. A persuadable model that could override that would be the easiest bypass in the app,
+  so the decision is computed and displayed but not connected to session state.
+
+### Consequences
+AI features are optional: blocking and scheduling never depend on them. A sanitizer miss in
+free text can still reach Groq, which the design limits by keeping free text short and rare.
+
+### Alternatives Considered
+On-device NER model: large, and weak across languages. Sending titles after sanitizing: more
+useful suggestions, but it makes the sanitizer the only protection. Storing the key in the
+database: the key would then be protected only by the database key, not directly by Keystore.

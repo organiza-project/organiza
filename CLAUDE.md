@@ -47,5 +47,6 @@ Recorded in ADR-0002. `./gradlew test` runs everything.
 - `core/calendar` — `.ics` parser and recurrence engine (ADR-0008).
 - `core/scheduler` — turns occurrences into sessions and sessions into policy (ADR-0008).
 - `core/enforcement` — block engine, content policy, DNS sinkhole, tamper monitor (ADR-0007).
+- `core/ai` — sanitizer, prompt templates, BYOK Groq client (ADR-0009).
 - `app/android` — Phase 1: services, overlay, VPN, UI.
 - `.claude/rules/` — working rules for architecture, testing and privacy.
