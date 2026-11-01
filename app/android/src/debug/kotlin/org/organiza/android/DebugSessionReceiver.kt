@@ -1,5 +1,6 @@
 package org.organiza.android
 
+import android.app.admin.DevicePolicyManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -29,6 +30,9 @@ class DebugSessionReceiver : BroadcastReceiver() {
             )
             "stop" -> app.endAllForTesting()
             "userstop" -> app.stopSession()
+            // adb can only remove test-only admins, but an admin can always remove itself.
+            "removeadmin" -> context.getSystemService(DevicePolicyManager::class.java)
+                .removeActiveAdmin(OrganizaApp.adminComponent(context))
             "rule" -> app.saveRule(
                 StoredRule(
                     id = intent.getStringExtra("id").orEmpty(),

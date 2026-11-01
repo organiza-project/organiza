@@ -45,7 +45,16 @@ debug_state() {
 open_settings() { shell am start -W -a android.settings.SETTINGS >/dev/null; sleep 2; }
 fresh_settings() { shell am force-stop com.android.settings >/dev/null; }
 
+# Start from a real clean install. An active admin blocks uninstall, so install this build
+# over any older one first and have it remove its own admin.
+"$ADB" install -r -t "$APK" >/dev/null
+shell am broadcast -n "$RECEIVER" --es command removeadmin >/dev/null
+sleep 2
 "$ADB" uninstall "$APP" >/dev/null 2>&1
+if shell pm list packages | grep -q "package:$APP\$"; then
+  echo "ABORT: could not uninstall $APP, so this run would inherit old data"
+  exit 2
+fi
 "$ADB" install -r -t "$APK" >/dev/null
 shell settings put secure enabled_accessibility_services "$SERVICE" >/dev/null
 shell settings put secure accessibility_enabled 1 >/dev/null
@@ -255,7 +264,7 @@ check "the failure is reported" "storageFailure=KEY_UNREADABLE" "$(debug_state)"
 check "the database file is kept" "$before" "$(in_app "wc -c < databases/organiza.db")"
 shell input keyevent KEYCODE_HOME >/dev/null
 
-shell dpm remove-active-admin "$ADMIN" >/dev/null
+shell am broadcast -n "$RECEIVER" --es command removeadmin >/dev/null
 echo
 echo "passed=$passed failed=$failed"
 [[ "$failed" -eq 0 ]]
