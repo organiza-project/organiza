@@ -57,4 +57,11 @@ class TamperMonitorTest {
         capabilities.revoke(Capability.VPN)
         assertEquals(emptyList(), monitor.check())
     }
+
+    @Test
+    fun `a restored baseline catches a capability lost while the process was dead`() {
+        capabilities.revoke(Capability.ACCESSIBILITY)
+        monitor.arm(baseline = Capability.entries.toSet())
+        assertEquals(listOf(TamperEvent(Capability.ACCESSIBILITY, start)), monitor.check())
+    }
 }

@@ -18,9 +18,10 @@ public class TamperMonitor(
 
     public val events: List<TamperEvent> get() = recorded.toList()
 
-    public fun arm() {
+    /** Starts watching. Pass a stored [baseline] to resume after the process was killed. */
+    public fun arm(baseline: Set<Capability> = capabilities.granted()) {
         armed = true
-        lastGranted = capabilities.granted()
+        lastGranted = baseline
     }
 
     public fun disarm() {

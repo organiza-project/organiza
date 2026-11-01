@@ -3,6 +3,6 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":core:domain"))
-    testImplementation(libs.sqlite.jdbc)
+    api(project(":core:domain"))
+    testImplementation(project(":core:testing"))
 }

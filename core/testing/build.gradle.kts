@@ -4,4 +4,6 @@ plugins {
 
 dependencies {
     api(project(":core:domain"))
+    api(project(":core:storage"))
+    api(libs.sqlite.jdbc)
 }
