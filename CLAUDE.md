@@ -39,4 +39,10 @@ DeviceAdminReceiver), then Linux, Windows, iOS.
 - Secrets never committed. See `.gitignore`.
 
 ## 4. Repository Layout
-_To be defined in Phase 0 and recorded in `ADR.md`._
+Recorded in ADR-0002. `./gradlew test` runs everything.
+
+- `core/domain` — value types and OS ports. Kotlin stdlib only, no Android.
+- `core/testing` — fakes of every port.
+- `core/storage` — SQL schema (`docs/schema.md`), later the storage engine.
+- `app/android` — Phase 1: services, overlay, VPN, UI.
+- `.claude/rules/` — working rules for architecture, testing and privacy.
