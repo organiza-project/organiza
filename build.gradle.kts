@@ -10,7 +10,6 @@ subprojects {
         extensions.configure<KotlinJvmProjectExtension> {
             compilerOptions {
                 jvmTarget.set(JvmTarget.JVM_17)
-                freeCompilerArgs.add("-Xjdk-release=17")
                 allWarningsAsErrors.set(true)
             }
             explicitApi()
