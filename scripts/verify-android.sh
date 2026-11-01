@@ -269,6 +269,55 @@ check "a malformed reply is a denial" "granted=false" "$(debug_state)"
 echo error > "$FAKE_DIR/mode"
 broadcast aigate --es base64 "$(b64 'please')"; sleep 3
 check "a server error is a denial" "failure=SERVER" "$(debug_state)"
+echo "--- voice commands"
+echo grant > "$FAKE_DIR/mode"
+hear() { # transcript
+  printf '%s' "$1" > "$FAKE_DIR/mode.transcript"
+  broadcast voicetone; sleep 2
+}
+confirm() { broadcast voiceconfirm; sleep 1; }
+session stop
+audio_before=$(sent | grep -c '^AUDIO')
+broadcast voicesilence; sleep 2
+check "silence is reported" "nothing was sent" "$(debug_state)"
+check "silence never leaves the device" "$audio_before" "$(sent | grep -c '^AUDIO')"
+hear ' Add a habit called stretch.'
+state=$(debug_state)
+check "a heard command waits for confirmation" "Confirm: Add habit: stretch" "$state"
+check_not "nothing is applied before confirming" "habits=stretch" "$state"
+check "audio is sent as a wav to whisper" "wav=True model=True" "$(sent | grep '^AUDIO' | tail -1)"
+confirm
+check "confirming applies it" "habits=Stretch" "$(debug_state)"
+hear ' Remove the habit, stretch.'
+broadcast voicediscard; sleep 1
+check "discarding changes nothing" "habits=Stretch" "$(debug_state)"
+hear ' Mark stretch as done.'
+confirm
+check "marking a habit works" "Done: Mark stretch done" "$(debug_state)"
+hear ' Could you log that for me'
+check "the model can only rewrite into the grammar" "Confirm: Mark stretch done" "$(debug_state)"
+broadcast voicediscard; sleep 1
+hear ' Thank you.'
+check "a whisper hallucination does nothing" "not understood" "$(debug_state)"
+hear ' Schedule calapp tomorrow at 9 for 1 hour.'
+check "scheduling is understood" "Confirm: Schedule calapp" "$(debug_state)"
+confirm
+check "scheduling works" "Done: Schedule calapp" "$(debug_state)"
+hear ' Cancel the calapp session.'
+confirm
+check "cancelling works" "Done: Cancel the next calapp session" "$(debug_state)"
+session start --es packages com.example.none --ez strict true
+hear ' Schedule calapp tomorrow at 9 for 1 hour.'
+confirm
+check "the schedule is frozen during a strict session" "cannot change during a strict session" "$(debug_state)"
+session stop
+hear ' Remove the habit, stretch.'
+confirm
+check_not "removing a habit hides it" "habits=Stretch" "$(debug_state)"
+shell pm grant "$APP" android.permission.RECORD_AUDIO >/dev/null
+broadcast voicerecord; sleep 5
+check "the real recorder runs without crashing" "Voice" "$(debug_state)"
+
 kill "$fake_pid" 2>/dev/null; sleep 1
 broadcast aigate --es base64 "$(b64 'please')"; sleep 4
 state=$(debug_state)

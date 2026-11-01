@@ -3,6 +3,7 @@
 
 It records every request so the script can check exactly what left the device.
 Usage: fake-groq.py PORT LOG_FILE MODE_FILE. The mode file holds grant, garbage or error.
+Transcriptions return the contents of MODE_FILE.transcript.
 """
 import json
 import sys
@@ -21,6 +22,9 @@ def mode():
 
 def content_for(body):
     system = body["messages"][0]["content"]
+    if "fixed grammar" in system:
+        hallucinated = "Thank you" in body["messages"][1]["content"]
+        return {"command": None if hallucinated else "mark stretch as done"}
     if "guard a focus session" in system:
         return {"decision": "grant", "reason": "Test reply"}
     if "plan focus blocks" in system:
@@ -30,7 +34,14 @@ def content_for(body):
 
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
-        raw = self.rfile.read(int(self.headers.get("Content-Length", 0))).decode("utf-8")
+        data = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        if self.path.endswith("/audio/transcriptions"):
+            with open(LOG_FILE, "a", encoding="utf-8") as log:
+                log.write(f"AUDIO bytes={len(data)} wav={b'RIFF' in data} model={b'whisper-large-v3-turbo' in data}\n")
+            with open(MODE_FILE + ".transcript", encoding="utf-8") as handle:
+                self.reply(200, json.dumps({"text": handle.read().strip()}))
+            return
+        raw = data.decode("utf-8")
         with open(LOG_FILE, "a", encoding="utf-8") as log:
             log.write(f"AUTH {self.headers.get('Authorization')}\nBODY {raw}\n")
         if mode() == "error":

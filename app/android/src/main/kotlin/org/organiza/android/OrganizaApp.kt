@@ -37,13 +37,19 @@ import org.organiza.scheduler.RuleEdit
 import org.organiza.scheduler.SessionScheduler
 import org.organiza.scheduler.StartResult
 import org.organiza.scheduler.StopResult
+import org.organiza.scheduler.VoiceExecutor
+import org.organiza.scheduler.VoiceOutcome
 import org.organiza.storage.Database
+import org.organiza.storage.HabitStore
 import org.organiza.storage.MigrationResult
 import org.organiza.storage.Migrations
 import org.organiza.storage.SessionState
 import org.organiza.storage.SessionStore
 import org.organiza.storage.StoredRule
 import org.organiza.storage.TamperStore
+import org.organiza.voice.VoiceCommand
+import org.organiza.voice.VoicePipeline
+import org.organiza.voice.VoiceResult
 
 class OrganizaApp : Application(), EnforcementCapabilities {
     val session = ActiveSession()
@@ -78,6 +84,59 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         val sessions = SessionStore(db)
         val tamper = TamperStore(db)
         val aiFacts = AiFacts(db)
+        val habits = HabitStore(db)
+        val voice = VoiceExecutor(db, clock, scheduler)
+    }
+
+    /** A heard command waiting for the user's tap. Nothing happens until then (ADR-0010). */
+    @Volatile var pendingCommand: VoiceCommand? = null
+        private set
+
+    /** Whether the user has agreed that recordings go to Groq. */
+    var voiceConsent: Boolean
+        get() = getSharedPreferences(PREFERENCES, MODE_PRIVATE).getBoolean(VOICE_CONSENT, false)
+        set(value) = getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit().putBoolean(VOICE_CONSENT, value).apply()
+
+    fun handleSpeech(samples: ShortArray, sampleRate: Int) = onStorageThread {
+        val known = storage?.habits?.active().orEmpty().map { it.name }
+        onAiThread {
+            val pipeline = VoicePipeline(apiKeys, GroqClient(UrlConnectionTransport(), aiEndpoint), Sanitizer())
+            val zone = ZoneId.systemDefault()
+            show(pipeline.fromAudio(samples, sampleRate, clock.now().atZone(zone), known))
+        }
+    }
+
+    private fun show(result: VoiceResult) {
+        pendingCommand = (result as? VoiceResult.Understood)?.command
+        statusMessage = when (result) {
+            is VoiceResult.Understood -> "Confirm: " + result.command.describe()
+            VoiceResult.NotUnderstood -> "Voice: not understood, nothing was changed"
+            VoiceResult.Silent -> "Voice: nothing heard, nothing was sent"
+            VoiceResult.TooLong -> "Voice: too long, nothing was sent"
+            is VoiceResult.Failed -> "Voice failed: ${result.failure}"
+        }
+    }
+
+    fun confirmVoiceCommand() = onStorageThread {
+        val command = pendingCommand ?: return@onStorageThread
+        val voice = storage?.voice ?: return@onStorageThread
+        pendingCommand = null
+        statusMessage = when (val outcome = voice.apply(command)) {
+            VoiceOutcome.Done -> "Done: " + command.describe()
+            VoiceOutcome.AlreadyExists -> "That habit already exists"
+            VoiceOutcome.NoSuchHabit -> "No habit with that name"
+            is VoiceOutcome.AmbiguousHabit -> "Which one: ${outcome.matches.joinToString()}?"
+            VoiceOutcome.NoSuchRule -> "No rule has that calendar tag"
+            VoiceOutcome.NothingToCancel -> "No upcoming session to cancel. Running sessions cannot be cancelled by voice."
+            VoiceOutcome.RefusedStrict -> "The schedule cannot change during a strict session"
+            VoiceOutcome.InvalidTime -> "That time is not allowed"
+        }
+        reconcile()
+    }
+
+    fun discardVoiceCommand() {
+        pendingCommand = null
+        statusMessage = "Discarded"
     }
 
     override fun onCreate() {
@@ -245,7 +304,9 @@ class OrganizaApp : Application(), EnforcementCapabilities {
     fun requestWeeklyReview() = onStorageThread {
         val facts = storage?.aiFacts ?: return@onStorageThread
         val now = clock.now()
-        val week = facts.weekly(now.minus(WEEK), now)
+        val today = now.atZone(ZoneId.systemDefault()).toLocalDate()
+        val habits = facts.habits(today.minusDays(7), today.plusDays(1), Sanitizer())
+        val week = facts.weekly(now.minus(WEEK), now, habits)
         onAiThread {
             statusMessage = when (val result = coach().weeklyReview(week)) {
                 is AiResult.Ok -> "Weekly review: ${result.value.summary}\n" + result.value.suggestions.joinToString("\n")
@@ -311,13 +372,16 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         Log.i(
             "OrganizaDebug",
             "capabilities=$capabilities tamper=$tamper storageFailure=$failure " +
-                "active=${session.current != SessionPolicy.IDLE} message=${statusMessage?.replace('\n', ' ')}",
+                "active=${session.current != SessionPolicy.IDLE} " +
+                "habits=${storage?.habits?.active().orEmpty().joinToString("|") { it.name }} message=${statusMessage?.replace('\n', ' ')}",
         )
     }
 
     companion object {
         private const val TAG = "Organiza"
         private const val DATABASE_NAME = "organiza.db"
+        private const val PREFERENCES = "organiza"
+        private const val VOICE_CONSENT = "voice_consent"
         private const val MIN_TICK_MS = 500L
         private const val MAX_TICK_MS = 30_000L
         private const val REQUEST_INTERVAL_MS = 5_000L

@@ -1,11 +1,16 @@
 package org.organiza.android
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.admin.DevicePolicyManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Bundle
 import android.provider.Settings
+import android.view.MotionEvent
 import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
@@ -22,6 +27,7 @@ import org.organiza.scheduler.ManualRequest
 class SetupActivity : Activity() {
     private val app get() = OrganizaApp.from(this)
     private lateinit var status: TextView
+    private var recorder: VoiceRecorder? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,6 +86,9 @@ class SetupActivity : Activity() {
             addView(button("Weekly review") { app.requestWeeklyReview() })
             addView(goal)
             addView(button("Suggest a schedule") { app.requestSchedule(goal.text.toString()) })
+            addView(talkButton())
+            addView(button("Confirm command") { app.confirmVoiceCommand() })
+            addView(button("Discard command") { app.discardVoiceCommand() })
             addView(reason)
             addView(button("Ask the gatekeeper") { app.askGatekeeper(reason.text.toString(), 30) })
         }
@@ -100,6 +109,9 @@ class SetupActivity : Activity() {
 
     override fun onPause() {
         status.removeCallbacks(poll)
+        // Recording never continues once the screen is left.
+        recorder?.stop()
+        recorder = null
         super.onPause()
     }
 
@@ -129,6 +141,45 @@ class SetupActivity : Activity() {
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
+    private fun talkButton() = Button(this).apply {
+        text = "Hold to speak a command"
+        setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> startTalking()
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    view.performClick()
+                    stopTalking()
+                }
+            }
+            true
+        }
+    }
+
+    private fun startTalking() {
+        if (!app.voiceConsent) {
+            AlertDialog.Builder(this)
+                .setTitle("Send recordings to Groq?")
+                .setMessage(VOICE_NOTICE)
+                .setPositiveButton("Allow") { _, _ -> app.voiceConsent = true }
+                .setNegativeButton("Not now", null)
+                .show()
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_MICROPHONE)
+            return
+        }
+        recorder = VoiceRecorder().takeIf(VoiceRecorder::start)
+        if (recorder == null) status.text = "Could not start the microphone"
+    }
+
+    private fun stopTalking() {
+        val active = recorder ?: return
+        recorder = null
+        app.handleSpeech(active.stop(), VoiceRecorder.SAMPLE_RATE)
+    }
+
     private fun button(label: String, onClick: () -> Unit) = Button(this).apply {
         text = label
         setOnClickListener(View.OnClickListener { onClick() })
@@ -156,6 +207,10 @@ class SetupActivity : Activity() {
     private companion object {
         const val PADDING = 48
         const val REQUEST_CALENDAR = 1
+        const val REQUEST_MICROPHONE = 2
+        const val VOICE_NOTICE = "While you hold the button, your voice is recorded and sent to Groq using your own " +
+            "key, so they can turn it into text. Unlike typed text, a recording cannot have names removed first. " +
+            "Organiza keeps no recordings or transcripts, and silence is never sent."
         const val REFRESH_DELAY_MS = 400L
         const val POLL_MS = 1000L
         const val AI_NOTICE = "AI is optional and uses your own Groq key. Goals and answers you type are sent to " +
