@@ -46,6 +46,11 @@ public class Sanitizer(privateTerms: Set<String> = emptySet()) {
         text = TITLED_NAME.replace(text, NAME)
         text = CONTEXT_NAME.replace(text, ::replaceName)
         text = RELATION_NAME.replace(text, ::replaceName)
+        // Over-scrubs phrases like "New York", which is the safe way to be wrong here.
+        text = NAME_PAIR.replace(text) { match ->
+            val first = match.groupValues[1].lowercase(Locale.ROOT)
+            if (first in NOT_NAMES) match.value else NAME
+        }
         return SanitizedText(text.take(MAX_CHARS), text != flat)
     }
 
@@ -87,12 +92,13 @@ public class Sanitizer(privateTerms: Set<String> = emptySet()) {
         private val HANDLE = Regex("""(?<![\w.])@\w{2,}""")
         private val TITLED_NAME = Regex("""\b(Dr|Mr|Mrs|Ms|Mx|Prof|Sir)\.?\s+$NAME_WORD(\s+$NAME_WORD)?""")
         private val CONTEXT_NAME = Regex(
-            """\b((?i:with|call|meet|email|text|see|ask|message|visit|phone)\s+)($NAME_WORD(\s+$NAME_WORD)?)""",
+            """\b((?i:with|for|from|by|call|meet|email|text|see|ask|message|visit|phone)\s+)($NAME_WORD(\s+$NAME_WORD)?)""",
         )
         private val RELATION_NAME = Regex(
             """\b((?i:wife|husband|mom|mum|dad|mother|father|sister|brother|son|daughter|friend|boss|partner|""" +
                 """girlfriend|boyfriend|colleague|doctor)\s+)($NAME_WORD(\s+$NAME_WORD)?)""",
         )
+        private val NAME_PAIR = Regex("""\b($NAME_WORD)\s+$NAME_WORD""")
         private val NOT_NAMES = setOf(
             "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
             "january", "february", "march", "april", "may", "june", "july", "august",

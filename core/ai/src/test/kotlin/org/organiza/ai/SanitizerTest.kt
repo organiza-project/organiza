@@ -74,6 +74,26 @@ class SanitizerTest {
     }
 
     @Test
+    fun `names after common prepositions are caught`() {
+        assertEquals("Prep for [NAME], then rest", clean("Prep for Sarah Connor, then rest"))
+        assertEquals("a gift for [NAME]", clean("a gift for John"))
+        assertEquals("notes from [NAME]", clean("notes from Priya"))
+    }
+
+    @Test
+    fun `two capitalized words in a row are treated as a name`() {
+        assertEquals("[NAME] called twice", clean("Sarah Connor called twice"))
+        assertEquals("meeting [NAME] today", clean("meeting Jean-Luc Picard today"))
+    }
+
+    @Test
+    fun `calendar words are not names`() {
+        assertEquals("plan for Monday", clean("plan for Monday"))
+        assertEquals("Monday Morning review", clean("Monday Morning review"))
+        assertEquals("due from March", clean("due from March"))
+    }
+
+    @Test
     fun `context words before ordinary lowercase text change nothing`() {
         assertEquals("work with focus", clean("work with focus"))
         assertEquals("call the bank", clean("call the bank"))
