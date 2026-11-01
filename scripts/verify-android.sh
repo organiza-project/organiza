@@ -30,6 +30,10 @@ check_not() { # name unexpected actual
 }
 
 shell() { "$ADB" shell "$@" 2>&1 | tr -d '\r'; }
+# Quoted so the whole line reaches the app's shell. Unquoted, adb's remote shell splits it
+# and sh -c sees only the first word, which makes checks pass without testing anything.
+in_app() { "$ADB" shell "run-as $APP sh -c '$1'" 2>&1 | tr -d '\r'; }
+app_pid() { "$ADB" shell pidof "$APP" 2>&1 | tr -d '\r'; }
 top_app() { shell dumpsys activity activities | grep -m1 topResumedActivity; }
 session() { shell am broadcast -n "$RECEIVER" --es command "$@" >/dev/null; sleep 2; }
 debug_state() {
@@ -137,6 +141,81 @@ check "other settings pages stay open" "settings" "$(top_app)"
 shell input keyevent KEYCODE_HOME >/dev/null; sleep 1
 session stop
 
+echo "--- encrypted storage"
+db="databases/organiza.db"
+session stop
+shell am broadcast -n "$RECEIVER" --es command rule --es id marker --es name ZZPLAINTEXTMARKER --es tag marker >/dev/null; sleep 2
+check "the rule was saved" "Rule saved" "$(debug_state)"
+header=$(shell run-as "$APP" head -c 15 "$db")
+check_not "database has no plain SQLite header" "SQLite format 3" "$header"
+check "database file exists" "organiza.db" "$(shell run-as "$APP" ls databases)"
+in_app "echo ZZPLAINTEXTMARKER > files_control" >/dev/null
+check "control: the grep can find the marker" "1" "$(in_app "cat files_control | grep -c ZZPLAINTEXTMARKER")"
+in_app "rm files_control" >/dev/null
+db_bytes=$(in_app "cat databases/organiza.db* | wc -c")
+check_not "control: the database files are not empty" "0" "${db_bytes// /}x"
+check "plaintext does not reach the database" "0" "$(in_app "cat databases/organiza.db* | grep -c ZZPLAINTEXTMARKER")"
+check "the wrapped key file exists" "database.key" "$(shell run-as "$APP" ls no_backup)"
+
+echo "--- sessions survive a process kill"
+kill_now() {
+  local pid; pid=$(app_pid)
+  in_app "kill -9 $pid" >/dev/null
+  sleep 1
+  check_not "control: process $pid was really killed" "$pid" "$(app_pid)x"
+}
+kill_app() { kill_now; sleep 8; }
+fresh_settings
+session start --es packages com.android.settings
+kill_app
+open_settings
+check_not "blocked app is still sent home after a kill" "com.android.settings" "$(top_app)"
+check "the session is still active" "active=true" "$(debug_state)"
+session stop
+
+echo "--- calendar scheduling"
+ics() { # uid tag startSeconds lengthSeconds
+  # The device clock decides when sessions run, and it can differ from this machine's.
+  local now start end
+  now=$(shell date +%s)
+  start=$(date -u -d "@$(( now + $3 ))" +%Y%m%dT%H%M%SZ)
+  end=$(date -u -d "@$(( now + $3 + $4 ))" +%Y%m%dT%H%M%SZ)
+  printf 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:%s\r\nSUMMARY:work #%s\r\nDTSTART:%s\r\nDTEND:%s\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n' "$1" "$2" "$start" "$end"
+}
+import_ics() { shell am broadcast -n "$RECEIVER" --es command ics --es base64 "$(printf '%s' "$1" | base64 -w0)" >/dev/null; sleep 2; }
+shell am broadcast -n "$RECEIVER" --es command rule --es id calapp --es name calapp --es tag calapp --es packages com.android.settings >/dev/null; sleep 1
+shell am broadcast -n "$RECEIVER" --es command rule --es id caldns --es name caldns --es tag caldns --es domains reddit.com >/dev/null; sleep 1
+fresh_settings
+import_ics "$(ics running calapp -60 600)"
+check "import reports the event" "1 added" "$(debug_state)"
+open_settings
+check_not "a tagged running event blocks its apps" "com.android.settings" "$(top_app)"
+import_ics "BEGIN:VCALENDAR"
+open_settings
+check_not "deleting the event does not end the session" "com.android.settings" "$(top_app)"
+session stop
+import_ics "$(ics timed caldns 12 25)"
+check "the session has not started yet" "active=false" "$(debug_state)"
+check_not "not blocked before the start time" "unknown host" "$(shell ping -c 1 -W 2 old.reddit.com)"
+sleep 16
+check "the session starts on time with no prompting" "active=true" "$(debug_state)"
+check "the vpn starts from the background" "VPN" "$(debug_state)"
+sleep 2
+check "dns is blocked by the scheduled session" "unknown host" "$(shell ping -c 1 -W 3 old.reddit.com)"
+sleep 22
+state=$(debug_state)
+check "the session ends on time" "active=false" "$state"
+check_not "the vpn stops with it" "VPN" "$state"
+check_not "dns recovers when it ends" "unknown host" "$(shell ping -c 1 -W 2 old.reddit.com)"
+
+echo "--- strict sessions cannot be stopped"
+session start --es packages com.example.none --ez strict true
+shell am broadcast -n "$RECEIVER" --es command userstop >/dev/null; sleep 2
+state=$(debug_state)
+check "stopping is refused" "cannot be stopped early" "$state"
+check "the session is still active" "active=true" "$state"
+session stop
+
 echo "--- uninstall protection"
 check "admin blocks uninstall" "DELETE_FAILED" "$(shell pm uninstall "$APP")"
 
@@ -146,6 +225,35 @@ shell settings put secure enabled_accessibility_services "''" >/dev/null
 sleep 3
 check "losing accessibility is recorded" "tamper=ACCESSIBILITY" "$(debug_state)"
 session stop
+
+echo "--- tamper during a process kill"
+enable_accessibility() {
+  shell settings put secure enabled_accessibility_services "$SERVICE" >/dev/null
+  shell settings put secure accessibility_enabled 1 >/dev/null
+  sleep 5
+}
+enable_accessibility
+session start --es packages com.example.none
+sleep 6
+shell settings put secure enabled_accessibility_services "''" >/dev/null
+kill_now
+shell am start -W -n "$APP/org.organiza.android.SetupActivity" >/dev/null
+sleep 8
+check "loss during a kill is recorded after restart" "ACCESSIBILITY,OVERLAY,ACCESSIBILITY" "$(debug_state)"
+session stop
+shell input keyevent KEYCODE_HOME >/dev/null
+
+echo "--- a damaged key never deletes data"
+enable_accessibility
+before=$(in_app "wc -c < databases/organiza.db")
+check_not "control: the database has content" "0" "${before// /}x"
+in_app "echo damaged > no_backup/database.key" >/dev/null
+kill_now
+shell am start -W -n "$APP/org.organiza.android.SetupActivity" >/dev/null
+sleep 5
+check "the failure is reported" "storageFailure=KEY_UNREADABLE" "$(debug_state)"
+check "the database file is kept" "$before" "$(in_app "wc -c < databases/organiza.db")"
+shell input keyevent KEYCODE_HOME >/dev/null
 
 shell dpm remove-active-admin "$ADMIN" >/dev/null
 echo

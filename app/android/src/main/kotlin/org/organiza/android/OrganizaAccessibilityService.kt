@@ -48,6 +48,7 @@ class OrganizaAccessibilityService : AccessibilityService() {
                 // Tracked while idle too, so a new session can act on the app already open.
                 blockEngine.onForeground(source)
                 inspect(source, policy, blockEngine)
+                app.requestReconcile()
             }
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
                 val now = SystemClock.elapsedRealtime()

@@ -13,7 +13,10 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import java.io.IOException
+import java.time.Duration
 import org.organiza.enforcement.SessionPolicy
+import org.organiza.scheduler.ManualRequest
 
 /** Plain permission and test screen for Phase 1. Phase 5 replaces it (ADR-0007). */
 class SetupActivity : Activity() {
@@ -25,6 +28,11 @@ class SetupActivity : Activity() {
         status = TextView(this)
         val packages = EditText(this).apply { hint = "Packages, comma separated" }
         val domains = EditText(this).apply { hint = "Domains, comma separated" }
+        val minutes = EditText(this).apply {
+            hint = "Minutes"
+            setText("30")
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
         val strict = CheckBox(this).apply { text = "Strict (guards Organiza's settings pages)" }
         val shortForm = CheckBox(this).apply { text = "Block Shorts and Reels" }
         val column = LinearLayout(this).apply {
@@ -37,17 +45,25 @@ class SetupActivity : Activity() {
             addView(button("Enable uninstall protection") { requestDeviceAdmin() })
             addView(packages)
             addView(domains)
+            addView(minutes)
             addView(strict)
             addView(shortForm)
             addView(button("Start session") {
                 val input = SessionInput.parse(packages.text.toString(), domains.text.toString())
-                app.startSession(SessionPolicy(input.blockList, strict.isChecked, shortForm.isChecked))
-                refresh(input.rejected)
+                val request = ManualRequest(
+                    input.blockList.packages,
+                    input.blockList.domains,
+                    strict.isChecked,
+                    shortForm.isChecked,
+                )
+                app.startManual(request, Duration.ofMinutes(minutes.text.toString().toLongOrNull() ?: 0))
+                refreshSoon(input.rejected)
             })
             addView(button("Stop session") {
                 app.stopSession()
-                refresh()
+                refreshSoon()
             })
+            addView(button("Import calendar (.ics)") { pickCalendar() })
         }
         setContentView(ScrollView(this).apply { addView(column) })
     }
@@ -55,6 +71,32 @@ class SetupActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refresh()
+    }
+
+    /** Storage work is asynchronous, so the result shows a moment later. */
+    private fun refreshSoon(rejected: List<String> = emptyList()) {
+        status.postDelayed({ refresh(rejected) }, REFRESH_DELAY_MS)
+    }
+
+    private fun pickCalendar() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+        startActivityForResult(intent, REQUEST_CALENDAR)
+    }
+
+    @Deprecated("Deprecated in Android, and adequate for this temporary screen")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data
+        if (requestCode != REQUEST_CALENDAR || resultCode != RESULT_OK || uri == null) return
+        try {
+            val text = contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
+            if (text != null) app.importCalendar(text)
+            refreshSoon()
+        } catch (_: IOException) {
+            status.text = "Could not read that file"
+        }
     }
 
     private fun button(label: String, onClick: () -> Unit) = Button(this).apply {
@@ -74,12 +116,16 @@ class SetupActivity : Activity() {
             appendLine("Granted: ${app.granted().joinToString().ifEmpty { "nothing" }}")
             appendLine("VPN consent: ${if (VpnService.prepare(this@SetupActivity) == null) "yes" else "no"}")
             appendLine("Session: ${if (app.session.current == SessionPolicy.IDLE) "idle" else "running"}")
-            appendLine("Tamper events: ${app.tamperEvents().size}")
+            appendLine("Tamper events: ${app.tamperCount}")
+            app.storageFailure?.let { appendLine("Storage problem: $it. Your data has not been deleted.") }
+            app.statusMessage?.let(::appendLine)
             if (rejected.isNotEmpty()) appendLine("Could not read: ${rejected.joinToString()}")
         }
     }
 
     private companion object {
         const val PADDING = 48
+        const val REQUEST_CALENDAR = 1
+        const val REFRESH_DELAY_MS = 400L
     }
 }

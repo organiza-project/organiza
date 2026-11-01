@@ -9,15 +9,32 @@ import android.database.ContentObserver
 import android.net.VpnService
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
+import android.util.Log
+import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
+import java.util.concurrent.Executors
+import org.organiza.calendar.IcsCalendar
 import org.organiza.domain.port.Capability
 import org.organiza.domain.port.Clock
 import org.organiza.domain.port.EnforcementCapabilities
 import org.organiza.enforcement.ActiveSession
 import org.organiza.enforcement.SessionPolicy
-import org.organiza.enforcement.TamperEvent
 import org.organiza.enforcement.TamperMonitor
+import org.organiza.scheduler.ManualRequest
+import org.organiza.scheduler.RuleEdit
+import org.organiza.scheduler.SessionScheduler
+import org.organiza.scheduler.StartResult
+import org.organiza.scheduler.StopResult
+import org.organiza.storage.Database
+import org.organiza.storage.MigrationResult
+import org.organiza.storage.Migrations
+import org.organiza.storage.SessionState
+import org.organiza.storage.SessionStore
+import org.organiza.storage.StoredRule
+import org.organiza.storage.TamperStore
 
 class OrganizaApp : Application(), EnforcementCapabilities {
     val session = ActiveSession()
@@ -25,7 +42,28 @@ class OrganizaApp : Application(), EnforcementCapabilities {
 
     @Volatile var vpnRunning = false
 
-    private val tamper by lazy { TamperMonitor(this, clock) }
+    /** What the setup screen shows. Written on the storage thread. */
+    @Volatile var statusMessage: String? = null
+        private set
+    @Volatile var storageFailure: StorageFailure? = null
+        private set
+    @Volatile var tamperCount = 0
+        private set
+
+    // Storage and everything that touches it run on this one thread, away from the main thread.
+    private val storageThread = Executors.newSingleThreadExecutor()
+    private val main by lazy { Handler(Looper.getMainLooper()) }
+    private var storage: Storage? = null
+    private val monitor by lazy { TamperMonitor(this, clock) }
+    private var monitorArmed = false
+    private val tick = Runnable { onStorageThread { reconcile() } }
+    @Volatile private var lastRequest = 0L
+
+    private class Storage(val db: Database, val clock: Clock) {
+        val scheduler = SessionScheduler(db, clock)
+        val sessions = SessionStore(db)
+        val tamper = TamperStore(db)
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -34,10 +72,45 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         contentResolver.registerContentObserver(
             Settings.Secure.getUriFor(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES),
             false,
-            object : ContentObserver(Handler(Looper.getMainLooper())) {
+            object : ContentObserver(main) {
                 override fun onChange(selfChange: Boolean) = checkTamper()
             },
         )
+        onStorageThread {
+            openStorage()
+            reconcile()
+        }
+    }
+
+    private fun onStorageThread(work: () -> Unit) {
+        storageThread.execute {
+            try {
+                work()
+            } catch (failure: RuntimeException) {
+                // Enforcement has to outlive a failed write. The exception type names the
+                // failing operation, and carries no user data.
+                Log.e(TAG, "storage work failed: ${failure.javaClass.simpleName}")
+                statusMessage = "Storage error"
+            }
+        }
+    }
+
+    private fun openStorage() {
+        try {
+            val file = getDatabasePath(DATABASE_NAME)
+            file.parentFile?.mkdirs()
+            val key = DatabaseKey(this, file).load()
+            val db = try {
+                SqlCipherDatabase.open(file, key)
+            } finally {
+                key.fill(0)
+            }
+            if (Migrations.migrate(db) is MigrationResult.TooNew) throw StorageException(StorageFailure.DATABASE_TOO_NEW)
+            storage = Storage(db, clock)
+        } catch (failure: StorageException) {
+            // Never delete or recreate the database here (ADR-0008).
+            storageFailure = failure.failure
+        }
     }
 
     private fun accessibilityEnabled(): Boolean {
@@ -59,28 +132,122 @@ class OrganizaApp : Application(), EnforcementCapabilities {
     fun deviceAdminActive(): Boolean =
         getSystemService(DevicePolicyManager::class.java).isAdminActive(adminComponent(this))
 
-    fun startSession(policy: SessionPolicy) {
-        session.set(policy)
-        synchronized(tamper) { tamper.arm() }
-        if (policy.blockList.domains.isNotEmpty() && VpnService.prepare(this) == null) {
-            startService(Intent(this, DnsVpnService::class.java))
+    /** Applies due transitions and puts the resulting policy in force. Storage thread only. */
+    private fun reconcile() {
+        val active = storage ?: return
+        val state = active.scheduler.reconcile()
+        if (state.policy != session.current) session.set(state.policy)
+        if (state.activeSessionIds.isEmpty()) {
+            if (monitorArmed) monitor.disarm()
+            monitorArmed = false
+        } else if (!monitorArmed) {
+            monitor.arm(active.sessions.grantedCapabilities(state.activeSessionIds.first()) ?: granted())
+            monitorArmed = true
+        }
+        syncVpn(state.policy)
+        // Give a restarted VPN time to come up before a stored baseline is compared.
+        main.postDelayed({ checkTamper() }, TAMPER_GRACE_MS)
+        val untilNext = state.nextTransition?.let { Duration.between(clock.now(), it).toMillis() } ?: MAX_TICK_MS
+        main.removeCallbacks(tick)
+        main.postDelayed(tick, untilNext.coerceIn(MIN_TICK_MS, MAX_TICK_MS))
+    }
+
+    private fun syncVpn(policy: SessionPolicy) {
+        val wanted = policy.blockList.domains.isNotEmpty() && VpnService.prepare(this) == null
+        try {
+            if (wanted && !vpnRunning) {
+                startService(Intent(this, DnsVpnService::class.java))
+            } else if (!wanted && vpnRunning) {
+                startService(Intent(this, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_STOP))
+            }
+        } catch (_: IllegalStateException) {
+            // Android refused a background start. The next tick tries again.
+            statusMessage = "Could not change the VPN yet"
         }
     }
 
-    fun stopSession() {
-        synchronized(tamper) { tamper.disarm() }
-        session.set(SessionPolicy.IDLE)
-        startService(Intent(this, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_STOP))
+    /** Called on foreground changes, so a due session applies when the phone is in use. */
+    fun requestReconcile() {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastRequest < REQUEST_INTERVAL_MS) return
+        lastRequest = now
+        onStorageThread { reconcile() }
     }
 
-    /** Called whenever the OS takes a capability away. */
-    fun checkTamper() {
-        synchronized(tamper) { tamper.check() }
+    fun startManual(request: ManualRequest, duration: Duration) = onStorageThread {
+        val scheduler = storage?.scheduler ?: return@onStorageThread
+        statusMessage = when (scheduler.startManual(request, duration)) {
+            StartResult.Started -> "Session started"
+            StartResult.InvalidDuration -> "Length not allowed. Strict sessions can run up to 24 hours."
+        }
+        reconcile()
     }
 
-    fun tamperEvents(): List<TamperEvent> = synchronized(tamper) { tamper.events }
+    fun stopSession() = onStorageThread {
+        val scheduler = storage?.scheduler ?: return@onStorageThread
+        statusMessage = when (scheduler.stopActive()) {
+            StopResult.Stopped -> "Session stopped"
+            StopResult.RefusedStrict -> "A strict session is running and cannot be stopped early."
+        }
+        reconcile()
+    }
+
+    fun saveRule(rule: StoredRule) = onStorageThread {
+        val scheduler = storage?.scheduler ?: return@onStorageThread
+        statusMessage = when (scheduler.saveRule(rule)) {
+            RuleEdit.Saved -> "Rule saved"
+            RuleEdit.RefusedStrict -> "This rule is in a running strict session and cannot be changed."
+        }
+        reconcile()
+    }
+
+    fun importCalendar(text: String) = onStorageThread {
+        val scheduler = storage?.scheduler ?: return@onStorageThread
+        val now = clock.now()
+        val until = now.plus(CALENDAR_WINDOW)
+        val read = IcsCalendar.read(text, now, until, ZoneId.systemDefault())
+        val sync = scheduler.syncCalendar(read.occurrences, now, until)
+        statusMessage = "Calendar: ${sync.added} added, ${sync.updated} updated, ${sync.removed} removed, " +
+            "${sync.skippedStrict.size} strict events too long, ${read.issues.size} events not understood"
+        reconcile()
+    }
+
+    /** Called whenever the OS may have taken a capability away. */
+    fun checkTamper() = onStorageThread {
+        val active = storage ?: return@onStorageThread
+        val lost = monitor.check()
+        val current = active.sessions.inState(SessionState.ACTIVE).firstOrNull()?.id
+        lost.forEach { active.tamper.record(current, it.capability, it.at) }
+        if (monitorArmed) active.sessions.saveGrantedCapabilities(granted())
+        tamperCount = active.tamper.all().size
+    }
+
+    /** Debug and test support: ends strict sessions too, and reports state to the log. */
+    internal fun endAllForTesting() = onStorageThread {
+        storage?.scheduler?.endAllForTesting()
+        reconcile()
+    }
+
+    internal fun logStatus() = onStorageThread {
+        val capabilities = granted().sorted().joinToString(",")
+        val tamper = storage?.tamper?.all().orEmpty().joinToString(",") { it.capability.name }
+        val failure = storageFailure?.name.orEmpty()
+        Log.i(
+            "OrganizaDebug",
+            "capabilities=$capabilities tamper=$tamper storageFailure=$failure " +
+                "active=${session.current != SessionPolicy.IDLE} message=$statusMessage",
+        )
+    }
 
     companion object {
+        private const val TAG = "Organiza"
+        private const val DATABASE_NAME = "organiza.db"
+        private const val MIN_TICK_MS = 500L
+        private const val MAX_TICK_MS = 30_000L
+        private const val REQUEST_INTERVAL_MS = 5_000L
+        private const val TAMPER_GRACE_MS = 5_000L
+        private val CALENDAR_WINDOW: Duration = Duration.ofDays(60)
+
         fun from(context: Context): OrganizaApp = context.applicationContext as OrganizaApp
 
         fun adminComponent(context: Context) = ComponentName(context, OrganizaDeviceAdminReceiver::class.java)

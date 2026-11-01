@@ -3,12 +3,16 @@ agp = "9.0.1"
 kotlin = "2.3.0"
 junit = "5.13.4"
 sqlite-jdbc = "3.54.1.0"
+sqlcipher = "4.20.0"
+androidx-sqlite = "2.7.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test-junit5", version.ref = "kotlin" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 junit-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
+sqlcipher = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher" }
+androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "androidx-sqlite" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

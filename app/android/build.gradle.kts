@@ -21,5 +21,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:enforcement"))
+    implementation(project(":core:scheduler"))
+    implementation(libs.sqlcipher)
+    implementation(libs.androidx.sqlite)
 }
