@@ -34,8 +34,8 @@ Options rejected and why.
 | 0002 | Hexagonal module layout | Accepted | 2026-11-01 |
 | 0003 | Ports and hand-written fakes for OS APIs | Accepted | 2026-11-01 |
 | 0004 | Local schema v1 as a tested SQL artifact | Accepted | 2026-11-01 |
-| 0005 | Enforcement threat model and the limits of "unbypassable" | Proposed | 2026-11-01 |
-| 0006 | Challenge commitments are not zero-knowledge proofs | Proposed | 2026-11-01 |
+| 0005 | Enforcement threat model and the limits of "unbypassable" | Accepted | 2026-11-01 |
+| 0006 | Challenge commitments are not zero-knowledge proofs | Accepted | 2026-11-01 |
 
 ---
 
@@ -162,9 +162,9 @@ enforce it.
 
 ## ADR-0005: Enforcement threat model and the limits of "unbypassable"
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
-- **Deciders:** pending jackforce review
+- **Deciders:** jackforce
 
 ### Context
 The mission promises unbypassable enforcement. A third-party Android app without root
@@ -208,9 +208,9 @@ optional future tier.
 
 ## ADR-0006: Challenge commitments are not zero-knowledge proofs
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-01
-- **Deciders:** pending jackforce review
+- **Deciders:** jackforce
 
 ### Context
 The roadmap describes `H(UserID || ChallengeID || Date || SuccessBit || Salt)` as a
