@@ -37,6 +37,7 @@ Options rejected and why.
 | 0005 | Enforcement threat model and the limits of "unbypassable" | Accepted | 2026-11-01 |
 | 0006 | Challenge commitments are not zero-knowledge proofs | Accepted | 2026-11-01 |
 | 0007 | Android enforcement pipeline | Accepted | 2026-11-01 |
+| 0008 | Encrypted storage and deterministic calendar scheduling | Accepted | 2026-11-01 |
 
 ---
 
@@ -286,3 +287,53 @@ change it before the first public release if not.
 ### Alternatives Considered
 Trailing-edge debounce: adds visible delay before each block. Full-tunnel VPN: routes
 all traffic through the app for no enforcement benefit, and worsens privacy and battery.
+
+---
+
+## ADR-0008: Encrypted storage and deterministic calendar scheduling
+
+- **Status:** Accepted
+- **Date:** 2026-11-01
+- **Deciders:** jackforce
+
+### Context
+Sessions live in memory, so killing the process ends them (ADR-0007). Scheduling must
+work offline and give the same answer every time, and calendar files are untrusted input.
+
+### Decision
+- **Storage:** `:core:storage` holds migrations and repositories over a small `Database`
+  port. Tests use SQLite through JDBC. Android uses `sqlcipher-android` (AES-256).
+- **Key handling:** a random 256-bit database key is wrapped with AES-256-GCM by a
+  non-exportable Android Keystore key and kept in `noBackupFilesDir`. If unwrapping fails,
+  the app reports the error and never deletes or recreates the database.
+- **Schema v2** adds `rule.block_short_form`, `session.granted_capabilities` and
+  `tamper_event`. `tamper_event` stores the lost capability and the time, nothing else.
+- **`:core:calendar`** is a pure parser and recurrence engine for an RFC 5545 subset.
+  Anything it cannot interpret faithfully, such as an unsupported RRULE part or unknown
+  time zone, is reported as an issue and skipped. It never guesses at a schedule.
+- **`:core:scheduler`** turns occurrences into sessions and sessions into the active
+  policy. Only start and end times and the event UID are stored, never titles or
+  descriptions. Tags match whole tokens, case-insensitively, so `#focused` is not
+  `#focus`. With several matching tags, the alphabetically first one wins.
+- **Anti-bypass:** calendar sync only changes sessions still `scheduled`, so editing or
+  deleting an event cannot end a running session. Strict sessions cannot be stopped early.
+- **Lockout protection:** strict sessions are limited to 24 hours, so a mistake or a
+  recurring event can never become open-ended.
+- **Timing:** no exact alarms, which would need a restricted permission. The scheduler
+  re-evaluates on a timer while the process runs and on every foreground change, so a
+  session is enforced by the time the phone is actually being used.
+- **Calendar source for now:** `.ics` import through the system file picker.
+
+### Consequences
+Sessions survive a process kill, and tamper events are durable. Enforcement relies on the
+accessibility service keeping the process alive. The wall clock is trusted, so moving the
+system clock forward can end a session early; detecting that is unsolved. A multi-day
+strict event is skipped and reported rather than shortened.
+
+The roadmap's bidirectional CalDAV sync is **not** covered here. It needs a network client
+and credentials in the keystore, so it gets its own ADR.
+
+### Alternatives Considered
+Room: adds annotation processing and would hide the tested SQL artifact. Reading Android's
+calendar provider: needs a sensitive permission and exposes titles of every event.
+AlarmManager exact alarms: restricted, and unnecessary while the phone is not in use.

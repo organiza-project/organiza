@@ -43,7 +43,9 @@ Recorded in ADR-0002. `./gradlew test` runs everything.
 
 - `core/domain` — value types and OS ports. Kotlin stdlib only, no Android.
 - `core/testing` — fakes of every port.
-- `core/storage` — SQL schema (`docs/schema.md`), later the storage engine.
+- `core/storage` — SQL schema (`docs/schema.md`), migrations, repositories (ADR-0008).
+- `core/calendar` — `.ics` parser and recurrence engine (ADR-0008).
+- `core/scheduler` — turns occurrences into sessions and sessions into policy (ADR-0008).
 - `core/enforcement` — block engine, content policy, DNS sinkhole, tamper monitor (ADR-0007).
 - `app/android` — Phase 1: services, overlay, VPN, UI.
 - `.claude/rules/` — working rules for architecture, testing and privacy.
