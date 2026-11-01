@@ -36,6 +36,7 @@ Options rejected and why.
 | 0004 | Local schema v1 as a tested SQL artifact | Accepted | 2026-11-01 |
 | 0005 | Enforcement threat model and the limits of "unbypassable" | Accepted | 2026-11-01 |
 | 0006 | Challenge commitments are not zero-knowledge proofs | Accepted | 2026-11-01 |
+| 0007 | Android enforcement pipeline | Accepted | 2026-11-01 |
 
 ---
 
@@ -241,3 +242,47 @@ imply otherwise.
 Real ZK with device attestation: Android attestation can vouch for the device and app
 build, but not for the usage data the app reads, and it adds a Google dependency.
 Possibly worth revisiting as an optional anti-cheat tier.
+
+---
+
+## ADR-0007: Android enforcement pipeline
+
+- **Status:** Accepted
+- **Date:** 2026-11-01
+- **Deciders:** jackforce
+
+### Context
+Phase 1 implements the pipeline in the roadmap under the limits in ADR-0005. The
+deterministic parts need tests without a device, and a mistake in this layer can lock
+someone out of their phone.
+
+### Decision
+- A new `:core:enforcement` module holds the block engine, content policy, DNS packet
+  handling and tamper monitor. `:app:android` only translates framework calls.
+- Debouncing is leading-edge: the first event for an app acts at once, and only repeats
+  inside the window are dropped.
+- **Lockout protection:** launchers, dialers, emergency apps and Organiza itself can
+  never be blocked, whatever the block list says.
+- **Scoped text reading:** visible text is read only on system settings and installer
+  screens during strict mode, and browser URLs only from known URL bars. In-app short
+  form players match on view IDs, never on labels: YouTube's Shorts tab label is always
+  on screen, so matching it would block the whole app.
+- **DNS:** only the virtual DNS address is routed through the VPN, so other traffic is
+  untouched. TCP to port 53 is reset. Allowed queries use a protected socket to the
+  resolver of the underlying non-VPN network.
+- Sessions are held in memory until the Phase 2 store exists, so killing the process
+  ends the session. That is a known gap, not the final behaviour.
+- The Phase 1 screen is a plain setup tool for granting permissions and testing.
+  Phase 5 replaces it through `taste-skill`.
+- A debug-only receiver, guarded by the `DUMP` permission so only the shell can use it,
+  starts sessions for adb-driven verification. It is not in release builds.
+
+### Consequences
+Short form view IDs and browser URL bar IDs are private to those apps and will rot, so
+they need checks against real app versions. Truncated DNS answers that need a TCP retry
+fail. Application ID `org.organiza.app` assumes the project can keep using that name;
+change it before the first public release if not.
+
+### Alternatives Considered
+Trailing-edge debounce: adds visible delay before each block. Full-tunnel VPN: routes
+all traffic through the app for no enforcement benefit, and worsens privacy and battery.
