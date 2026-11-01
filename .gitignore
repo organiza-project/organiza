@@ -1,36 +1,126 @@
-# Flutter / Dart dependencies and outputs
-.dart_tool/
-.packages
-build/
-dist/
+# ==========================================================
+# Organiza — .gitignore
+# Android/Kotlin · Gradle · Rust/Native · IDEs · Claude
+# ==========================================================
 
-# Directory created by dartdoc
-doc/api/
+# ---------- OS ----------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*~
+*.swp
+*.swo
 
-# Environment files and credentials
+# ---------- Secrets & local config (NEVER commit) ----------
+local.properties
 .env
 .env.*
-
-# Signing keys and keystores
-key.properties
-*.jks
+!.env.example
 *.keystore
+*.jks
+!debug.keystore
+keystore.properties
+signing.properties
+google-services.json
+*.pem
 *.p12
-*.mobileprovision
+*.key
+secrets/
+# BYOK: user API keys must never land in the repo
+**/groq*.key
+**/*api_key*
 
-# IDE and editor files
-.idea/
+# ---------- Gradle ----------
+.gradle/
+**/build/
+!src/**/build/
+gradle-app.setting
+.gradletasknamecache
+!gradle/wrapper/gradle-wrapper.jar
+.kotlin/
+*.hprof
+
+# ---------- Android ----------
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+captures/
+.externalNativeBuild/
+.cxx/
+output.json
+output-metadata.json
+lint-results*.html
+lint-results*.xml
+**/release/
+**/debug/
+!**/src/debug/
+!**/src/release/
+proguard/
+*.log
+# Android Studio Navigation editor temp files
+.navigation/
+
+# ---------- Kotlin / JVM ----------
+out/
+bin/
 *.iml
-.vscode/
+hs_err_pid*
 
-# Web build artifacts
-*.dart.js
-*.info.json
-*.js
-*.js_
-*.js.deps
-*.js.map
+# ---------- Rust / Native ----------
+target/
+**/target/
+**/*.rs.bk
+*.pdb
+# Cargo.lock is committed for binaries/apps; uncomment for pure libraries
+# Cargo.lock
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.obj
+jniLibs/**/*.so
+.cargo/registry/
+.cargo/git/
 
-# Flutter plugin markers
-.flutter-plugins
-.flutter-plugins-dependencies
+# ---------- SQLCipher / local data (dev artifacts) ----------
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# ---------- IDEs ----------
+.idea/
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.fleet/
+*.code-workspace
+
+# ---------- Node (tooling scripts) ----------
+node_modules/
+
+# ---------- Coverage / test output ----------
+coverage/
+*.profraw
+*.profdata
+lcov.info
+jacoco.exec
+
+# ---------- Claude ----------
+.claude/settings.local.json
+.claude/*.local.*
+.claude/cache/
+.claude/todos/
+.claude/shell-snapshots/
+.claude/statsig/
+.claude/projects/
+CLAUDE.local.md
