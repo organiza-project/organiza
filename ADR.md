@@ -41,6 +41,7 @@ Options rejected and why.
 | 0009 | BYOK AI pipeline and on-device sanitizer | Accepted | 2026-11-01 |
 | 0010 | Voice commands through Groq Whisper | Accepted | 2026-11-01 |
 | 0011 | Arena challenges, encrypted sync and a blind relay | Accepted | 2026-11-02 |
+| 0012 | Compose UI on tested screen models, achromatic ledger style | Accepted | 2026-11-02 |
 
 ---
 
@@ -484,3 +485,40 @@ Direct peer-to-peer: phones are rarely reachable at the same moment, and it expo
 peers. A third-party service such as Firebase: a Google dependency, against the project's privacy
 position. Pairwise encryption: stronger after a member leaves, but much more complex for
 small groups of friends sharing one invite.
+
+---
+
+## ADR-0012: Compose UI on tested screen models, achromatic ledger style
+
+- **Status:** Accepted
+- **Date:** 2026-11-02
+- **Deciders:** jackforce
+
+### Context
+Phase 5 replaces the plain setup screen with the product UI. CLAUDE.md routes visual work through
+`taste-skill`, which dealt the **achromatic ledger** app style for this brief (seed 1398748691,
+`.taste-skill/direction.json`). Screen logic needs tests, and Compose code is slow to test.
+
+### Decision
+- **Jetpack Compose with foundation only.** Material 3 is left out, because its components bring a stock
+  look the style rules out. A small design system in `ui/` holds the tokens and the few components needed.
+- **Screen models live in `:core:presentation`**, plain Kotlin with tests: what each screen shows, its
+  sentences, durations, positions and states. Compose only lays them out.
+- **Style.** No colour in the chrome. The primary action is near-black and the secondary a grey pill.
+  One hue, #1d5fbf, marks each screen's main data element: the running session, today's column and
+  your own row. Status colours appear only on status. Tokens follow the sheet, with dark-theme
+  values from the skill's defaults.
+- **Face.** A blue-grey ground (#f2f4f7) taken from a printed planner's ledger paper, and Geist,
+  bundled under the OFL in `res/font` so no font is fetched at runtime.
+- **Signature element.** The day strip: today from 06:00 to midnight, with every session as a bar and
+  a line at now. It answers what the app is for: when you are protected.
+- **Navigation.** A bottom bar with four destinations, Focus, Habits, Arena and Vault, with the
+  screen's name as its title. No navigation library: the screens are few and share one state holder.
+
+### Consequences
+The look is checked on emulator screenshots against the skill's app critique, because its browser
+inspector cannot measure a native screen. Screen-reader labels and touch targets are reviewed by hand.
+
+### Alternatives Considered
+Material 3: fast, but its defaults are the stock look. Keeping Android Views: no tooling gain, and
+more code for the same screens.
