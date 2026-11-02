@@ -2,6 +2,7 @@ package org.organiza.android
 
 import android.app.Application
 import android.app.admin.DevicePolicyManager
+import android.content.pm.ApplicationInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -14,7 +15,9 @@ import android.provider.Settings
 import android.util.Log
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
+import java.util.UUID
 import java.util.concurrent.Executors
 import org.organiza.ai.AiCoach
 import org.organiza.ai.AiResult
@@ -23,6 +26,12 @@ import org.organiza.ai.GroqClient
 import org.organiza.ai.GroqEndpoint
 import org.organiza.ai.Sanitizer
 import org.organiza.ai.UrlConnectionTransport
+import org.organiza.arena.ArenaEngine
+import org.organiza.arena.ChallengeRules
+import org.organiza.arena.CreateResult
+import org.organiza.arena.HttpArenaRelay
+import org.organiza.arena.JoinResult
+import org.organiza.arena.SyncResult
 import org.organiza.calendar.IcsCalendar
 import org.organiza.domain.Parsed
 import org.organiza.domain.port.Capability
@@ -40,6 +49,8 @@ import org.organiza.scheduler.StopResult
 import org.organiza.scheduler.VoiceExecutor
 import org.organiza.scheduler.VoiceOutcome
 import org.organiza.storage.Database
+import org.organiza.storage.HabitCriterion
+import org.organiza.storage.HabitKind
 import org.organiza.storage.HabitStore
 import org.organiza.storage.MigrationResult
 import org.organiza.storage.Migrations
@@ -53,7 +64,10 @@ import org.organiza.voice.VoiceResult
 
 class OrganizaApp : Application(), EnforcementCapabilities {
     val session = ActiveSession()
-    val clock = Clock(Instant::now)
+    val clock = Clock { Instant.now().plus(clockOffsetForTesting) }
+
+    /** Lets debug checks reach tomorrow. Only the debug receiver changes it. */
+    @Volatile internal var clockOffsetForTesting: Duration = Duration.ZERO
 
     @Volatile var vpnRunning = false
 
@@ -79,13 +93,125 @@ class OrganizaApp : Application(), EnforcementCapabilities {
     private val tick = Runnable { onStorageThread { reconcile() } }
     @Volatile private var lastRequest = 0L
 
-    private class Storage(val db: Database, val clock: Clock) {
+    private inner class Storage(val db: Database, val clock: Clock) {
         val scheduler = SessionScheduler(db, clock)
         val sessions = SessionStore(db)
         val tamper = TamperStore(db)
         val aiFacts = AiFacts(db)
         val habits = HabitStore(db)
         val voice = VoiceExecutor(db, clock, scheduler)
+        val arena = ArenaEngine(
+            db,
+            clock,
+            ZoneId.systemDefault(),
+            KeystoreSecretStore(this@OrganizaApp),
+            usageHistory,
+            this@OrganizaApp,
+            allowInsecureRelay = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
+        ) { url -> HttpArenaRelay(UrlConnectionTransport(), url) }
+    }
+
+    private val usageHistory by lazy { AndroidUsageHistory(this) }
+
+    // Relay calls can take many seconds, so they must not hold up enforcement work.
+    private val arenaThread = Executors.newSingleThreadExecutor()
+    private var lastArenaRun = 0L
+    private var lastArenaDate: LocalDate? = null
+
+    /** The leaderboard text for the setup screen. */
+    @Volatile var arenaSummary: String = ""
+        private set
+
+    /** The last invite created, ready to share. It is not logged or shown in status text. */
+    @Volatile var latestInvite: String? = null
+        private set
+
+    private fun onArenaThread(work: () -> Unit) {
+        arenaThread.execute {
+            try {
+                work()
+            } catch (failure: RuntimeException) {
+                Log.e(TAG, "arena work failed: ${failure.javaClass.simpleName}")
+                statusMessage = "Arena error"
+            }
+        }
+    }
+
+    /** Closes finished days and syncs: each new day, and at most hourly otherwise. */
+    private fun runArenaIfDue() {
+        val today = clock.now().atZone(ZoneId.systemDefault()).toLocalDate()
+        val now = SystemClock.elapsedRealtime()
+        val due = lastArenaDate != today || lastArenaRun == 0L || now - lastArenaRun >= ARENA_INTERVAL_MS
+        if (!due) return
+        lastArenaDate = today
+        lastArenaRun = now
+        arenaNow()
+    }
+
+    fun arenaNow() = onArenaThread {
+        val arena = storage?.arena ?: return@onArenaThread
+        arena.closeDays()
+        var unavailable = false
+        for (challenge in arena.challenges()) {
+            if (arena.sync(challenge.id) == SyncResult.RelayUnavailable) unavailable = true
+        }
+        arenaSummary = describeArena(arena) + if (unavailable) "\nRelay unavailable, results are queued" else ""
+    }
+
+    private fun describeArena(arena: ArenaEngine): String = arena.challenges().joinToString("\n") { challenge ->
+        val rows = arena.leaderboard(challenge.id).joinToString(" | ") { member ->
+            "${member.name} ${member.successes} days, streak ${member.standing.streak}, " +
+                "${member.standing.status.name.lowercase()}, ${member.verification.name.lowercase()}"
+        }
+        "${challenge.title} (${challenge.state}): $rows"
+    }
+
+    private fun habitIdFor(name: String): String {
+        val habits = storage?.habits ?: return ""
+        habits.active().firstOrNull { it.name.equals(name.trim(), ignoreCase = true) }?.let { return it.id }
+        return UUID.randomUUID().toString().also { habits.add(it, name.trim(), clock.now()) }
+    }
+
+    fun createChallenge(habitName: String, title: String, rules: ChallengeRules, relayUrl: String, displayName: String) =
+        onStorageThread {
+            val arena = storage?.arena ?: return@onStorageThread
+            val today = clock.now().atZone(ZoneId.systemDefault()).toLocalDate().toString()
+            when (val result = arena.create(habitIdFor(habitName), title, today, rules, relayUrl, displayName)) {
+                is CreateResult.Created -> {
+                    latestInvite = result.invite.encode()
+                    statusMessage = "Challenge created. Share the invite like a password."
+                }
+                CreateResult.InsecureRelay -> statusMessage = "The relay must use https"
+                CreateResult.InvalidRules -> statusMessage = "Those challenge rules are not allowed"
+                CreateResult.UnknownHabit -> statusMessage = "Choose a habit first"
+            }
+            arenaNow()
+        }
+
+    fun joinChallenge(invite: String, habitName: String, displayName: String) = onStorageThread {
+        val arena = storage?.arena ?: return@onStorageThread
+        statusMessage = when (arena.join(invite, habitIdFor(habitName), displayName)) {
+            is JoinResult.Joined -> "Joined the challenge"
+            JoinResult.AlreadyJoined -> "You already joined this challenge"
+            JoinResult.InvalidInvite -> "That is not a valid invite"
+            JoinResult.TooLate -> "This challenge has already started"
+            JoinResult.UnknownHabit -> "Choose a habit first"
+        }
+        arenaNow()
+    }
+
+    internal fun addCriterionHabitForTesting(name: String, kind: String, target: String) = onStorageThread {
+        val criterion = HabitCriterion(HabitKind.valueOf(kind), target, null)
+        storage?.habits?.add(UUID.randomUUID().toString(), name, criterion, clock.now())
+    }
+
+    fun markHabitDone(name: String) = onStorageThread {
+        val voice = storage?.voice ?: return@onStorageThread
+        val today = clock.now().atZone(ZoneId.systemDefault()).toLocalDate()
+        statusMessage = when (voice.apply(VoiceCommand.MarkHabit(name.trim(), today, true))) {
+            VoiceOutcome.Done -> "Marked done"
+            else -> "No habit with that name"
+        }
     }
 
     /** A heard command waiting for the user's tap. Nothing happens until then (ADR-0010). */
@@ -201,6 +327,7 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         }
         if (vpnRunning) add(Capability.VPN)
         if (deviceAdminActive()) add(Capability.DEVICE_ADMIN)
+        if (usageHistory.permitted()) add(Capability.USAGE_STATS)
     }
 
     fun deviceAdminActive(): Boolean =
@@ -219,6 +346,7 @@ class OrganizaApp : Application(), EnforcementCapabilities {
             monitorArmed = true
         }
         syncVpn(state.policy)
+        runArenaIfDue()
         // Give a restarted VPN time to come up before a stored baseline is compared.
         main.postDelayed({ checkTamper() }, TAMPER_GRACE_MS)
         val untilNext = state.nextTransition?.let { Duration.between(clock.now(), it).toMillis() } ?: MAX_TICK_MS
@@ -373,13 +501,15 @@ class OrganizaApp : Application(), EnforcementCapabilities {
             "OrganizaDebug",
             "capabilities=$capabilities tamper=$tamper storageFailure=$failure " +
                 "active=${session.current != SessionPolicy.IDLE} " +
-                "habits=${storage?.habits?.active().orEmpty().joinToString("|") { it.name }} message=${statusMessage?.replace('\n', ' ')}",
+                "habits=${storage?.habits?.active().orEmpty().joinToString("|") { it.name }} " +
+                "arena=[${arenaSummary.replace('\n', ';')}] message=${statusMessage?.replace('\n', ' ')}",
         )
     }
 
     companion object {
         private const val TAG = "Organiza"
         private const val DATABASE_NAME = "organiza.db"
+        private const val ARENA_INTERVAL_MS = 60 * 60 * 1000L
         private const val PREFERENCES = "organiza"
         private const val VOICE_CONSENT = "voice_consent"
         private const val MIN_TICK_MS = 500L

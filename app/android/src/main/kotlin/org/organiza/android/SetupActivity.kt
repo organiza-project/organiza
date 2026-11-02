@@ -20,6 +20,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import java.io.IOException
 import java.time.Duration
+import org.organiza.arena.ChallengeRules
 import org.organiza.enforcement.SessionPolicy
 import org.organiza.scheduler.ManualRequest
 
@@ -45,6 +46,24 @@ class SetupActivity : Activity() {
         }
         val goal = EditText(this).apply { hint = "Your goal this week" }
         val reason = EditText(this).apply { hint = "Why do you need to leave this session?" }
+        val arenaHabit = EditText(this).apply { hint = "Habit for the challenge" }
+        val arenaTitle = EditText(this).apply { hint = "Challenge title" }
+        val arenaDays = EditText(this).apply {
+            hint = "Days"
+            setText("30")
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        val arenaFreezes = EditText(this).apply {
+            hint = "Freeze days"
+            setText("2")
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        val arenaRelay = EditText(this).apply { hint = "Relay address (https)" }
+        val arenaName = EditText(this).apply { hint = "Your name in the group" }
+        val arenaInvite = EditText(this).apply {
+            hint = "Paste an invite"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
         val strict = CheckBox(this).apply { text = "Strict (guards Organiza's settings pages)" }
         val shortForm = CheckBox(this).apply { text = "Block Shorts and Reels" }
         val column = LinearLayout(this).apply {
@@ -89,6 +108,34 @@ class SetupActivity : Activity() {
             addView(talkButton())
             addView(button("Confirm command") { app.confirmVoiceCommand() })
             addView(button("Discard command") { app.discardVoiceCommand() })
+            addView(TextView(this@SetupActivity).apply { text = ARENA_NOTICE })
+            addView(arenaHabit)
+            addView(button("Mark this habit done today") { app.markHabitDone(arenaHabit.text.toString()) })
+            addView(arenaTitle)
+            addView(arenaDays)
+            addView(arenaFreezes)
+            addView(arenaRelay)
+            addView(arenaName)
+            addView(button("Create a challenge") {
+                val rules = ChallengeRules(
+                    arenaDays.text.toString().toIntOrNull() ?: 0,
+                    arenaFreezes.text.toString().toIntOrNull() ?: 0,
+                )
+                app.createChallenge(
+                    arenaHabit.text.toString(),
+                    arenaTitle.text.toString(),
+                    rules,
+                    arenaRelay.text.toString().trim(),
+                    arenaName.text.toString(),
+                )
+            })
+            addView(button("Share the invite") { shareInvite() })
+            addView(arenaInvite)
+            addView(button("Join with this invite") {
+                app.joinChallenge(arenaInvite.text.toString(), arenaHabit.text.toString(), arenaName.text.toString())
+                arenaInvite.text.clear()
+            })
+            addView(button("Sync challenges now") { app.arenaNow() })
             addView(reason)
             addView(button("Ask the gatekeeper") { app.askGatekeeper(reason.text.toString(), 30) })
         }
@@ -185,6 +232,16 @@ class SetupActivity : Activity() {
         setOnClickListener(View.OnClickListener { onClick() })
     }
 
+    private fun shareInvite() {
+        val invite = app.latestInvite
+        if (invite == null) {
+            status.text = "Create a challenge first"
+            return
+        }
+        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, invite)
+        startActivity(Intent.createChooser(send, "Share the invite"))
+    }
+
     private fun requestDeviceAdmin() {
         startActivity(
             Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
@@ -200,12 +257,16 @@ class SetupActivity : Activity() {
             appendLine("Tamper events: ${app.tamperCount}")
             app.storageFailure?.let { appendLine("Storage problem: $it. Your data has not been deleted.") }
             app.statusMessage?.let(::appendLine)
+            app.arenaSummary.takeIf(String::isNotEmpty)?.let(::appendLine)
             if (rejected.isNotEmpty()) appendLine("Could not read: ${rejected.joinToString()}")
         }
     }
 
     private companion object {
         const val PADDING = 48
+        const val ARENA_NOTICE = "Challenges share only your daily result and streak with your group, encrypted so " +
+            "the relay cannot read them. Results are self-reported: \"confirmed\" means they were not rewritten, " +
+            "not that they are proven true."
         const val REQUEST_CALENDAR = 1
         const val REQUEST_MICROPHONE = 2
         const val VOICE_NOTICE = "While you hold the button, your voice is recorded and sent to Groq using your own " +

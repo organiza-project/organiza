@@ -21,6 +21,22 @@ check() { # name expected actual
   fi
 }
 
+check_eq() { # name expected actual, for counts: "0" must not match "10"
+  if [[ "${3// /}" == "$2" ]]; then
+    echo "PASS  $1"; passed=$((passed + 1))
+  else
+    echo "FAIL  $1: expected exactly '$2', got '$3'"; failed=$((failed + 1))
+  fi
+}
+
+check_above_zero() { # name actual
+  if [[ "${2// /}" =~ ^[0-9]+$ ]] && (( ${2// /} > 0 )); then
+    echo "PASS  $1"; passed=$((passed + 1))
+  else
+    echo "FAIL  $1: expected a positive count, got '$2'"; failed=$((failed + 1))
+  fi
+}
+
 check_not() { # name unexpected actual
   if [[ "$3" != *"$2"* ]]; then
     echo "PASS  $1"; passed=$((passed + 1))
@@ -90,7 +106,7 @@ open_settings
 top=$(top_app)
 check_not "blocked app is sent home" "com.android.settings" "$top"
 windows=$(shell dumpsys window windows | grep -c 'package=org.organiza.app appop=CREATE_ACCESSIBILITY_OVERLAY')
-check "overlay is gone once home" "0" "$windows"
+check_eq "overlay is gone once home" "0" "$windows"
 session stop
 open_settings
 check "stopping the session unblocks" "settings" "$(top_app)"
@@ -107,7 +123,7 @@ launcher=$(shell cmd package resolve-activity --brief -a android.intent.action.M
 session start --es packages "$launcher"
 shell input keyevent KEYCODE_HOME >/dev/null; sleep 2
 windows=$(shell dumpsys window windows | grep -c 'package=org.organiza.app appop=CREATE_ACCESSIBILITY_OVERLAY')
-check "blocking the launcher ($launcher) shows no overlay" "0" "$windows"
+check_eq "blocking the launcher ($launcher) shows no overlay" "0" "$windows"
 check "launcher stays usable" "$launcher" "$(top_app)"
 session stop
 
@@ -159,11 +175,11 @@ header=$(shell run-as "$APP" head -c 15 "$db")
 check_not "database has no plain SQLite header" "SQLite format 3" "$header"
 check "database file exists" "organiza.db" "$(shell run-as "$APP" ls databases)"
 in_app "echo ZZPLAINTEXTMARKER > files_control" >/dev/null
-check "control: the grep can find the marker" "1" "$(in_app "cat files_control | grep -c ZZPLAINTEXTMARKER")"
+check_eq "control: the grep can find the marker" "1" "$(in_app "cat files_control | grep -c ZZPLAINTEXTMARKER")"
 in_app "rm files_control" >/dev/null
 db_bytes=$(in_app "cat databases/organiza.db* | wc -c")
-check_not "control: the database files are not empty" "0" "${db_bytes// /}x"
-check "plaintext does not reach the database" "0" "$(in_app "cat databases/organiza.db* | grep -c ZZPLAINTEXTMARKER")"
+check_above_zero "control: the database files are not empty" "$db_bytes"
+check_eq "plaintext does not reach the database" "0" "$(in_app "cat databases/organiza.db* | grep -c ZZPLAINTEXTMARKER")"
 check "the wrapped key file exists" "database.key" "$(shell run-as "$APP" ls no_backup)"
 
 echo "--- sessions survive a process kill"
@@ -241,11 +257,11 @@ broadcast aiendpoint --es url http://10.0.2.2:18080; sleep 1
 broadcast clearkey; sleep 1
 broadcast aireview; sleep 3
 check "no key means no call" "NO_KEY" "$(debug_state)"
-check "control: nothing was sent without a key" "0" "$(sent | wc -l)"
+check_eq "control: nothing was sent without a key" "0" "$(sent | wc -l)"
 broadcast savekey --es key "$test_key"; sleep 2
 check "the key is saved" "API key saved" "$(debug_state)"
 check "the key file exists" "groq.key" "$(in_app "ls no_backup")"
-check "the key is not stored in the clear" "0" "$(in_app "cat no_backup/* databases/* | grep -c gsk_verify")"
+check_eq "the key is not stored in the clear" "0" "$(in_app "cat no_backup/* databases/* | grep -c gsk_verify")"
 check_not "the key is not logged" "gsk_verify" "$("$ADB" logcat -d | tr -d '\r' | grep -F "$test_key" | grep -v 'savekey')"
 session start --es packages com.instagram.android --es domains secretsite.example
 echo grant > "$FAKE_DIR/mode"
@@ -280,7 +296,7 @@ session stop
 audio_before=$(sent | grep -c '^AUDIO')
 broadcast voicesilence; sleep 2
 check "silence is reported" "nothing was sent" "$(debug_state)"
-check "silence never leaves the device" "$audio_before" "$(sent | grep -c '^AUDIO')"
+check_eq "silence never leaves the device" "$audio_before" "$(sent | grep -c '^AUDIO')"
 hear ' Add a habit called stretch.'
 state=$(debug_state)
 check "a heard command waits for confirmation" "Confirm: Add habit: stretch" "$state"
@@ -333,6 +349,84 @@ check_not "control: it is not reported as missing" "NO_KEY" "$(debug_state)"
 broadcast clearkey; sleep 1
 check_not "removing the key deletes the file" "groq.key" "$(in_app "ls no_backup")"
 
+echo "--- arena challenges"
+RELAY_DUMP=$(mktemp)
+relay_url=http://10.0.2.2:18081
+: "${JAVA_HOME:=/usr/lib/jvm/java-17-openjdk-amd64}"; export JAVA_HOME
+session stop
+arena_state() { debug_state; }
+get_invite() {
+  "$ADB" logcat -c
+  broadcast arenainvite
+  sleep 1
+  "$ADB" logcat -d -s OrganizaDebug:I | tr -d '\r' | grep -o 'invite=.*' | tail -1 | cut -d= -f2-
+}
+peer() { ./gradlew -q :core:arena:arenaPeer "-Ppeer=$1,http://127.0.0.1:18081,$2" --console=plain 2>&1 | grep -E '^peer'; }
+shell appops set "$APP" GET_USAGE_STATS allow >/dev/null
+check "usage access is detected" "USAGE_STATS" "$(debug_state)"
+# The relay is not running yet, so this also tests an outage.
+broadcast arenacreate --es habit Reading --es title 'SecretTitleText' --es relay "$relay_url" --es name AppUser --ei days 1
+sleep 4
+check "a relay outage is reported, not fatal" "Relay unavailable" "$(debug_state)"
+invite=$(get_invite)
+check "the invite is produced" "organiza-arena:1:" "$invite"
+python3 scripts/arena-relay.py 18081 "$RELAY_DUMP" &
+relay_pid=$!
+trap 'kill "$fake_pid" "$relay_pid" 2>/dev/null' EXIT
+sleep 1
+broadcast arenamark --es name Reading; sleep 1
+broadcast arenasync; sleep 3
+state=$(debug_state)
+check_not "queued results go out when the relay returns" "Relay unavailable" "$state"
+check "the leaderboard lists this member" "AppUser 0 days" "$state"
+check_eq "secrets are not stored in the clear" "0" "$(in_app "cat databases/* no_backup/arena/* | grep -c ${invite: -20}")"
+check "the challenge secrets exist" "group" "$(in_app "ls no_backup/arena")"
+peer_out=$(peer honest "$invite")
+check "the second member joins from another process" "Joined" "$peer_out"
+broadcast clockdays --el days 1; sleep 1
+broadcast arenasync; sleep 4
+peer_out=$(peer honest "$invite")
+broadcast arenasync; sleep 4
+state=$(debug_state)
+check "the app sees the second member" "Peer " "$state"
+check "the app's own day was closed and met" "AppUser 1 days" "$state"
+check "this member is confirmed by reveal" "AppUser 1 days, streak 1, completed, confirmed" "$state"
+check "the other member is confirmed by reveal" "Peer 1 days, streak 1, completed, confirmed" "$state"
+check "the second member sees the app's result" "peer-board: AppUser status=COMPLETED successes=1 verification=CONFIRMED" "$peer_out"
+printf 'ZZSEARCHCONTROL success' > "$RELAY_DUMP.control"
+check_eq "control: the relay search can find text" "1" "$(LC_ALL=C grep -a -c -E 'ZZSEARCHCONTROL|success' "$RELAY_DUMP.control")"
+echo "INFO  board: $(echo "$state" | grep -o 'arena=.*message' | cut -c1-300)"
+echo "INFO  peer: $(echo "$peer_out" | grep board | tr '\n' ';' | cut -c1-300)"
+dump=$(cat "$RELAY_DUMP" | tr -d '\0' | LC_ALL=C grep -a -c -E 'SecretTitleText|AppUser|Reading|Peer|success|commitment')
+check_eq "the relay saw nothing readable" "0" "$dump"
+sizes=$(LC_ALL=C grep -a '^MSG ' "$RELAY_DUMP" | awk '{print $3}' | sort -u | wc -l)
+check "control: the relay did receive messages" "MSG" "$(LC_ALL=C grep -a -m1 '^MSG ' "$RELAY_DUMP" | cut -c1-3)"
+check_eq "every message the relay saw was the same size" "1" "$sizes"
+peer cheat "$invite" >/dev/null
+broadcast arenasync; sleep 4
+check "a cheating member is marked invalid" "Cheater 0 days, streak 0, active, invalid" "$(debug_state)"
+pid_before=$(app_pid)
+kill_now; sleep 4
+broadcast arenasync; sleep 4
+check "the challenge survives a process kill" "Cheater" "$(debug_state)"
+broadcast clockdays --el days 0; sleep 1
+
+echo "--- usage based habits"
+broadcast arenahabit --es name OpenedSettings --es kind ZERO_LAUNCHES --es target com.android.settings; sleep 1
+broadcast arenahabit --es name NeverOpened --es kind ZERO_LAUNCHES --es target com.example.neveropened; sleep 1
+broadcast arenacreate --es habit OpenedSettings --es title UsedApp --es relay "$relay_url" --es name AppUser --ei days 1 --ei freezes 1; sleep 3
+broadcast arenacreate --es habit NeverOpened --es title UnusedApp --es relay "$relay_url" --es name AppUser --ei days 1 --ei freezes 1; sleep 3
+fresh_settings
+open_settings; sleep 4
+shell input keyevent KEYCODE_HOME >/dev/null; sleep 2
+broadcast clockdays --el days 1; sleep 1
+broadcast arenasync; sleep 5
+state=$(debug_state)
+check "an app that was used fails a zero launches habit" "UsedApp (completed): AppUser 0 days" "$state"
+check "an app that was not used passes it" "UnusedApp (completed): AppUser 1 days" "$state"
+broadcast clockdays --el days 0; sleep 1
+kill "$relay_pid" 2>/dev/null
+
 echo "--- uninstall protection"
 check "admin blocks uninstall" "DELETE_FAILED" "$(shell pm uninstall "$APP")"
 
@@ -363,13 +457,13 @@ shell input keyevent KEYCODE_HOME >/dev/null
 echo "--- a damaged key never deletes data"
 enable_accessibility
 before=$(in_app "wc -c < databases/organiza.db")
-check_not "control: the database has content" "0" "${before// /}x"
+check_above_zero "control: the database has content" "$before"
 in_app "echo damaged > no_backup/database.key" >/dev/null
 kill_now
 shell am start -W -n "$APP/org.organiza.android.SetupActivity" >/dev/null
 sleep 5
 check "the failure is reported" "storageFailure=KEY_UNREADABLE" "$(debug_state)"
-check "the database file is kept" "$before" "$(in_app "wc -c < databases/organiza.db")"
+check_eq "the database file is kept" "${before// /}" "$(in_app "wc -c < databases/organiza.db")"
 shell input keyevent KEYCODE_HOME >/dev/null
 
 shell am broadcast -n "$RECEIVER" --es command removeadmin >/dev/null

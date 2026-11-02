@@ -21,6 +21,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:arena"))
     implementation(project(":core:scheduler"))
     implementation(libs.sqlcipher)
     implementation(libs.androidx.sqlite)

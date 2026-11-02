@@ -7,9 +7,11 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
+import android.util.Log
 import java.io.File
 import java.time.Duration
 import org.organiza.ai.GroqEndpoint
+import org.organiza.arena.ChallengeRules
 import org.organiza.scheduler.ManualRequest
 import org.organiza.storage.StoredRule
 
@@ -72,6 +74,27 @@ class DebugSessionReceiver : BroadcastReceiver() {
             }
             "voiceconfirm" -> app.confirmVoiceCommand()
             "voicediscard" -> app.discardVoiceCommand()
+            "arenacreate" -> app.createChallenge(
+                intent.getStringExtra("habit").orEmpty(),
+                intent.getStringExtra("title").orEmpty(),
+                ChallengeRules(
+                    intent.getIntExtra("days", 1),
+                    intent.getIntExtra("freezes", 0),
+                    intent.getIntExtra("maxFailures", 0),
+                    strict,
+                ),
+                intent.getStringExtra("relay").orEmpty(),
+                intent.getStringExtra("name").orEmpty(),
+            )
+            "arenahabit" -> app.addCriterionHabitForTesting(
+                intent.getStringExtra("name").orEmpty(),
+                intent.getStringExtra("kind").orEmpty(),
+                intent.getStringExtra("target").orEmpty(),
+            )
+            "arenamark" -> app.markHabitDone(intent.getStringExtra("name").orEmpty())
+            "arenasync" -> app.arenaNow()
+            "arenainvite" -> Log.i("OrganizaDebug", "invite=${app.latestInvite}")
+            "clockdays" -> app.clockOffsetForTesting = Duration.ofDays(intent.getLongExtra("days", 0))
             "ics" -> app.importCalendar(
                 Base64.decode(intent.getStringExtra("base64").orEmpty(), Base64.DEFAULT).decodeToString(),
             )
