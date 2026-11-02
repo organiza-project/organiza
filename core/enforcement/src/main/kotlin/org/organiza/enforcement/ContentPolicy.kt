@@ -40,8 +40,9 @@ public class ContentPolicy(private val appLabel: String) {
     private data class ParsedUrl(val host: DomainName, val path: String)
 
     private fun parseUrl(raw: String): ParsedUrl? {
-        val text = raw.trim()
-        if (text.any(Char::isWhitespace)) return null
+        // Chrome appends labels such as "Connection is not secure" to the bar's text. A search
+        // starts with an ordinary word, so its first token does not parse as a host below.
+        val text = raw.trim().substringBefore(' ')
         val rest = text.substringAfter("://", text)
         val authority = rest.substringBefore('/').substringBefore('?').substringBefore('#')
         val host = DomainName.parse(authority.substringAfterLast('@').substringBefore(':'))

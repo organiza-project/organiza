@@ -34,8 +34,20 @@ class ContentPolicyTest {
     }
 
     @Test
+    fun `labels chrome appends after the url do not hide it`() {
+        val labelled = ScreenSnapshot(
+            chrome,
+            urlBarText = "old.reddit.com/login/?reason=lor2 Connection is not secure",
+        )
+        assertEquals(ContentDecision.BLOCK_DOMAIN, decide(labelled))
+        val shorts = ScreenSnapshot(chrome, urlBarText = "m.youtube.com/shorts/abc Connection is not secure")
+        assertEquals(ContentDecision.BLOCK_SHORT_FORM, decide(shorts, blockShortForm = true))
+    }
+
+    @Test
     fun `allows other domains and search text`() {
         assertEquals(ContentDecision.ALLOW, decide(ScreenSnapshot(chrome, urlBarText = "example.com")))
+        assertEquals(ContentDecision.ALLOW, decide(ScreenSnapshot(chrome, urlBarText = "example.com Connection is not secure")))
         assertEquals(ContentDecision.ALLOW, decide(ScreenSnapshot(chrome, urlBarText = "how to use reddit.com well")))
         assertEquals(ContentDecision.ALLOW, decide(ScreenSnapshot(chrome, urlBarText = null)))
     }

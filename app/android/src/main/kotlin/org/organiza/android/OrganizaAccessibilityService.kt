@@ -27,6 +27,15 @@ class OrganizaAccessibilityService : AccessibilityService() {
     private var subscription: AutoCloseable? = null
     private var surface: AccessibilityBlockSurface? = null
     private var lastInspection = 0L
+    private var trailingSource: PackageName? = null
+    private val trailingInspection = Runnable {
+        val blockEngine = engine
+        val source = trailingSource
+        if (blockEngine != null && source != null) {
+            lastInspection = SystemClock.elapsedRealtime()
+            inspect(source, app.session.current, blockEngine)
+        }
+    }
 
     override fun onServiceConnected() {
         release()
@@ -52,7 +61,15 @@ class OrganizaAccessibilityService : AccessibilityService() {
             }
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
                 val now = SystemClock.elapsedRealtime()
-                if (now - lastInspection < INSPECTION_INTERVAL_MS) return
+                val wait = INSPECTION_INTERVAL_MS - (now - lastInspection)
+                if (wait > 0) {
+                    // Check again once the window closes. Dropping this event outright would
+                    // miss a page that finishes drawing inside the window.
+                    main.removeCallbacks(trailingInspection)
+                    trailingSource = source
+                    main.postDelayed(trailingInspection, wait)
+                    return
+                }
                 lastInspection = now
                 inspect(source, policy, blockEngine)
             }
@@ -123,6 +140,7 @@ class OrganizaAccessibilityService : AccessibilityService() {
     }
 
     private fun release() {
+        main.removeCallbacks(trailingInspection)
         subscription?.close()
         subscription = null
         surface?.dismissOverlay()
