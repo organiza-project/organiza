@@ -1,10 +1,11 @@
 # CLAUDE.md — Project Organiza Directives
 
 ## 0. Mission
-Organiza delivers **unbypassable OS-level focus enforcement** with **100% local data
-ownership**: calendar-driven scheduling, BYOK AI coaching, and zero-knowledge peer
-accountability. Android first (AccessibilityService, VpnService loopback,
-DeviceAdminReceiver), then Linux, Windows, iOS.
+Organiza delivers **OS-level focus enforcement that is hard to bypass and mindful by
+design** (ADR-0005, ADR-0016) with **100% local data ownership**: calendar-driven
+scheduling, BYOK AI coaching, and zero-knowledge peer accountability. Android is the
+only platform in active development (ADR-0014); Linux is frozen, and Windows and iOS
+wait for an approved next phase.
 
 ## 1. Git & GitHub Mandates
 - **Remote:** `origin` → `https://github.com/organiza-project/organiza`. Verify the

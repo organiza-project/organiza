@@ -43,6 +43,10 @@ Options rejected and why.
 | 0011 | Arena challenges, encrypted sync and a blind relay | Accepted | 2026-11-02 |
 | 0012 | Compose UI on tested screen models, achromatic ledger style | Accepted | 2026-11-02 |
 | 0013 | Linux daemon on the shared Kotlin core; native core deferred | Accepted | 2026-11-02 |
+| 0014 | Android-only milestone and feature packages | Accepted | 2026-11-02 |
+| 0015 | Backend choice: local only, hosted Supabase or self-hosted | Accepted | 2026-11-02 |
+| 0016 | Mindful friction: typed-phrase overrides instead of hard lockouts | Accepted | 2026-11-02 |
+| 0017 | AI copilot insights and override reflection | Accepted | 2026-11-02 |
 
 ---
 
@@ -574,3 +578,191 @@ database layout, which a future sync or export can rely on.
 Rust core now: a rewrite of tested logic, with no platform that needs it yet. Kotlin Multiplatform now:
 JVM-only libraries (BouncyCastle, JDBC, java.time) would need replacing before any Linux work.
 An nftables DNS filter: stronger than a hosts file, but much more invasive to a desktop's network.
+
+---
+
+## ADR-0014: Android-only milestone and feature packages
+
+- **Status:** Accepted
+- **Date:** 2026-11-02
+- **Deciders:** jackforce
+
+### Context
+The core engine is done and the Linux daemon works (ADR-0013). The next milestone is a polished,
+open-source Android app that the maintainer dogfoods before any other platform gets more work.
+External contributors need to find their way around the Android code, where most logic had grown
+into one `OrganizaApp` class and one `Screens.kt` file.
+
+### Decision
+- **Platform freeze.** Linux, Windows and iOS get no new work until the Android build has been
+  dogfooded and the next phase is approved. `:platform:linux` stays in the build and in CI, so it
+  keeps compiling against the shared core, but it gets no new features.
+- **Feature packages in `:app:android`.** Code is grouped by what the user sees:
+  `feature/onboarding`, `feature/blocker`, `feature/sync`, `feature/ai`, `feature/focus`,
+  `feature/habits`, `feature/arena`, `feature/vault` and `feature/voice`. Shared Android glue
+  (encrypted storage, Keystore) lives in `data`, and the design system stays in `ui`. Logic that
+  can be tested off-device stays in the `:core` modules, so a feature package is mostly wiring and
+  Compose.
+- **Packages, not Gradle modules, for now.** Feature modules would need the single app state holder
+  split behind interfaces first. Packages give contributors the same map at a fraction of the
+  risk, and can be promoted to modules once their boundaries hold.
+- **Release builds** are minified with R8. They are signed with a release key when one is
+  configured outside the repository (`CONTRIBUTING.md`), and with the debug key otherwise, so a
+  dogfood APK can always be built and installed.
+
+### Consequences
+Component class names change (the accessibility service, the VPN service and the device admin move
+into `feature/blocker`), so an installed debug build has to be re-enabled after updating. A
+debug-signed release APK cannot be upgraded in place by a properly signed one later.
+
+### Alternatives Considered
+Feature Gradle modules now: enforced boundaries, but a large refactor of shared state with no
+behaviour change to show for it. Leaving the layout as it is: cheaper today, harder for every new
+contributor.
+
+---
+
+## ADR-0015: Backend choice: local only, hosted Supabase or self-hosted
+
+- **Status:** Accepted
+- **Date:** 2026-11-02
+- **Deciders:** jackforce
+
+### Context
+Arena challenges need a relay that friends share (ADR-0011), and asking every user to run
+`scripts/arena-relay.py` is too much. The product now offers a managed backend, Supabase on
+PostgreSQL, while self-hosters and privacy purists bring their own. CLAUDE.md still rules: the
+single-player app works offline, no telemetry leaves the device, and Arena shares only encrypted,
+padded commitments.
+
+### Decision
+- **Three choices, made in onboarding and changeable later.** *Local only* (the default when
+  nothing else is configured): no account, and Arena uses a relay URL the user enters. *Organiza
+  hosted*: the Supabase project whose URL and anon key are set at build time
+  (`organiza.supabaseUrl`, `organiza.supabaseAnonKey`); a build without them shows the option as
+  unavailable. *Self-hosted*: the user enters their own Supabase URL and anon key.
+- **Two ports in `:core:sync`.** `AuthRepository` signs up, signs in, refreshes and signs out.
+  `SyncRepository` reports the backend and hands Arena the relay for a challenge. Each has a
+  local-only implementation and a Supabase one, chosen once from the stored `BackendConfig`, so
+  screens and business logic never branch on the backend.
+- **What the backend stores.** Supabase Auth holds an email address and a password hash. One table,
+  `arena_message`, holds the same opaque, padded ciphertext the blind relay holds, under the same
+  derived mailbox ID. Habits, sessions, usage, overrides and AI keys never leave the device. The
+  schema and its row-level security are in `supabase/migrations`, so a self-hoster applies the
+  same file.
+- **Access goes through two `SECURITY DEFINER` functions,** `arena_append` and `arena_fetch`. The
+  table itself has row-level security on and no policies, so clients cannot list, update or
+  delete messages, or read a mailbox without its ID. Both functions require a signed-in user and
+  check the sizes.
+- **Only the anon key is accepted.** A key whose JWT role is `service_role` is refused in the UI,
+  because it bypasses row-level security for every user of that project and must never sit on a
+  phone. Raw PostgreSQL credentials are not accepted either: a phone would then hold a database
+  password. A self-hoster runs Supabase, or anything that serves the same Auth and PostgREST
+  endpoints.
+- **Sessions are sealed.** The refresh token is stored with the Keystore-sealed secret store, and
+  the access token is kept in memory only.
+- **Only POST is used,** for both Auth and the RPC functions, so the existing `HttpTransport` port
+  carries it and the fakes stay small.
+
+### Consequences
+Hosted Arena needs someone to run and pay for the Organiza Supabase project. Until it exists, the
+hosted option is unavailable and self-hosting works. The backend can see account emails, network
+addresses, mailbox IDs and message timing, but not results. Signing in is never needed for
+blocking, habits or AI.
+
+### Alternatives Considered
+Syncing personal data through Supabase: it breaks local data ownership unless end-to-end encrypted,
+which is a separate design. Firebase: a Google dependency (ADR-0011). Direct PostgreSQL from the
+phone: credentials on the device and no row-level security for anonymous peers.
+
+---
+
+## ADR-0016: Mindful friction: typed-phrase overrides instead of hard lockouts
+
+- **Status:** Accepted
+- **Date:** 2026-11-02
+- **Deciders:** jackforce
+
+### Context
+Until now a blocked app flashed a black overlay and went home, with no way through except ending the
+session, and strict sessions could not be ended at all. People who hit a wall with no exit uninstall
+the app. Products such as StayFree keep users by asking for a deliberate pause instead. ADR-0005
+already set the target at "bypass requires deliberate effort, and is recorded". This decision moves
+the everyday experience to that target.
+
+### Decision
+- **An intervention screen replaces the flash.** Opening a blocked app or site shows a full-screen
+  intervention over the home screen. It cannot be dismissed by back or by tapping outside. It
+  offers two ways out: *Stay focused*, always available, or the override path.
+- **The override path.** First, a breathing pause that cannot be skipped. Then a reason, chosen from
+  a short list with an optional note. Then the user types a reflective phrase drawn from a bundled
+  set, matched ignoring case, spacing and punctuation. Pasting is refused. Last, the user chooses
+  1, 5 or 15 minutes, gets a pass for that one app or site, and the app reopens.
+- **Friction escalates.** The pause starts at 10 seconds and doubles with each override that day, up
+  to 2 minutes. Strict sessions start at 30 seconds, need the longer phrases, and, with an AI key,
+  show an AI reflection on the stated reason before the phrase (ADR-0017).
+- **Passes are narrow and short.** A pass covers one package, one blocked site entry, or the short
+  video feed of one app, and ends on time even if the app is open. Passes live in memory, so a
+  restart blocks again. A pass for a site also lifts it in the DNS filter for that time.
+- **Strict keeps its meaning.** A strict session still cannot be stopped early as a whole, and the
+  guard on Organiza's own settings during a strict session still has no override, because it
+  protects the enforcement itself.
+- **Every outcome is logged locally.** Each intervention records whether the person stayed focused or
+  overrode, the target, the reason, the pause and the pass length. Schema v5 adds the
+  `intervention_event` table. The Focus screen shows today's choices, and the AI copilot can use the
+  counts by hour (ADR-0017).
+- **Phrases are original text,** written for Organiza in a stoic spirit, so there is no attribution or
+  licensing question, and they are easy to translate.
+
+### Consequences
+A determined person can get through any block with two minutes of effort, which is the product's
+intent now, and the log makes each time visible. CLAUDE.md's mission line changes from
+"unbypassable" to "hard to bypass, mindful by design". The verify script checks the intervention
+instead of a plain return to the home screen.
+
+### Alternatives Considered
+Keeping hard lockouts with a separate soft mode: two enforcement experiences to explain and test. A
+fixed delay with no typing: easy to wait out on autopilot. Allowing paste: defeats the point of
+typing.
+
+---
+
+## ADR-0017: AI copilot insights and override reflection
+
+- **Status:** Accepted
+- **Date:** 2026-11-02
+- **Deciders:** jackforce
+
+### Context
+The BYOK features from ADR-0009 (weekly review, schedule suggestion, gatekeeper) each sit behind a
+button and answer once. The goal is a background copilot: notice distraction windows, propose focus
+blocks around the calendar, suggest habit changes, and help in the moment of an override.
+
+### Decision
+- **Local analysis first.** `DistractionWindows` in `:core:ai` finds the hours with the most blocked
+  attempts and overrides over the last 14 days, from the local intervention log. It runs without a
+  key, so the insight exists even when AI is off.
+- **The copilot prompt sends counts, not content:** attempts and overrides per hour of the week,
+  focus minutes, habit completion rates with sanitized names, and busy calendar blocks with
+  sanitized tags. It never sends app or site names, typed reasons, or usage per app. The reply must
+  parse into proposed focus blocks, warnings and habit tips, or it is discarded. Proposals are
+  never applied without a tap.
+- **The copilot runs at most once a day,** when the app is opened with a key saved, and on demand.
+- **Override reflection.** In a strict session with a key, the stated reason is sanitized and sent
+  with the minutes left and how many overrides happened today. The model returns a short, neutral
+  reflection, which is shown before the phrase. It never decides: a failure or a timeout shows a
+  plain local prompt, and the person continues either way. This replaces the gatekeeper's yes or
+  no, which the old panel showed as advice only.
+- **The sanitizer stays regex-based** (ADR-0009): emails, phone numbers, URLs, card-like numbers,
+  handles and capitalised name pairs. There is no on-device NER model, because shipping one would
+  add tens of megabytes. Typed reasons are short, and the prompt asks the model not to repeat
+  personal details.
+
+### Consequences
+Insights get better with a week of use. The copilot sees when someone is distracted, not what with.
+Groq's terms still apply to whatever is sent, which the onboarding AI step says.
+
+### Alternatives Considered
+Sending per-app usage: more precise advice, but it reveals what someone uses. An on-device language
+model: private, but too large for this milestone. Letting the model decide overrides: it would
+fail closed or fail open, and both are wrong for a reflection.
