@@ -14,6 +14,7 @@ failed=0
 
 check() { if [[ "$3" == *"$2"* ]]; then echo "PASS  $1"; passed=$((passed + 1)); else echo "FAIL  $1: expected '$2' in '$3'"; failed=$((failed + 1)); fi; }
 check_not() { if [[ "$3" != *"$2"* ]]; then echo "PASS  $1"; passed=$((passed + 1)); else echo "FAIL  $1: did not expect '$2' in '$3'"; failed=$((failed + 1)); fi; }
+check_pid() { if [[ "$2" =~ ^[0-9]+$ ]]; then echo "PASS  $1"; passed=$((passed + 1)); else echo "FAIL  $1: expected a process ID, got '$2'"; failed=$((failed + 1)); fi; }
 check_eq() { if [[ "$3" == "$2" ]]; then echo "PASS  $1"; passed=$((passed + 1)); else echo "FAIL  $1: expected exactly '$2', got '$3'"; failed=$((failed + 1)); fi; }
 
 mkdir -p "$CACHE"
@@ -74,11 +75,11 @@ echo "--- process blocking"
 vm "nohup sleep 900 >/dev/null 2>&1 &"
 vm "sudo nohup sleep 901 >/dev/null 2>&1 &"
 sleep 1
-check "control: the user's program is running before the session" "1" "x$(pid_of tester sleep)"
+check_pid "control: the user's program is running before the session" "$(pid_of tester sleep)"
 check "a session starts" "Session started" "$(as_tester organiza start --minutes 10 --block sleep --site reddit.com)"
 sleep 6
 check_eq "the user's blocked program was ended" "" "$(pid_of tester sleep)"
-check "root's process of the same name was left alone" "1" "x$(pid_of root sleep)"
+check_pid "root's process of the same name was left alone" "$(pid_of root sleep)"
 vm "nohup sleep 902 >/dev/null 2>&1 &"
 sleep 4
 check_eq "a blocked program started later is ended too" "" "$(pid_of tester sleep)"
