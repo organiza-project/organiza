@@ -21,11 +21,13 @@ public interface ArenaRelay {
     public fun fetch(mailbox: String, after: Long): List<RelayMessage>
 }
 
-/** Key storage for challenge secrets. Android: sealed by a Keystore key. */
+/** Key storage for challenge secrets and the sync session. Android: sealed by a Keystore key. */
 public interface SecretStore {
     public fun put(name: String, value: ByteArray)
 
     public fun get(name: String): ByteArray?
+
+    public fun remove(name: String)
 }
 
 /** Speaks to `scripts/arena-relay.py` or anything else with the same small protocol. */

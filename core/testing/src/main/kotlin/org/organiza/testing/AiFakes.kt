@@ -20,10 +20,11 @@ public class FakeApiKeyStore : ApiKeyStore {
     }
 }
 
-/** Records every request and repeats the last configured reply or failure. */
+/** Records every request. Queued replies go first, then the last configured reply or failure repeats. */
 public class FakeHttpTransport : HttpTransport {
     public data class Request(val url: String, val headers: Map<String, String>, val body: String)
 
+    private val queued = ArrayDeque<HttpReply>()
     private var reply: HttpReply? = null
     private var failure: IOException? = IOException("no response configured")
     private val recorded = mutableListOf<Request>()
@@ -39,8 +40,14 @@ public class FakeHttpTransport : HttpTransport {
         failure = error
     }
 
+    /** Answers the next request with this, once, before the repeating reply. */
+    public fun queue(status: Int, body: String) {
+        queued.addLast(HttpReply(status, body))
+    }
+
     override fun post(url: String, headers: Map<String, String>, body: ByteArray): HttpReply {
         recorded += Request(url, headers, String(body, Charsets.ISO_8859_1))
+        queued.removeFirstOrNull()?.let { return it }
         failure?.let { throw it }
         return checkNotNull(reply)
     }

@@ -10,6 +10,11 @@ compose-bom = "2026.03.00"
 sqlite-jdbc-crypt = "3.53.4.0"
 activity-compose = "1.12.4"
 androidx-sqlite = "2.7.0"
+embedded-postgres = "2.1.0"
+androidx-test-runner = "1.7.0"
+androidx-test-junit = "1.3.0"
+espresso = "3.7.0"
+postgresql = "42.7.7"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test-junit5", version.ref = "kotlin" }
@@ -24,7 +29,14 @@ compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-
 compose-foundation = { module = "androidx.compose.foundation:foundation" }
 compose-ui = { module = "androidx.compose.ui:ui" }
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
+espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
+androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-junit" }
 activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
+embedded-postgres = { module = "io.zonky.test:embedded-postgres", version.ref = "embedded-postgres" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
 sqlite-jdbc-crypt = { module = "io.github.willena:sqlite-jdbc", version.ref = "sqlite-jdbc-crypt" }
 
 [plugins]

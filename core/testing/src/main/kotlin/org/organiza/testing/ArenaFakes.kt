@@ -16,6 +16,10 @@ public class FakeSecretStore : SecretStore {
 
     override fun get(name: String): ByteArray? = stored[name]
 
+    override fun remove(name: String) {
+        stored.remove(name)
+    }
+
     public fun clear() {
         stored.clear()
     }
