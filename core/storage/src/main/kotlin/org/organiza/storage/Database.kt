@@ -5,6 +5,8 @@ public interface Row {
     public fun string(column: Int): String?
 
     public fun long(column: Int): Long?
+
+    public fun blob(column: Int): ByteArray?
 }
 
 /** The SQL engine. Implementations must have foreign keys enabled (ADR-0008). */

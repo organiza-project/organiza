@@ -63,6 +63,15 @@ class MigrationsTest {
     }
 
     @Test
+    fun `received peer results hold only what the wire format allows`() {
+        Migrations.migrate(db)
+        assertEquals(
+            setOf("challenge_id", "member_id", "local_date", "outcome", "streak", "commitment", "previous_commitment", "signature"),
+            db.query("SELECT name FROM pragma_table_info('arena_entry')") { it.string(0) }.toSet(),
+        )
+    }
+
+    @Test
     fun `tamper events hold only capability and time`() {
         Migrations.migrate(db)
         assertEquals(

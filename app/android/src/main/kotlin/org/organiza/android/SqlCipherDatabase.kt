@@ -34,6 +34,8 @@ class SqlCipherDatabase private constructor(private val db: SQLiteDatabase) : Da
         override fun string(column: Int): String? = if (cursor.isNull(column)) null else cursor.getString(column)
 
         override fun long(column: Int): Long? = if (cursor.isNull(column)) null else cursor.getLong(column)
+
+        override fun blob(column: Int): ByteArray? = if (cursor.isNull(column)) null else cursor.getBlob(column)
     }
 
     companion object {

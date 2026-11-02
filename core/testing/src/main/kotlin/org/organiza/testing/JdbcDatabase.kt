@@ -61,5 +61,7 @@ public class JdbcDatabase : Database, AutoCloseable {
         override fun string(column: Int): String? = rows.getString(column + 1)
 
         override fun long(column: Int): Long? = rows.getLong(column + 1).takeUnless { rows.wasNull() }
+
+        override fun blob(column: Int): ByteArray? = rows.getBytes(column + 1)
     }
 }

@@ -5,6 +5,15 @@ import java.time.LocalDate
 
 public data class StoredHabit(val id: String, val name: String)
 
+public enum class HabitKind(internal val column: String) {
+    MANUAL("manual"),
+    SCREEN_TIME_UNDER("screen_time_under"),
+    ZERO_LAUNCHES("zero_launches"),
+}
+
+/** How a habit is judged. [target] is a package name, and [limitMillis] a daily limit. */
+public data class HabitCriterion(val kind: HabitKind, val target: String?, val limitMillis: Long?)
+
 public class HabitStore(private val db: Database) {
     public fun add(id: String, name: String, at: Instant) {
         db.execute(
@@ -12,6 +21,19 @@ public class HabitStore(private val db: Database) {
             listOf(id, name, at.toEpochMilli()),
         )
     }
+
+    public fun add(id: String, name: String, criterion: HabitCriterion, at: Instant) {
+        db.execute(
+            "INSERT INTO habit (id, name, criterion_kind, criterion_target, criterion_limit_ms, created_at_ms) " +
+                "VALUES (?, ?, ?, ?, ?, ?)",
+            listOf(id, name, criterion.kind.column, criterion.target, criterion.limitMillis, at.toEpochMilli()),
+        )
+    }
+
+    public fun criterion(id: String): HabitCriterion? =
+        db.query("SELECT criterion_kind, criterion_target, criterion_limit_ms FROM habit WHERE id = ?", listOf(id)) { row ->
+            HabitCriterion(HabitKind.entries.first { it.column == row.string(0) }, row.string(1), row.long(2))
+        }.firstOrNull()
 
     public fun active(): List<StoredHabit> =
         db.query("SELECT id, name FROM habit WHERE archived_at_ms IS NULL ORDER BY name COLLATE NOCASE") { row ->

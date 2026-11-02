@@ -3,7 +3,7 @@
 The source of truth is the scripts in
 [`schema/`](../core/storage/src/main/resources/org/organiza/storage/schema/), applied in
 order by `Migrations` and tested by `SchemaV1Test` and `MigrationsTest`. The current
-version is 2. Decisions are in ADR-0004, ADR-0006 and ADR-0008.
+version is 3. Decisions are in ADR-0004, ADR-0006, ADR-0008 and ADR-0011.
 
 | Table | Purpose | Notes |
 |-------|---------|-------|
@@ -14,6 +14,9 @@ version is 2. Decisions are in ADR-0004, ADR-0006 and ADR-0008.
 | `habit_log` | One result per habit per local day | Holds the result only, never the underlying usage |
 | `challenge` | A peer challenge over a habit | A habit in a challenge cannot be deleted |
 | `challenge_log` | One daily commitment, and the only table that feeds sync | Columns are pinned by an allow-list test |
+| `arena_member` | Other people in a challenge | A public key and a chosen display name |
+| `arena_entry` | Results received from other people | Columns are pinned by a test and carry no usage data |
+| `arena_reveal` | A member's revealed salts | Stored as the signed message they sent |
 | `tamper_event` | A capability lost during a session | Capability and time only; columns are pinned by a test |
 
 ## Conventions
