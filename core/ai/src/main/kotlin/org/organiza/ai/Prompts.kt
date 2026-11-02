@@ -1,6 +1,7 @@
 package org.organiza.ai
 
 import java.time.DayOfWeek
+import org.organiza.domain.OverrideReason
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -27,7 +28,23 @@ public data class WeeklyFacts(
 /** A time already taken. [tag] is raw here and is sanitized before it is sent. */
 public data class BusyBlock(val day: DayOfWeek, val startMinute: Int, val minutes: Int, val tag: String?)
 
-public data class GatekeeperFacts(val minutesLeft: Long, val request: SanitizedText)
+/** An override in a strict session (ADR-0017). [note] is the person's own words, sanitized. */
+public data class ReflectionFacts(
+    val minutesLeft: Long,
+    val overridesToday: Int,
+    val reason: OverrideReason,
+    val note: SanitizedText,
+)
+
+/** Counts only: blocked attempts and overrides per local hour, never app or site names (ADR-0017). */
+public data class CopilotFacts(
+    val days: Int,
+    val attemptsByHour: List<Int>,
+    val overridesByHour: List<Int>,
+    val focusMinutes: Long,
+    val habits: List<HabitFacts>,
+    val busy: List<BusyBlock>,
+)
 
 public object Prompts {
     private const val DATA_ONLY =
@@ -92,14 +109,53 @@ public object Prompts {
         maxTokens = SHORT_REPLY_TOKENS,
     )
 
-    public fun gatekeeper(facts: GatekeeperFacts): Prompt = Prompt(
-        system = "You guard a focus session the person chose in advance. They are asking to leave it early. " +
-            "Grant only for a genuine, specific and urgent need, and deny boredom, habit or vague reasons. " + DATA_ONLY +
-            """Reply only with JSON: {"decision": "grant" or "deny", "reason": string}.""",
+    public fun overrideReflection(facts: ReflectionFacts): Prompt = Prompt(
+        system = "The person chose a focus session in advance and is now opening a blocked app anyway. They have " +
+            "already waited and stated a reason. Write two or three calm, neutral sentences that help them check " +
+            "whether this is a real need, without judging, refusing or giving permission. Do not repeat names or " +
+            "other personal details. " + DATA_ONLY +
+            """Reply only with JSON: {"reflection": string}.""",
         user = buildJsonObject {
             put("minutesLeft", facts.minutesLeft)
-            put("request", facts.request.value)
+            put("overridesToday", facts.overridesToday)
+            put("reason", facts.reason.name)
+            put("note", facts.note.value)
         }.toString(),
         maxTokens = SHORT_REPLY_TOKENS,
+    )
+
+    public fun copilot(facts: CopilotFacts, sanitizer: Sanitizer): Prompt = Prompt(
+        system = "You are a focus copilot. From counts of blocked attempts and overrides per local hour, focus time, " +
+            "habit completion and calendar commitments, propose focus blocks for the coming week, warn about the " +
+            "hours where focus breaks most, and suggest small habit adjustments. " + DATA_ONLY +
+            """Reply only with JSON: {"focusBlocks": [{"day": "MONDAY", "start": "HH:mm", "minutes": number, """ +
+            """"label": string}], "warnings": [string], "habitTips": [string]}. Never overlap a busy block. """ +
+            "Give at most 5 blocks, 3 warnings and 3 tips.",
+        user = buildJsonObject {
+            put("days", facts.days)
+            putJsonArray("attemptsByHour") { facts.attemptsByHour.forEach { add(it) } }
+            putJsonArray("overridesByHour") { facts.overridesByHour.forEach { add(it) } }
+            put("focusMinutes", facts.focusMinutes)
+            putJsonArray("habits") {
+                facts.habits.forEach { habit ->
+                    addJsonObject {
+                        put("name", habit.name.value)
+                        put("daysMet", habit.daysMet)
+                        put("daysTotal", habit.daysTotal)
+                    }
+                }
+            }
+            putJsonArray("busy") {
+                facts.busy.forEach { block ->
+                    addJsonObject {
+                        put("day", block.day.name)
+                        put("startMinute", block.startMinute)
+                        put("minutes", block.minutes)
+                        put("tag", block.tag?.let { sanitizer.clean(it).value })
+                    }
+                }
+            }
+        }.toString(),
+        maxTokens = LONG_REPLY_TOKENS,
     )
 }

@@ -25,8 +25,11 @@ def content_for(body):
     if "fixed grammar" in system:
         hallucinated = "Thank you" in body["messages"][1]["content"]
         return {"command": None if hallucinated else "mark stretch as done"}
-    if "guard a focus session" in system:
-        return {"decision": "grant", "reason": "Test reply"}
+    if "focus copilot" in system:
+        return {"focusBlocks": [{"day": "MONDAY", "start": "21:00", "minutes": 45, "label": "Test"}],
+                "warnings": ["Test warning"], "habitTips": []}
+    if "opening a blocked app anyway" in system:
+        return {"reflection": "Test reflection"}
     if "plan focus blocks" in system:
         return {"blocks": [{"day": "MONDAY", "start": "09:30", "minutes": 60, "label": "Test"}], "note": ""}
     return {"summary": "Test summary", "suggestions": ["Test suggestion"]}

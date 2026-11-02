@@ -17,6 +17,7 @@ import org.organiza.ai.HabitFacts
 import org.organiza.ai.Sanitizer
 import org.organiza.ai.UrlConnectionTransport
 import org.organiza.ai.WeeklyFacts
+import org.organiza.domain.OverrideReason
 import org.organiza.domain.Parsed
 import org.organiza.testing.FakeApiKeyStore
 
@@ -51,10 +52,10 @@ class RealGroqTest {
     }
 
     @Test
-    fun `gatekeeper denies boredom on the real model`() {
-        val decision = coach.gatekeeper(30, "I am bored and want to scroll for a while")
-        assertEquals(null, decision.failure)
-        assertFalse(decision.granted, "${decision.reason}")
+    fun `an override reflection comes back from the real model`() {
+        val result = coach.reflect(30, 2, OverrideReason.BOREDOM, "I am bored and want to scroll for a while")
+        assertTrue(result is AiResult.Ok, "$result")
+        assertTrue(result.value.isNotBlank())
     }
 
     @Test

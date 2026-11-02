@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
+import org.organiza.domain.OverrideReason
 
 public data class WeeklyReview(val summary: String, val suggestions: List<String>)
 
@@ -14,8 +15,7 @@ public data class SuggestedBlock(val day: DayOfWeek, val startMinute: Int, val m
 
 public data class ScheduleSuggestion(val blocks: List<SuggestedBlock>, val note: String)
 
-/** [granted] is true only for an explicit grant. Every failure is a denial (ADR-0009). */
-public data class GatekeeperDecision(val granted: Boolean, val reason: String?, val failure: AiFailure?)
+public data class CopilotAdvice(val focusBlocks: List<SuggestedBlock>, val warnings: List<String>, val habitTips: List<String>)
 
 /** Runs each AI feature. Replies are untrusted and must parse into a strict shape. */
 public class AiCoach(
@@ -29,13 +29,13 @@ public class AiCoach(
     public fun suggestSchedule(goal: String, busy: List<BusyBlock>): AiResult<ScheduleSuggestion> =
         ask(Prompts.scheduleOptimization(sanitizer.clean(goal), busy, sanitizer), ::parseSchedule)
 
-    public fun gatekeeper(minutesLeft: Long, request: String): GatekeeperDecision {
-        val prompt = Prompts.gatekeeper(GatekeeperFacts(minutesLeft, sanitizer.clean(request)))
-        return when (val result = ask(prompt, ::parseDecision)) {
-            is AiResult.Ok -> result.value
-            is AiResult.Failed -> GatekeeperDecision(granted = false, reason = null, failure = result.failure)
+    /** A reflection on an override. It never decides anything: the caller continues either way (ADR-0017). */
+    public fun reflect(minutesLeft: Long, overridesToday: Int, reason: OverrideReason, note: String): AiResult<String> =
+        ask(Prompts.overrideReflection(ReflectionFacts(minutesLeft, overridesToday, reason, sanitizer.clean(note)))) {
+            it["reflection"].text()
         }
-    }
+
+    public fun copilot(facts: CopilotFacts): AiResult<CopilotAdvice> = ask(Prompts.copilot(facts, sanitizer), ::parseAdvice)
 
     private fun <T : Any> ask(prompt: Prompt, parse: (JsonObject) -> T?): AiResult<T> {
         val key = keys.load() ?: return AiResult.Failed(AiFailure.NO_KEY)
@@ -69,10 +69,15 @@ public class AiCoach(
         return SuggestedBlock(day, start.groupValues[1].toInt() * 60 + start.groupValues[2].toInt(), minutes, label)
     }
 
-    private fun parseDecision(reply: JsonObject): GatekeeperDecision? {
-        val decision = reply["decision"].text() ?: return null
-        return GatekeeperDecision(granted = decision == "grant", reason = reply["reason"].text(), failure = null)
+    private fun parseAdvice(reply: JsonObject): CopilotAdvice? {
+        val blocks = (reply["focusBlocks"] as? JsonArray)?.take(MAX_ADVICE_BLOCKS)?.map { element ->
+            parseBlock(element as? JsonObject ?: return null) ?: return null
+        } ?: return null
+        return CopilotAdvice(blocks, texts(reply["warnings"]) ?: return null, texts(reply["habitTips"]) ?: return null)
     }
+
+    private fun texts(element: JsonElement?): List<String>? =
+        (element as? JsonArray)?.take(MAX_ADVICE_TEXTS)?.map { it.text() ?: return null }
 
     private fun JsonElement?.text(): String? =
         (this as? JsonPrimitive)?.takeIf { it.isString }?.content?.take(MAX_REPLY_TEXT)
@@ -80,6 +85,8 @@ public class AiCoach(
     public companion object {
         public const val MAX_REPLY_TEXT: Int = 1000
         private const val MAX_ITEMS = 50
+        private const val MAX_ADVICE_BLOCKS = 5
+        private const val MAX_ADVICE_TEXTS = 3
         private const val MAX_BLOCK_MINUTES = 720
         private val TIME = Regex("""([01]\d|2[0-3]):([0-5]\d)""")
     }

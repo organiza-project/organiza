@@ -6,6 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.organiza.domain.InvalidReason
+import org.organiza.domain.OverrideReason
 import org.organiza.domain.Parsed
 import org.organiza.testing.FakeApiKeyStore
 import org.organiza.testing.FakeHttpTransport
@@ -15,7 +16,7 @@ class GroqClientTest {
     private val key = (ApiKey.parse("gsk_test_key_value") as Parsed.Valid).value
     private val transport = FakeHttpTransport()
     private val client = GroqClient(transport, GroqEndpoint.PRODUCTION)
-    private val prompt = Prompts.gatekeeper(GatekeeperFacts(30, sanitizer.clean("I need my bank app")))
+    private val prompt = Prompts.overrideReflection(ReflectionFacts(30, 0, OverrideReason.WORK, sanitizer.clean("I need my bank app")))
 
     private fun reply(content: String) =
         """{"choices":[{"message":{"role":"assistant","content":${"\"" + content.replace("\"", "\\\"") + "\""}}}]}"""
