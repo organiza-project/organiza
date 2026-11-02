@@ -5,6 +5,7 @@ junit = "5.13.4"
 sqlite-jdbc = "3.54.1.0"
 sqlcipher = "4.20.0"
 kotlinx-serialization = "1.9.0"
+bouncycastle = "1.86"
 androidx-sqlite = "2.7.0"
 
 [libraries]
@@ -15,6 +16,7 @@ sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
 sqlcipher = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher" }
 androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "androidx-sqlite" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
