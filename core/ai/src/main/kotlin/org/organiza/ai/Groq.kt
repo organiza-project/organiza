@@ -3,7 +3,7 @@ package org.organiza.ai
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
-import java.net.URL
+import java.net.URI
 import java.util.UUID
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -60,7 +60,7 @@ public fun HttpTransport.post(url: String, headers: Map<String, String>, body: S
 
 public class UrlConnectionTransport : HttpTransport {
     override fun post(url: String, headers: Map<String, String>, body: ByteArray): HttpReply {
-        val connection = URL(url).openConnection() as HttpURLConnection
+        val connection = URI.create(url).toURL().openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "POST"
             connection.doOutput = true
