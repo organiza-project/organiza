@@ -22,4 +22,12 @@ class BlockListTest {
     fun `empty list blocks nothing`() {
         assertEquals(false, BlockList.EMPTY.blocks(pkg("com.instagram.android")))
     }
+
+    @Test
+    fun `blocks listed processes`() {
+        val steam = (org.organiza.domain.ProcessName.parse("steam") as org.organiza.domain.Parsed.Valid).value
+        val withProcess = list.copy(processes = setOf(steam))
+        assertEquals(true, withProcess.blocks(steam))
+        assertEquals(false, list.blocks(steam))
+    }
 }

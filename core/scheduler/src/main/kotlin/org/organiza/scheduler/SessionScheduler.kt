@@ -7,6 +7,7 @@ import java.util.UUID
 import org.organiza.calendar.Occurrence
 import org.organiza.domain.DomainName
 import org.organiza.domain.PackageName
+import org.organiza.domain.ProcessName
 import org.organiza.domain.port.Clock
 import org.organiza.enforcement.BlockList
 import org.organiza.enforcement.SessionPolicy
@@ -36,6 +37,7 @@ public data class ManualRequest(
     val domains: Set<DomainName>,
     val strict: Boolean = false,
     val blockShortForm: Boolean = false,
+    val processes: Set<ProcessName> = emptySet(),
 )
 
 public enum class StartResult { Started, InvalidDuration }
@@ -128,6 +130,7 @@ public class SessionScheduler(
             enabled = true,
             packages = request.packages,
             domains = request.domains,
+            processes = request.processes,
         )
         db.transaction {
             rules.save(rule, now)
@@ -190,7 +193,11 @@ public class SessionScheduler(
         val inForce = active.mapNotNull { session -> session.ruleId?.let(rules::find) }
         if (inForce.isEmpty()) return SessionPolicy.IDLE
         return SessionPolicy(
-            BlockList(inForce.flatMap { it.packages }.toSet(), inForce.flatMap { it.domains }.toSet()),
+            BlockList(
+                inForce.flatMap { it.packages }.toSet(),
+                inForce.flatMap { it.domains }.toSet(),
+                inForce.flatMap { it.processes }.toSet(),
+            ),
             strict = inForce.any { it.strict },
             blockShortForm = inForce.any { it.blockShortForm },
         )

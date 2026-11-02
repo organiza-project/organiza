@@ -35,7 +35,8 @@ public fun interface UsageHistory {
     public fun foregroundTime(app: PackageName, from: Instant, to: Instant): Duration
 }
 
-public enum class Capability { ACCESSIBILITY, OVERLAY, VPN, DEVICE_ADMIN, USAGE_STATS }
+/** DAEMON is the Linux enforcement service itself (ADR-0013). */
+public enum class Capability { ACCESSIBILITY, OVERLAY, VPN, DEVICE_ADMIN, USAGE_STATS, DAEMON }
 
 /** Which enforcement layers the OS currently grants. Losing one is a tamper signal. */
 public fun interface EnforcementCapabilities {

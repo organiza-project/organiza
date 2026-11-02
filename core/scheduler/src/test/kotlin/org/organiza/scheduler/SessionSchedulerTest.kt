@@ -294,4 +294,11 @@ class SessionSchedulerTest {
         scheduler.endAllForTesting()
         assertEquals(SessionPolicy.IDLE, scheduler.reconcile().policy)
     }
+
+    @Test
+    fun `manual sessions can block processes`() {
+        val steam = (org.organiza.domain.ProcessName.parse("steam") as Parsed.Valid).value
+        scheduler.startManual(ManualRequest(emptySet(), emptySet(), processes = setOf(steam)), Duration.ofMinutes(30))
+        assertEquals(setOf(steam), scheduler.reconcile().policy.blockList.processes)
+    }
 }

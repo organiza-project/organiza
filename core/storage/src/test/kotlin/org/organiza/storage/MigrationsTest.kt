@@ -47,6 +47,20 @@ class MigrationsTest {
     }
 
     @Test
+    fun `version 3 targets and tamper events survive the upgrade to version 4`() {
+        Migrations.migrate(db, target = 3)
+        db.execute("INSERT INTO rule (id, name, created_at_ms, updated_at_ms) VALUES ('r', 'Focus', 0, 0)")
+        db.execute("INSERT INTO rule_target (rule_id, kind, value) VALUES ('r', 'domain', 'reddit.com')")
+        db.execute("INSERT INTO tamper_event (capability, at_ms) VALUES ('VPN', 5)")
+        Migrations.migrate(db)
+        assertEquals(listOf("domain|reddit.com"), db.query("SELECT kind, value FROM rule_target") { "${it.string(0)}|${it.string(1)}" })
+        assertEquals(listOf("VPN|5"), db.query("SELECT capability, at_ms FROM tamper_event") { "${it.string(0)}|${it.long(1)}" })
+        db.execute("INSERT INTO rule_target (rule_id, kind, value) VALUES ('r', 'process', 'firefox')")
+        db.execute("DELETE FROM rule WHERE id = 'r'")
+        assertEquals(listOf(0L), db.query("SELECT count(*) FROM rule_target") { it.long(0) })
+    }
+
+    @Test
     fun `a database from a newer app is refused untouched`() {
         db.execute("PRAGMA user_version = 99")
         assertEquals(MigrationResult.TooNew(99), Migrations.migrate(db))

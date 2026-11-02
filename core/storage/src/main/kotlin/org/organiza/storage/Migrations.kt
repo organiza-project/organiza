@@ -10,7 +10,7 @@ public sealed interface MigrationResult {
 }
 
 public object Migrations {
-    public const val LATEST: Int = 3
+    public const val LATEST: Int = 4
 
     public fun migrate(db: Database, target: Int = LATEST): MigrationResult {
         val current = db.query("PRAGMA user_version") { it.long(0) }.single()?.toInt() ?: 0

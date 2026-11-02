@@ -42,6 +42,7 @@ Options rejected and why.
 | 0010 | Voice commands through Groq Whisper | Accepted | 2026-11-01 |
 | 0011 | Arena challenges, encrypted sync and a blind relay | Accepted | 2026-11-02 |
 | 0012 | Compose UI on tested screen models, achromatic ledger style | Accepted | 2026-11-02 |
+| 0013 | Linux daemon on the shared Kotlin core; native core deferred | Accepted | 2026-11-02 |
 
 ---
 
@@ -522,3 +523,54 @@ inspector cannot measure a native screen. Screen-reader labels and touch targets
 ### Alternatives Considered
 Material 3: fast, but its defaults are the stock look. Keeping Android Views: no tooling gain, and
 more code for the same screens.
+
+---
+
+## ADR-0013: Linux daemon on the shared Kotlin core; native core deferred
+
+- **Status:** Accepted
+- **Date:** 2026-11-02
+- **Deciders:** jackforce
+
+### Context
+Phase 6 planned to extract the core into Rust and port to Linux, Windows and iOS. ADR-0002 asked for
+Rust to be weighed against Kotlin Multiplatform first. The build machine has no macOS, so iOS cannot be
+built or tested, and no Windows toolchain, so the Windows Filtering Platform driver cannot either. The
+core is plain Kotlin on the JVM, covered by more than 300 tests.
+
+### Decision
+- **Linux first, on the JVM.** `:platform:linux` reuses the core modules as they are, so no logic is
+  rewritten and every existing test still applies.
+- **Choosing a native core is deferred** until iOS work starts. iOS cannot run a JVM, so that is
+  when Rust and Kotlin Multiplatform should be compared in a new ADR, against a real iOS constraint.
+  The Windows port waits for a Windows build machine.
+- **A root daemon and a user CLI.** A systemd service runs the scheduler and enforcement as root. The
+  `organiza` command talks to it over a Unix socket at `/run/organiza/control.sock`, which is open to
+  members of the `organiza` group only. The daemon refuses to stop a strict session, as on Android.
+- **Process blocking.** The daemon scans `/proc` every second and ends a blocked process: SIGTERM, then
+  SIGKILL. A target matches the executable's name, `argv[0]`, the 15-character `comm` or a Flatpak app
+  ID. **Lockout protection:** it never touches root or system processes, its own process, shells,
+  `sudo`, `sshd`, login and display servers, or desktop shells.
+- **Website blocking** writes a marked block into `/etc/hosts`, resolving blocked domains and their
+  `www.` and `m.` forms to 0.0.0.0. The block is removed when nothing is blocked, and nothing outside it
+  is ever changed. Hosts files cannot use wildcards, and browsers using DNS-over-HTTPS skip them. These
+  are the same limits as ADR-0005, and they are stated in the CLI's help.
+- **Encrypted storage.** The SQLite database uses SQLCipher format through `sqlite-jdbc` from
+  `io.github.willena`. Its key is a systemd credential, sealed by `systemd-creds` with the host key and
+  the TPM when there is one, and the daemon reads it from `$CREDENTIALS_DIRECTORY`. This protects
+  copies and backups of the database. It does not protect against root on the running machine, which
+  has the host key.
+- **Tamper evidence.** systemd restarts the daemon if it crashes or is killed. Anyone with `sudo` can
+  still stop it. A heartbeat file shows a gap during an active session, and the next start records it
+  as a `DAEMON` tamper event.
+- Schema v4 adds `process` rule targets and the `DAEMON` capability.
+
+### Consequences
+Linux gets real enforcement without a second copy of the logic. Window titles and browser URLs are not
+read on Linux, so in-browser blocking depends on the hosts file alone. Both platforms share the
+database layout, which a future sync or export can rely on.
+
+### Alternatives Considered
+Rust core now: a rewrite of tested logic, with no platform that needs it yet. Kotlin Multiplatform now:
+JVM-only libraries (BouncyCastle, JDBC, java.time) would need replacing before any Linux work.
+An nftables DNS filter: stronger than a hosts file, but much more invasive to a desktop's network.

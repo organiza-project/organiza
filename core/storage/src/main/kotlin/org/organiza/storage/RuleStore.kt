@@ -4,6 +4,7 @@ import java.time.Instant
 import org.organiza.domain.DomainName
 import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
+import org.organiza.domain.ProcessName
 
 public data class StoredRule(
     val id: String,
@@ -14,6 +15,7 @@ public data class StoredRule(
     val enabled: Boolean,
     val packages: Set<PackageName>,
     val domains: Set<DomainName>,
+    val processes: Set<ProcessName> = emptySet(),
 )
 
 public class RuleStore(private val db: Database) {
@@ -39,6 +41,7 @@ public class RuleStore(private val db: Database) {
             db.execute("DELETE FROM rule_target WHERE rule_id = ?", listOf(rule.id))
             rule.packages.forEach { insertTarget(rule.id, KIND_PACKAGE, it.value) }
             rule.domains.forEach { insertTarget(rule.id, KIND_DOMAIN, it.value) }
+            rule.processes.forEach { insertTarget(rule.id, KIND_PROCESS, it.value) }
         }
     }
 
@@ -73,6 +76,7 @@ public class RuleStore(private val db: Database) {
             rule.copy(
                 packages = targets(rule.id, KIND_PACKAGE, PackageName::parse),
                 domains = targets(rule.id, KIND_DOMAIN, DomainName::parse),
+                processes = targets(rule.id, KIND_PROCESS, ProcessName::parse),
             )
         }
 
@@ -87,5 +91,6 @@ public class RuleStore(private val db: Database) {
     private companion object {
         const val KIND_PACKAGE = "package"
         const val KIND_DOMAIN = "domain"
+        const val KIND_PROCESS = "process"
     }
 }

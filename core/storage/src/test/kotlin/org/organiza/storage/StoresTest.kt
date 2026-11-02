@@ -119,4 +119,18 @@ class StoresTest {
             tamper.all(),
         )
     }
+
+    @Test
+    fun `process targets round trip`() {
+        val firefox = (org.organiza.domain.ProcessName.parse("firefox") as Parsed.Valid).value
+        val withProcess = rule.copy(processes = setOf(firefox))
+        rules.save(withProcess, at)
+        assertEquals(withProcess, rules.find("r1"))
+    }
+
+    @Test
+    fun `daemon tamper events can be stored`() {
+        tamper.record(null, Capability.DAEMON, at)
+        assertEquals(Capability.DAEMON, tamper.all().single().capability)
+    }
 }

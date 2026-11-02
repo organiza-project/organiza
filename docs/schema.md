@@ -3,12 +3,12 @@
 The source of truth is the scripts in
 [`schema/`](../core/storage/src/main/resources/org/organiza/storage/schema/), applied in
 order by `Migrations` and tested by `SchemaV1Test` and `MigrationsTest`. The current
-version is 3. Decisions are in ADR-0004, ADR-0006, ADR-0008 and ADR-0011.
+version is 4. Decisions are in ADR-0004, ADR-0006, ADR-0008, ADR-0011 and ADR-0013.
 
 | Table | Purpose | Notes |
 |-------|---------|-------|
 | `rule` | A named set of blocks, optionally bound to a calendar tag | `calendar_tag` is `#focus`, `#deepwork` and so on |
-| `rule_target` | What a rule blocks | `package` or `domain`; full URLs are not stored |
+| `rule_target` | What a rule blocks | `package`, `domain` or, on Linux, `process`; full URLs are not stored |
 | `session` | A planned or running block period | History survives rule deletion; calendar occurrences are unique per UID and start |
 | `habit` | A daily criterion | `manual`, `screen_time_under` or `zero_launches` |
 | `habit_log` | One result per habit per local day | Holds the result only, never the underlying usage |
