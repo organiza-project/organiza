@@ -1,4 +1,4 @@
-package org.organiza.android
+package org.organiza.android.feature.voice
 
 import android.annotation.SuppressLint
 import android.media.AudioFormat

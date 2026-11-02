@@ -7,8 +7,8 @@ set -u
 ADB="${ANDROID_HOME:-$HOME/Android/Sdk}/platform-tools/adb"
 APP=org.organiza.app
 RECEIVER="$APP/org.organiza.android.DebugSessionReceiver"
-SERVICE="$APP/org.organiza.android.OrganizaAccessibilityService"
-ADMIN="$APP/org.organiza.android.OrganizaDeviceAdminReceiver"
+SERVICE="$APP/org.organiza.android.feature.blocker.OrganizaAccessibilityService"
+ADMIN="$APP/org.organiza.android.feature.blocker.OrganizaDeviceAdminReceiver"
 APK=app/android/build/outputs/apk/debug/android-debug.apk
 passed=0
 failed=0
@@ -76,6 +76,7 @@ shell settings put secure enabled_accessibility_services "$SERVICE" >/dev/null
 shell settings put secure accessibility_enabled 1 >/dev/null
 shell appops set "$APP" ACTIVATE_VPN allow >/dev/null
 shell dpm set-active-admin "$ADMIN" >/dev/null
+shell am broadcast -n "$RECEIVER" --es command onboarded >/dev/null
 shell am start -W -n "$APP/org.organiza.android.MainActivity" >/dev/null
 # A fresh install can race the accessibility manager, which then drops the binding.
 # Wait until the service is really bound and stays bound.
@@ -100,14 +101,30 @@ open_settings
 check "idle session blocks nothing" "settings" "$(top_app)"
 shell input keyevent KEYCODE_HOME >/dev/null; sleep 1
 
-echo "--- app blocking"
+overlays() { shell dumpsys window windows | grep -c 'package=org.organiza.app appop=CREATE_ACCESSIBILITY_OVERLAY'; }
+
+echo "--- app blocking and the intervention"
 session start --es packages com.android.settings
 open_settings
 top=$(top_app)
 check_not "blocked app is sent home" "com.android.settings" "$top"
-windows=$(shell dumpsys window windows | grep -c 'package=org.organiza.app appop=CREATE_ACCESSIBILITY_OVERLAY')
-check_eq "overlay is gone once home" "0" "$windows"
+check_eq "the intervention stays up on the home screen" "1" "$(overlays)"
+shell input keyevent KEYCODE_BACK >/dev/null; sleep 1
+check_eq "back does not close the intervention" "1" "$(overlays)"
+session stay
+check_eq "staying focused closes it" "0" "$(overlays)"
+check "the choice is logged" "choices=[stayed]" "$(debug_state)"
+
+echo "--- override passes"
+session pass --es packages com.android.settings --el seconds 20
+open_settings
+check "a passed app opens" "settings" "$(top_app)"
+check_eq "and shows no intervention" "0" "$(overlays)"
+shell input keyevent KEYCODE_HOME >/dev/null; sleep 20
+open_settings
+check_not "it is blocked again once the pass ends" "com.android.settings" "$(top_app)"
 session stop
+check_eq "ending the session closes the intervention" "0" "$(overlays)"
 open_settings
 check "stopping the session unblocks" "settings" "$(top_app)"
 shell input keyevent KEYCODE_HOME >/dev/null; sleep 1
@@ -136,6 +153,8 @@ blocked=$(shell ping -c 1 -W 3 old.reddit.com)
 check "blocked subdomain does not resolve" "unknown host" "$blocked"
 allowed=$(shell ping -c 1 -W 5 example.com)
 check_not "allowed domain still resolves" "unknown host" "$allowed"
+session pass --es domains reddit.com --el seconds 30
+check_not "a site pass lifts it in the dns filter" "unknown host" "$(shell ping -c 1 -W 5 new.reddit.com)"
 session stop
 state=$(debug_state)
 check_not "vpn stops with the session" "VPN" "$state"
@@ -271,20 +290,19 @@ broadcast aischedule --es base64 "$(b64 "$leaky")"; sleep 3
 check "schedule suggestions are shown, not applied" "Suggested (not applied)" "$(debug_state)"
 check "the key is sent as a bearer token" "Bearer $test_key" "$(sent)"
 check_not "the model is not retired" "llama" "$(sent)"
+broadcast aicopilot; sleep 3
+check "the copilot reads the model reply" "copilot=true" "$(debug_state)"
+check "the copilot sends counts by hour" "attemptsByHour" "$(sent | grep '^BODY' | tail -1)"
 for secret in Sarah Connor jane clinic 415-555 x.example instagram secretsite "$test_key\"model"; do
   check_not "request bodies do not contain $secret" "$secret" "$(sent | grep '^BODY')"
 done
 check "control: the request log holds bodies" "focusMinutes" "$(sent | grep '^BODY')"
-broadcast aigate --es base64 "$(b64 "$leaky")"; sleep 3
-state=$(debug_state)
-check "a grant is reported" "granted=true" "$state"
-check "a grant does not end the session" "active=true" "$state"
 echo garbage > "$FAKE_DIR/mode"
-broadcast aigate --es base64 "$(b64 'please')"; sleep 3
-check "a malformed reply is a denial" "granted=false" "$(debug_state)"
+broadcast aicopilot; sleep 3
+check "a malformed copilot reply is reported" "Copilot failed: MALFORMED" "$(debug_state)"
 echo error > "$FAKE_DIR/mode"
-broadcast aigate --es base64 "$(b64 'please')"; sleep 3
-check "a server error is a denial" "failure=SERVER" "$(debug_state)"
+broadcast aicopilot; sleep 3
+check "a server error is reported" "Copilot failed: SERVER" "$(debug_state)"
 echo "--- voice commands"
 echo grant > "$FAKE_DIR/mode"
 hear() { # transcript
@@ -335,10 +353,8 @@ broadcast voicerecord; sleep 5
 check "the real recorder runs without crashing" "Voice" "$(debug_state)"
 
 kill "$fake_pid" 2>/dev/null; sleep 1
-broadcast aigate --es base64 "$(b64 'please')"; sleep 4
-state=$(debug_state)
-check "being offline is a denial" "granted=false failure" "${state/reason=null /}"
-check "offline is reported" "failure=OFFLINE" "$state"
+broadcast aicopilot; sleep 4
+check "offline is reported" "Copilot failed: OFFLINE" "$(debug_state)"
 session stop
 broadcast aiendpoint --es url http://10.0.2.2:18080
 kill_now; sleep 4

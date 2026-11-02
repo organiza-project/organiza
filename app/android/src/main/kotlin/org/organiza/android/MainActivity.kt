@@ -2,13 +2,12 @@ package org.organiza.android
 
 import android.Manifest
 import android.app.AlertDialog
-import android.app.admin.DevicePolicyManager
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -37,20 +36,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import java.io.IOException
 import java.time.Duration
+import org.organiza.android.feature.arena.ArenaScreen
+import org.organiza.android.feature.focus.FocusScreen
+import org.organiza.android.feature.focus.SessionInput
+import org.organiza.android.feature.habits.HabitsScreen
+import org.organiza.android.feature.onboarding.OnboardingScreen
+import org.organiza.android.feature.onboarding.Permissions
+import org.organiza.android.feature.vault.VaultScreen
+import org.organiza.android.feature.voice.VoiceRecorder
 import org.organiza.android.ui.Actions
-import org.organiza.android.ui.ArenaScreen
 import org.organiza.android.ui.BottomBar
-import org.organiza.android.ui.FocusScreen
-import org.organiza.android.ui.HabitsScreen
 import org.organiza.android.ui.OrganizaTheme
 import org.organiza.android.ui.Space
 import org.organiza.android.ui.Theme
 import org.organiza.android.ui.UiSnapshot
-import org.organiza.android.ui.VaultScreen
 import org.organiza.arena.ChallengeRules
-import org.organiza.presentation.Protection
+import org.organiza.presentation.Permission
 import org.organiza.presentation.ProtectionItem
 import org.organiza.scheduler.ManualRequest
+import org.organiza.sync.BackendKind
 
 class MainActivity : ComponentActivity(), Actions {
     private val app get() = OrganizaApp.from(this)
@@ -78,6 +82,7 @@ class MainActivity : ComponentActivity(), Actions {
     override fun onResume() {
         super.onResume()
         app.requestUiRefresh()
+        if (app.onboarded) app.copilot.runIfDue()
     }
 
     override fun onPause() {
@@ -96,19 +101,39 @@ class MainActivity : ComponentActivity(), Actions {
 
     override fun stopSession() = app.stopSession()
 
-    override fun askGatekeeper(reason: String) = app.askGatekeeper(reason, 30)
+    override fun fix(item: ProtectionItem) = grant(Permissions.forProtection(item.kind))
 
-    override fun fix(item: ProtectionItem) {
-        when (item.kind) {
-            Protection.ACCESSIBILITY -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            Protection.VPN_CONSENT -> VpnService.prepare(this)?.let(vpnConsent::launch)
-            Protection.DEVICE_ADMIN -> startActivity(
-                Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
-                    .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, OrganizaApp.adminComponent(this)),
-            )
-            Protection.USAGE -> startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+    override fun grant(permission: Permission) {
+        if (permission == Permission.VPN) {
+            VpnService.prepare(this)?.let(vpnConsent::launch)
+            return
+        }
+        val intent = Permissions.settingsIntent(this, permission) ?: return
+        try {
+            startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            if (permission == Permission.BATTERY) startActivity(Permissions.batteryFallback) else app.showMessage("This phone has no screen for that")
         }
     }
+
+    override fun finishOnboarding() {
+        app.onboarded = true
+        app.copilot.runIfDue()
+    }
+
+    override fun restartOnboarding() {
+        app.onboarded = false
+    }
+
+    override fun chooseBackend(kind: BackendKind?, url: String, key: String) = app.sync.choose(kind, url, key)
+
+    override fun signIn(email: String, password: String) = app.sync.signIn(email, password)
+
+    override fun signUp(email: String, password: String) = app.sync.signUp(email, password)
+
+    override fun signOut() = app.sync.signOut()
+
+    override fun runCopilot() = app.copilot.run()
 
     override fun addHabit(name: String) = app.addHabit(name)
 
@@ -200,14 +225,15 @@ private fun Root(ui: UiSnapshot, actions: Actions) {
                 .padding(horizontal = Space.margin),
             verticalArrangement = Arrangement.spacedBy(Space.gap),
         ) {
-            when (tab) {
-                0 -> FocusScreen(ui, actions)
-                1 -> HabitsScreen(ui, actions)
-                2 -> ArenaScreen(ui, actions)
+            when {
+                ui.onboarding -> OnboardingScreen(ui, actions)
+                tab == 0 -> FocusScreen(ui, actions)
+                tab == 1 -> HabitsScreen(ui, actions)
+                tab == 2 -> ArenaScreen(ui, actions)
                 else -> VaultScreen(ui, actions)
             }
             Spacer(Modifier.height(8.dp))
         }
-        BottomBar(tab) { tab = it }
+        if (!ui.onboarding) BottomBar(tab) { tab = it }
     }
 }

@@ -26,18 +26,36 @@ import org.organiza.ai.GroqClient
 import org.organiza.ai.GroqEndpoint
 import org.organiza.ai.Sanitizer
 import org.organiza.ai.UrlConnectionTransport
+import org.organiza.android.data.AndroidUsageHistory
+import org.organiza.android.data.DatabaseKey
+import org.organiza.android.data.KeystoreApiKeyStore
+import org.organiza.android.data.KeystoreSecretStore
+import org.organiza.android.data.SqlCipherDatabase
+import org.organiza.android.data.StorageException
+import org.organiza.android.data.StorageFailure
+import org.organiza.android.feature.ai.CopilotController
+import org.organiza.android.feature.blocker.DnsVpnService
+import org.organiza.android.feature.blocker.InterventionHost
+import org.organiza.android.feature.blocker.OrganizaAccessibilityService
+import org.organiza.android.feature.blocker.OrganizaDeviceAdminReceiver
+import org.organiza.android.feature.onboarding.Permissions
+import org.organiza.android.feature.sync.SyncController
 import org.organiza.arena.ArenaEngine
 import org.organiza.arena.ChallengeRules
 import org.organiza.arena.CreateResult
-import org.organiza.arena.HttpArenaRelay
 import org.organiza.arena.JoinResult
 import org.organiza.arena.SyncResult
 import org.organiza.calendar.IcsCalendar
+import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
+import org.organiza.domain.port.BlockTarget
 import org.organiza.domain.port.Capability
 import org.organiza.domain.port.Clock
 import org.organiza.domain.port.EnforcementCapabilities
 import org.organiza.enforcement.ActiveSession
+import org.organiza.enforcement.InterventionFlow
+import org.organiza.enforcement.InterventionOutcome
+import org.organiza.enforcement.OverridePasses
 import org.organiza.enforcement.SessionPolicy
 import org.organiza.enforcement.TamperMonitor
 import org.organiza.scheduler.AiFacts
@@ -52,10 +70,13 @@ import org.organiza.storage.Database
 import org.organiza.storage.HabitCriterion
 import org.organiza.storage.HabitKind
 import org.organiza.storage.HabitStore
+import org.organiza.storage.InterventionChoice
+import org.organiza.storage.InterventionStore
 import org.organiza.storage.MigrationResult
 import org.organiza.storage.Migrations
 import org.organiza.storage.SessionState
 import org.organiza.storage.SessionStore
+import org.organiza.storage.StoredIntervention
 import org.organiza.storage.StoredRule
 import org.organiza.storage.RuleStore
 import org.organiza.storage.TamperStore
@@ -64,6 +85,7 @@ import org.organiza.android.ui.ChallengeView
 import org.organiza.android.ui.UiSnapshot
 import org.organiza.android.ui.Upcoming
 import org.organiza.presentation.ArenaModel
+import org.organiza.presentation.ChoicesModel
 import org.organiza.presentation.FocusModel
 import org.organiza.presentation.FocusState
 import org.organiza.presentation.Format
@@ -74,9 +96,22 @@ import org.organiza.voice.VoiceCommand
 import org.organiza.voice.VoicePipeline
 import org.organiza.voice.VoiceResult
 
-class OrganizaApp : Application(), EnforcementCapabilities {
+class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
     val session = ActiveSession()
-    val clock = Clock { Instant.now().plus(clockOffsetForTesting) }
+    override val clock: Clock = Clock { Instant.now().plus(clockOffsetForTesting) }
+
+    /** Override passes, shared by the accessibility and DNS layers (ADR-0016). */
+    val passes by lazy { OverridePasses(clock) }
+
+    /** Today's overrides, which set the next pause. Refreshed with the screens. */
+    @Volatile var overridesToday = 0
+        private set
+
+    @Volatile private var activeUntil: Instant? = null
+    @Volatile private var keySaved = false
+
+    val sync by lazy { SyncController(this) }
+    val copilot by lazy { CopilotController(this) }
 
     /** Lets debug checks reach tomorrow. Only the debug receiver changes it. */
     @Volatile internal var clockOffsetForTesting: Duration = Duration.ZERO
@@ -118,8 +153,10 @@ class OrganizaApp : Application(), EnforcementCapabilities {
     private val tick = Runnable { onStorageThread { reconcile() } }
     @Volatile private var lastRequest = 0L
 
-    private inner class Storage(val db: Database, val clock: Clock) {
+    /** The stores, for feature controllers. Use them on the storage thread only, through [onStores]. */
+    inner class Storage(val db: Database, val clock: Clock) {
         val scheduler = SessionScheduler(db, clock)
+        val interventions = InterventionStore(db)
         val sessions = SessionStore(db)
         val tamper = TamperStore(db)
         val aiFacts = AiFacts(db)
@@ -134,7 +171,7 @@ class OrganizaApp : Application(), EnforcementCapabilities {
             usageHistory,
             this@OrganizaApp,
             allowInsecureRelay = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
-        ) { url -> HttpArenaRelay(UrlConnectionTransport(), url) }
+        ) { url -> sync.backend.sync.relayFor(url) }
     }
 
     private val usageHistory by lazy { AndroidUsageHistory(this) }
@@ -207,7 +244,8 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         onStorageThread {
             val arena = storage?.arena ?: return@onStorageThread
             val today = clock.now().atZone(ZoneId.systemDefault()).toLocalDate().toString()
-            when (val result = arena.create(habitIdFor(habitName), title, today, rules, relayUrl, displayName)) {
+            val relay = relayUrl.ifBlank { sync.backend.sync.defaultRelayUrl().orEmpty() }
+            when (val result = arena.create(habitIdFor(habitName), title, today, rules, relay, displayName)) {
                 is CreateResult.Created -> {
                     latestInvite = result.invite.encode()
                     statusMessage = "Challenge created. Share the invite like a password."
@@ -315,6 +353,9 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         }
     }
 
+    /** Runs [work] with the stores on the storage thread, if storage opened. */
+    fun onStores(work: (Storage) -> Unit) = onStorageThread { storage?.let(work) }
+
     private fun onStorageThread(work: () -> Unit) {
         storageThread.execute {
             try {
@@ -370,7 +411,12 @@ class OrganizaApp : Application(), EnforcementCapabilities {
     private fun reconcile() {
         val active = storage ?: return
         val state = active.scheduler.reconcile()
-        if (state.policy != session.current) session.set(state.policy)
+        if (state.policy != session.current) {
+            // A pass belongs to the session it was taken in.
+            if (state.policy == SessionPolicy.IDLE) passes.clear()
+            session.set(state.policy)
+        }
+        activeUntil = active.sessions.inState(SessionState.ACTIVE).maxOfOrNull { it.end }
         if (state.activeSessionIds.isEmpty()) {
             if (monitorArmed) monitor.disarm()
             monitorArmed = false
@@ -400,8 +446,18 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         val zone = ZoneId.systemDefault()
         val now = clock.now()
         val today = now.atZone(zone).toLocalDate()
+        keySaved = apiKeys.load() != null
+        val onboarding = !onboarded
+        val permissions = Permissions.granted(this)
         val snapshot = if (active == null) {
-            UiSnapshot(storageProblem = storageFailure?.let { "Storage problem: $it. Your data has not been deleted." })
+            UiSnapshot(
+                onboarding = onboarding,
+                permissions = permissions,
+                account = sync.view(),
+                hasApiKey = keySaved,
+                message = statusMessage,
+                storageProblem = storageFailure?.let { "Storage problem: $it. Your data has not been deleted." },
+            )
         } else {
             val sessions = SessionState.entries.flatMap { active.sessions.inState(it) }
             val views = sessions.map { session ->
@@ -418,7 +474,12 @@ class OrganizaApp : Application(), EnforcementCapabilities {
                 views,
                 capabilities,
                 active.tamper.all().count { it.at >= weekAgo },
+                batteryExempt = Permissions.batteryExempt(this),
             )
+            val startOfDay = today.atStartOfDay(zone).toInstant()
+            val todays = active.interventions.between(startOfDay, now.plusSeconds(1))
+            overridesToday = todays.count { it.choice == InterventionChoice.OVERRODE }
+            val choices = ChoicesModel.build(todays, zone, ::appLabel, copilot.windows(active.interventions, zone))
             val habits = active.habits.active().map { habit ->
                 HabitInput(
                     habit.id,
@@ -454,12 +515,17 @@ class OrganizaApp : Application(), EnforcementCapabilities {
                 )
             }
             UiSnapshot(
+                onboarding = onboarding,
+                permissions = permissions,
                 focus = focus,
                 canStop = focus.state == FocusState.ACTIVE,
+                choices = choices,
+                copilot = copilot.view(),
+                account = sync.view(),
                 habits = HabitMatrix.build(today, habits),
                 upcoming = upcoming,
                 challenges = challenges,
-                hasApiKey = apiKeys.load() != null,
+                hasApiKey = keySaved,
                 voiceConsent = voiceConsent,
                 pendingCommand = pendingCommand?.let { "Heard: " + it.describe() },
                 message = statusMessage,
@@ -472,6 +538,7 @@ class OrganizaApp : Application(), EnforcementCapabilities {
                     "Habits" to habits.size.toString(),
                     "Challenges" to challenges.size.toString(),
                     "Tamper events" to active.tamper.all().size.toString(),
+                    "Interventions" to active.interventions.between(Instant.EPOCH, now.plusSeconds(1)).size.toString(),
                 ),
             )
         }
@@ -479,7 +546,7 @@ class OrganizaApp : Application(), EnforcementCapabilities {
     }
 
     /** The installed app's name, or its package when it is not installed. */
-    private fun appLabel(app: org.organiza.domain.PackageName): String = try {
+    fun appLabel(app: PackageName): String = try {
         packageManager.getApplicationLabel(packageManager.getApplicationInfo(app.value, 0)).toString()
     } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
         app.value
@@ -579,6 +646,7 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         statusMessage = when (val parsed = ApiKey.parse(raw)) {
             is Parsed.Valid -> {
                 apiKeys.save(parsed.value)
+                keySaved = true
                 "API key saved"
             }
             is Parsed.Invalid -> "That does not look like an API key"
@@ -587,6 +655,7 @@ class OrganizaApp : Application(), EnforcementCapabilities {
 
     fun clearApiKey() = onAiThread {
         apiKeys.clear()
+        keySaved = false
         statusMessage = "API key removed"
     }
 
@@ -619,13 +688,63 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         }
     }
 
-    /** Shows the gatekeeper's decision. A grant does not end the session (ADR-0009). */
-    fun askGatekeeper(request: String, minutesLeft: Long) = onAiThread {
-        val decision = coach().gatekeeper(minutesLeft, request)
-        statusMessage = "Gatekeeper: granted=${decision.granted} reason=${decision.reason} failure=${decision.failure}"
+    fun coach() = AiCoach(apiKeys, GroqClient(UrlConnectionTransport(), aiEndpoint), Sanitizer())
+
+    fun hasApiKey(): Boolean = keySaved
+
+    fun onAi(work: () -> Unit) = onAiThread(work)
+
+    /** Logs a finished intervention (ADR-0016). Called once per intervention by the overlay. */
+    fun recordIntervention(flow: InterventionFlow, outcome: InterventionOutcome) = onStorageThread {
+        val active = storage ?: return@onStorageThread
+        val overrode = outcome as? InterventionOutcome.Overrode
+        active.interventions.record(
+            StoredIntervention(
+                sessionId = active.sessions.inState(SessionState.ACTIVE).firstOrNull()?.id,
+                target = flow.target,
+                choice = if (overrode == null) InterventionChoice.STAYED else InterventionChoice.OVERRODE,
+                reason = overrode?.reason,
+                note = overrode?.note?.takeIf(String::isNotBlank),
+                phraseId = overrode?.let { flow.phrase.id },
+                pause = overrode?.pause ?: Duration.ZERO,
+                passMinutes = overrode?.minutes,
+                strict = flow.strict,
+                reflected = overrode?.reflected == true,
+                at = clock.now(),
+            ),
+        )
+        if (overrode != null) overridesToday++
+        refreshUi()
     }
 
-    private fun coach() = AiCoach(apiKeys, GroqClient(UrlConnectionTransport(), aiEndpoint), Sanitizer())
+    /** Asks for an AI reflection on a strict override, and hands back null on any failure (ADR-0017). */
+    override fun reflect(flow: InterventionFlow, done: (String?) -> Unit) {
+        val reason = flow.chosenReason ?: return done(null)
+        val note = flow.chosenNote
+        val minutesLeft = activeUntil?.let { Duration.between(clock.now(), it).toMinutes() } ?: 0
+        val today = overridesToday
+        onAiThread {
+            val text = (coach().reflect(minutesLeft, today, reason, note) as? AiResult.Ok)?.value
+            main.post { done(text) }
+        }
+    }
+
+    override fun targetLabel(target: BlockTarget): String = ChoicesModel.label(target, ::appLabel)
+
+    /** The intervention's second line: what kind of session, and how long is left. */
+    override fun sessionLine(strict: Boolean): String {
+        val left = activeUntil?.let { Format.duration(Duration.between(clock.now(), it)) }
+        val kind = if (strict) "Strict session" else "Focus session"
+        return if (left == null) kind else "$kind, $left left"
+    }
+
+    /** Whether the first-run flow has been finished. */
+    var onboarded: Boolean
+        get() = getSharedPreferences(PREFERENCES, MODE_PRIVATE).getBoolean(ONBOARDED, false)
+        set(value) {
+            getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit().putBoolean(ONBOARDED, value).apply()
+            requestUiRefresh()
+        }
 
     private fun onAiThread(work: () -> Unit) {
         aiThread.execute {
@@ -648,6 +767,9 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         tamperCount = active.tamper.all().size
     }
 
+    /** Debug and test support: closes the intervention on screen as if Stay focused was tapped. */
+    @Volatile internal var stayFocusedForTesting: (() -> Unit)? = null
+
     /** Debug and test support: ends strict sessions too, and reports state to the log. */
     internal fun endAllForTesting() = onStorageThread {
         storage?.scheduler?.endAllForTesting()
@@ -658,12 +780,15 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         val capabilities = granted().sorted().joinToString(",")
         val tamper = storage?.tamper?.all().orEmpty().joinToString(",") { it.capability.name }
         val failure = storageFailure?.name.orEmpty()
+        val choices = storage?.interventions?.between(Instant.EPOCH, clock.now().plusSeconds(1)).orEmpty()
+            .joinToString(",") { it.choice.name.lowercase() }
         Log.i(
             "OrganizaDebug",
             "capabilities=$capabilities tamper=$tamper storageFailure=$failure " +
                 "active=${session.current != SessionPolicy.IDLE} " +
                 "habits=${storage?.habits?.active().orEmpty().joinToString("|") { it.name }} " +
-                "arena=[${arenaSummary.replace('\n', ';')}] message=${statusMessage?.replace('\n', ' ')}",
+                "arena=[${arenaSummary.replace('\n', ';')}] choices=[$choices] copilot=${copilot.view().advice != null} " +
+                "message=${statusMessage?.replace('\n', ' ')}",
         )
     }
 
@@ -673,6 +798,7 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         private const val ARENA_INTERVAL_MS = 60 * 60 * 1000L
         private const val PREFERENCES = "organiza"
         private const val VOICE_CONSENT = "voice_consent"
+        private const val ONBOARDED = "onboarded"
         private const val MIN_TICK_MS = 500L
         private const val MAX_TICK_MS = 30_000L
         private const val REQUEST_INTERVAL_MS = 5_000L

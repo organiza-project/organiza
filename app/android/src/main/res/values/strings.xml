@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Organiza</string>
-    <string name="accessibility_description">Organiza watches which app is open and reads browser URL bars so it can block what you chose to block during a focus session. Nothing leaves your device.</string>
-    <string name="overlay_message">Blocked by Organiza</string>
+    <string name="accessibility_description">Organiza watches which app is open and reads browser address bars, so it can pause you before what you chose to block during a focus session. Nothing leaves your device.</string>
     <string name="admin_disable_warning">This removes Organiza\'s uninstall protection and is recorded as tampering if a session is running.</string>
 </resources>

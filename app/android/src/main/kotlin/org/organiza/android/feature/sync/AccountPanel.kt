@@ -1,0 +1,101 @@
+package org.organiza.android.feature.sync
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import org.organiza.android.ui.AccountView
+import org.organiza.android.ui.Action
+import org.organiza.android.ui.Actions
+import org.organiza.android.ui.ButtonKind
+import org.organiza.android.ui.ChoiceRow
+import org.organiza.android.ui.Field
+import org.organiza.android.ui.KeyValue
+import org.organiza.android.ui.Panel
+import org.organiza.android.ui.PanelHeader
+import org.organiza.android.ui.Rule
+import org.organiza.android.ui.Theme
+import org.organiza.android.ui.Txt
+import org.organiza.android.ui.Type
+import org.organiza.sync.BackendKind
+
+/** Chooses where Arena results and the account live (ADR-0015). Blocking never depends on it. */
+@Composable
+fun BackendPanel(account: AccountView, actions: Actions) {
+    val colors = Theme.colors
+    var kind by rememberSaveable(account.kind) { mutableStateOf(account.kind) }
+    var url by rememberSaveable(account.kind) { mutableStateOf(if (account.kind == BackendKind.SELF_HOSTED) account.url else "") }
+    var key by remember { mutableStateOf("") }
+    Panel {
+        PanelHeader("Where Arena syncs")
+        Txt(
+            "Habits, sessions, usage and overrides stay on this phone whatever you choose. A backend only holds your " +
+                "account and encrypted challenge results it cannot read.",
+            Type.small,
+            colors.muted,
+        )
+        Spacer(Modifier.height(8.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ChoiceRow("Only this phone", "No account. Challenges use a relay address you enter", kind == null) { kind = null }
+            ChoiceRow(
+                "Organiza hosted",
+                if (account.hostedAvailable) "A managed Supabase backend. Sign in with email" else "Not available in this build",
+                kind == BackendKind.HOSTED,
+                enabled = account.hostedAvailable,
+            ) { kind = BackendKind.HOSTED }
+            ChoiceRow("My own Supabase", "Enter your project URL and its anon or publishable key", kind == BackendKind.SELF_HOSTED) {
+                kind = BackendKind.SELF_HOSTED
+            }
+        }
+        if (kind == BackendKind.SELF_HOSTED) {
+            Spacer(Modifier.height(12.dp))
+            Field(url, { url = it }, "Project URL (https)")
+            Field(key, { key = it }, "Anon or publishable key", secret = true)
+            Txt("Never use a service role or secret key here: it bypasses row-level security for every user.", Type.small, colors.muted)
+        }
+        Spacer(Modifier.height(8.dp))
+        val changed = kind != account.kind || (kind == BackendKind.SELF_HOSTED && (url != account.url || key.isNotBlank()))
+        Action("Use this", ButtonKind.SECONDARY, enabled = changed && !account.busy) {
+            actions.chooseBackend(kind, url, key)
+            key = ""
+        }
+    }
+    if (account.kind != null) AccountPanel(account, actions)
+}
+
+@Composable
+private fun AccountPanel(account: AccountView, actions: Actions) {
+    val colors = Theme.colors
+    var email by rememberSaveable { mutableStateOf("") }
+    // Secrets use remember, not rememberSaveable, so they never reach saved instance state.
+    var password by remember { mutableStateOf("") }
+    Panel {
+        PanelHeader("Account")
+        KeyValue("Backend", account.url)
+        Rule()
+        if (account.signedInAs != null) {
+            KeyValue("Signed in as", account.signedInAs)
+            Spacer(Modifier.height(8.dp))
+            Action("Sign out", ButtonKind.TEXT, enabled = !account.busy) { actions.signOut() }
+            return@Panel
+        }
+        Txt("Sign in to sync challenges. Your password goes to this backend only.", Type.small, colors.muted)
+        Spacer(Modifier.height(8.dp))
+        Field(email, { email = it }, "Email")
+        Field(password, { password = it }, "Password", secret = true)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val ready = email.isNotBlank() && password.isNotEmpty() && !account.busy
+            Action("Sign in", ButtonKind.PRIMARY, enabled = ready) { actions.signIn(email, password); password = "" }
+            Action("Create account", ButtonKind.TEXT, enabled = ready) { actions.signUp(email, password); password = "" }
+        }
+    }
+}

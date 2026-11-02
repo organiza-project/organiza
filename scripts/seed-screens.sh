@@ -6,7 +6,7 @@ set -u
 ADB="${ANDROID_HOME:-$HOME/Android/Sdk}/platform-tools/adb"
 APP=org.organiza.app
 RECEIVER="$APP/org.organiza.android.DebugSessionReceiver"
-SERVICE="$APP/org.organiza.android.OrganizaAccessibilityService"
+SERVICE="$APP/org.organiza.android.feature.blocker.OrganizaAccessibilityService"
 APK=app/android/build/outputs/apk/debug/android-debug.apk
 : "${JAVA_HOME:=/usr/lib/jvm/java-17-openjdk-amd64}"; export JAVA_HOME
 # adb shell joins arguments with spaces, so each one is quoted for the device's shell.

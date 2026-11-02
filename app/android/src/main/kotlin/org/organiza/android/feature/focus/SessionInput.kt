@@ -1,4 +1,4 @@
-package org.organiza.android
+package org.organiza.android.feature.focus
 
 import org.organiza.domain.DomainName
 import org.organiza.domain.PackageName

@@ -1,4 +1,4 @@
-package org.organiza.android
+package org.organiza.android.data
 
 import android.content.Context
 import java.io.File

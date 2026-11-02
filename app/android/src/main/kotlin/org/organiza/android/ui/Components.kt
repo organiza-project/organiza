@@ -193,3 +193,33 @@ fun KeyValue(label: String, value: String, valueColor: Color = Theme.colors.text
         Txt(value, Type.body, valueColor)
     }
 }
+
+/** One line of transient feedback, shown where the person is looking. */
+@Composable
+fun MessagePanel(text: String?) {
+    if (text == null) return
+    Panel { Txt(text, Type.body) }
+}
+
+/** A choice in a short list: one row per option, with the chosen one marked. */
+@Composable
+fun ChoiceRow(title: String, detail: String?, chosen: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+    val colors = Theme.colors
+    val shape = RoundedCornerShape(Space.radiusControl)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = Space.target)
+            .alpha(if (enabled) 1f else 0.55f)
+            .border(if (chosen) 2.dp else 1.dp, if (chosen) colors.text else colors.border, shape)
+            .clickable(enabled = enabled, role = Role.RadioButton, onClick = onClick)
+            .semantics { stateDescription = if (chosen) "Selected" else "Not selected" }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Txt(title, Type.bodyStrong)
+            if (detail != null) Txt(detail, Type.small, colors.muted)
+        }
+    }
+}

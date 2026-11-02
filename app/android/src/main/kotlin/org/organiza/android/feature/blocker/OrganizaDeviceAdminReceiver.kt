@@ -1,8 +1,10 @@
-package org.organiza.android
+package org.organiza.android.feature.blocker
 
 import android.app.admin.DeviceAdminReceiver
 import android.content.Context
 import android.content.Intent
+import org.organiza.android.OrganizaApp
+import org.organiza.android.R
 
 class OrganizaDeviceAdminReceiver : DeviceAdminReceiver() {
     override fun onDisableRequested(context: Context, intent: Intent): CharSequence =

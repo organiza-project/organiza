@@ -11,6 +11,11 @@ import android.util.Log
 import java.io.File
 import java.time.Duration
 import org.organiza.ai.GroqEndpoint
+import org.organiza.android.feature.focus.SessionInput
+import org.organiza.android.feature.voice.VoiceRecorder
+import org.organiza.domain.PackageName
+import org.organiza.domain.Parsed
+import org.organiza.domain.port.BlockTarget
 import org.organiza.arena.ChallengeRules
 import org.organiza.scheduler.ManualRequest
 import org.organiza.storage.StoredRule
@@ -59,7 +64,17 @@ class DebugSessionReceiver : BroadcastReceiver() {
             "clearkey" -> app.clearApiKey()
             "aireview" -> app.requestWeeklyReview()
             "aischedule" -> app.requestSchedule(decoded(intent))
-            "aigate" -> app.askGatekeeper(decoded(intent), 30)
+            "aicopilot" -> app.copilot.run()
+            "stay" -> app.stayFocusedForTesting?.invoke()
+            // Grants a pass as an override would, without the typing, for the enforcement checks.
+            "pass" -> {
+                val length = Duration.ofSeconds(intent.getLongExtra("seconds", 30))
+                input.blockList.packages.forEach { app.passes.grant(BlockTarget.App(it), length) }
+                // A site pass is keyed by the list entry, so the browser named here does not matter.
+                val browser = (PackageName.parse("com.android.chrome") as Parsed.Valid).value
+                input.blockList.domains.forEach { app.passes.grant(BlockTarget.Site(browser, it), length) }
+            }
+            "onboarded" -> app.onboarded = intent.getBooleanExtra("done", true)
             "voicetone" -> app.handleSpeech(ShortArray(16_000) { if (it % 2 == 0) 8000 else -8000 }, 16_000)
             "voicesilence" -> app.handleSpeech(ShortArray(16_000), 16_000)
             "voicefile" -> app.handleSpeech(wavSamples(File(app.filesDir, intent.getStringExtra("name").orEmpty())), 16_000)

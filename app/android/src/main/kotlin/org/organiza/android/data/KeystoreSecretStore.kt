@@ -1,4 +1,4 @@
-package org.organiza.android
+package org.organiza.android.data
 
 import android.content.Context
 import java.io.File
@@ -22,5 +22,9 @@ class KeystoreSecretStore(context: Context) : SecretStore {
         } catch (_: SealedDataException) {
             null
         }
+    }
+
+    override fun remove(name: String) {
+        File(directory, name).delete()
     }
 }

@@ -1,4 +1,4 @@
-package org.organiza.android
+package org.organiza.android.feature.blocker
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
@@ -10,11 +10,15 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.InputMethodManager
 import java.time.Duration
+import org.organiza.android.OrganizaApp
+import org.organiza.android.R
 import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
+import org.organiza.domain.port.BlockTarget
 import org.organiza.enforcement.BlockEngine
-import org.organiza.enforcement.ContentDecision
 import org.organiza.enforcement.ContentPolicy
+import org.organiza.enforcement.InterventionFlow
+import org.organiza.enforcement.InterventionOutcome
 import org.organiza.enforcement.LockoutExemptions
 import org.organiza.enforcement.ScreenSnapshot
 import org.organiza.enforcement.SessionPolicy
@@ -25,7 +29,7 @@ class OrganizaAccessibilityService : AccessibilityService() {
     private val contentPolicy by lazy { ContentPolicy(getString(R.string.app_name)) }
     private var engine: BlockEngine? = null
     private var subscription: AutoCloseable? = null
-    private var surface: AccessibilityBlockSurface? = null
+    private var surface: InterventionOverlay? = null
     private var lastInspection = 0L
     private var trailingSource: PackageName? = null
     private val trailingInspection = Runnable {
@@ -37,15 +41,48 @@ class OrganizaAccessibilityService : AccessibilityService() {
         }
     }
 
+    private val passEnded = Runnable { engine?.recheck() }
+
     override fun onServiceConnected() {
         release()
-        val blockSurface = AccessibilityBlockSurface(this)
+        val blockSurface = InterventionOverlay(this, app, ::chosen)
         surface = blockSurface
-        val blockEngine = BlockEngine(blockSurface, app.clock, DEBOUNCE, transientPackages(), exemptPackages())
+        val launchers = launcherPackages()
+        val blockEngine = BlockEngine(
+            blockSurface,
+            app.clock,
+            DEBOUNCE,
+            transientPackages(),
+            exemptPackages(launchers),
+            homes = parsePackages(launchers),
+            passes = app.passes,
+        )
         engine = blockEngine
+        app.stayFocusedForTesting = { main.post { blockEngine.dismiss() } }
         subscription = app.session.subscribe { policy ->
-            main.post { blockEngine.update(policy.blockList) }
+            main.post { blockEngine.update(policy.blockList, policy != SessionPolicy.IDLE) }
         }
+    }
+
+    /** The person finished an intervention. An override grants its pass and reopens what was blocked. */
+    private fun chosen(flow: InterventionFlow, outcome: InterventionOutcome) {
+        if (outcome is InterventionOutcome.Overrode) {
+            app.passes.grant(flow.target, Duration.ofMinutes(outcome.minutes.toLong()))
+            schedulePassEnd()
+        }
+        engine?.dismiss()
+        if (outcome is InterventionOutcome.Overrode) reopen(flow.target)
+    }
+
+    private fun schedulePassEnd() {
+        main.removeCallbacks(passEnded)
+        val until = app.passes.nextExpiry() ?: return
+        main.postDelayed(passEnded, Duration.between(app.clock.now(), until).toMillis() + PASS_GRACE_MS)
+    }
+
+    private fun reopen(target: BlockTarget) {
+        val launch = packageManager.getLaunchIntentForPackage(target.app.value) ?: return
+        startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
@@ -79,8 +116,8 @@ class OrganizaAccessibilityService : AccessibilityService() {
     private fun inspect(source: PackageName, policy: SessionPolicy, blockEngine: BlockEngine) {
         if (policy == SessionPolicy.IDLE) return
         val snapshot = snapshot(source, policy) ?: return
-        val decision = contentPolicy.decide(snapshot, policy.blockList, policy.blockShortForm, policy.strict)
-        if (decision != ContentDecision.ALLOW) blockEngine.block(source)
+        // Passes are checked by the engine, so the policy sees the full list.
+        contentPolicy.target(snapshot, policy.blockList, policy.blockShortForm, policy.strict)?.let(blockEngine::block)
     }
 
     /** Reads only what the session needs for this app, and returns null when that is nothing. */
@@ -117,9 +154,12 @@ class OrganizaAccessibilityService : AccessibilityService() {
         return parsePackages(keyboards + listOf(packageName, "com.android.systemui"))
     }
 
-    private fun exemptPackages(): Set<PackageName> {
+    private fun launcherPackages(): List<String> {
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        val launchers = packageManager.queryIntentActivities(home, 0).map { it.activityInfo.packageName }
+        return packageManager.queryIntentActivities(home, 0).map { it.activityInfo.packageName }
+    }
+
+    private fun exemptPackages(launchers: List<String>): Set<PackageName> {
         val dialer = getSystemService(TelecomManager::class.java).defaultDialerPackage
         return LockoutExemptions.of(packageName, launchers, dialer)
     }
@@ -141,9 +181,10 @@ class OrganizaAccessibilityService : AccessibilityService() {
 
     private fun release() {
         main.removeCallbacks(trailingInspection)
+        main.removeCallbacks(passEnded)
         subscription?.close()
         subscription = null
-        surface?.dismissOverlay()
+        surface?.discard()
         surface = null
         engine = null
     }
@@ -152,5 +193,6 @@ class OrganizaAccessibilityService : AccessibilityService() {
         val DEBOUNCE: Duration = Duration.ofMillis(300)
         const val INSPECTION_INTERVAL_MS = 500L
         const val MAX_NODES = 2000
+        const val PASS_GRACE_MS = 250L
     }
 }

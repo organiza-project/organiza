@@ -1,4 +1,4 @@
-package org.organiza.android
+package org.organiza.android.feature.blocker
 
 import android.content.Intent
 import android.net.ConnectivityManager
@@ -16,6 +16,8 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import org.organiza.android.OrganizaApp
+import org.organiza.android.R
 import org.organiza.domain.port.DnsUpstream
 import org.organiza.enforcement.DnsSinkhole
 
@@ -69,7 +71,8 @@ class DnsVpnService : VpnService(), DnsUpstream {
         app.vpnRunning = true
         val pool = Executors.newFixedThreadPool(WORKERS)
         workers = pool
-        val sinkhole = DnsSinkhole(this) { app.session.current.blockList }
+        // A site pass lifts its entry here too, so an override reaches the page (ADR-0016).
+        val sinkhole = DnsSinkhole(this) { app.passes.apply(app.session.current.blockList) }
         val output = FileOutputStream(established.fileDescriptor)
         reader = Thread({ readLoop(FileInputStream(established.fileDescriptor), output, sinkhole, pool) }, "dns-vpn")
             .apply { start() }
