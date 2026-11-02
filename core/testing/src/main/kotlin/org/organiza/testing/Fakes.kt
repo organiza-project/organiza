@@ -5,6 +5,7 @@ import java.time.Instant
 import org.organiza.domain.PackageName
 import org.organiza.domain.port.BlockAction
 import org.organiza.domain.port.BlockSurface
+import org.organiza.domain.port.BlockTarget
 import org.organiza.domain.port.Capability
 import org.organiza.domain.port.Clock
 import org.organiza.domain.port.DnsUpstream
@@ -43,9 +44,9 @@ public class RecordingBlockSurface : BlockSurface {
     public var overlayVisible: Boolean = false
         private set
 
-    override fun showOverlay(blocked: PackageName) {
+    override fun showOverlay(target: BlockTarget) {
         overlayVisible = true
-        recorded += BlockAction.ShowOverlay(blocked)
+        recorded += BlockAction.ShowOverlay(target)
     }
 
     override fun dismissOverlay() {

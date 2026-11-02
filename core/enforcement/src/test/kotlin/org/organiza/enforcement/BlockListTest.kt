@@ -30,4 +30,11 @@ class BlockListTest {
         assertEquals(true, withProcess.blocks(steam))
         assertEquals(false, list.blocks(steam))
     }
+
+    @Test
+    fun `the matching entry is the listed domain, not the visited subdomain`() {
+        val list = BlockList(emptySet(), setOf(domain("reddit.com")))
+        assertEquals(domain("reddit.com"), list.entryFor(domain("old.reddit.com")))
+        assertEquals(null, list.entryFor(domain("example.com")))
+    }
 }

@@ -11,7 +11,10 @@ public data class BlockList(
 ) {
     public fun blocks(app: PackageName): Boolean = app in packages
 
-    public fun blocks(domain: DomainName): Boolean = domains.any { it.covers(domain) }
+    public fun blocks(domain: DomainName): Boolean = entryFor(domain) != null
+
+    /** The listed domain that covers [domain], which an override pass is keyed by. */
+    public fun entryFor(domain: DomainName): DomainName? = domains.firstOrNull { it.covers(domain) }
 
     public fun blocks(process: ProcessName): Boolean = process in processes
 

@@ -3,6 +3,7 @@ package org.organiza.enforcement
 import org.organiza.domain.DomainName
 import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
+import org.organiza.domain.port.BlockTarget
 
 /**
  * What the accessibility layer read from the current screen. [guardedText] must stay
@@ -24,14 +25,27 @@ public class ContentPolicy(private val appLabel: String) {
         blockList: BlockList,
         blockShortForm: Boolean,
         strict: Boolean,
-    ): ContentDecision {
-        if (strict && namesThisApp(snapshot)) return ContentDecision.BLOCK_TAMPER
+    ): ContentDecision = when (target(snapshot, blockList, blockShortForm, strict)) {
+        is BlockTarget.Guard -> ContentDecision.BLOCK_TAMPER
+        is BlockTarget.Site -> ContentDecision.BLOCK_DOMAIN
+        is BlockTarget.ShortForm -> ContentDecision.BLOCK_SHORT_FORM
+        is BlockTarget.App, null -> ContentDecision.ALLOW
+    }
+
+    /** What to intervene on for this screen, or null to allow it. */
+    public fun target(
+        snapshot: ScreenSnapshot,
+        blockList: BlockList,
+        blockShortForm: Boolean,
+        strict: Boolean,
+    ): BlockTarget? {
+        if (strict && namesThisApp(snapshot)) return BlockTarget.Guard(snapshot.app)
         val url = urlBarId(snapshot.app)?.let { snapshot.urlBarText }?.let(::parseUrl)
-        if (url != null && blockList.blocks(url.host)) return ContentDecision.BLOCK_DOMAIN
+        url?.let { blockList.entryFor(it.host) }?.let { return BlockTarget.Site(snapshot.app, it) }
         if (blockShortForm && (url.isShortForm() || snapshot.viewIds.any(SHORT_FORM_VIEW_IDS::contains))) {
-            return ContentDecision.BLOCK_SHORT_FORM
+            return BlockTarget.ShortForm(snapshot.app)
         }
-        return ContentDecision.ALLOW
+        return null
     }
 
     private fun namesThisApp(snapshot: ScreenSnapshot): Boolean =

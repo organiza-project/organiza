@@ -2,6 +2,7 @@ package org.organiza.enforcement
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import org.organiza.domain.port.BlockTarget
 
 class ContentPolicyTest {
     private val chrome = pkg("com.android.chrome")
@@ -109,5 +110,20 @@ class ContentPolicyTest {
         assertEquals(true, ContentPolicy.isGuarded(settings))
         assertEquals(true, ContentPolicy.isGuarded(pkg("com.google.android.packageinstaller")))
         assertEquals(false, ContentPolicy.isGuarded(chrome))
+    }
+
+    @Test
+    fun `a site block names the list entry it matched, for a pass`() {
+        val snapshot = ScreenSnapshot(chrome, urlBarText = "https://old.reddit.com/r/all")
+        assertEquals(BlockTarget.Site(chrome, domain("reddit.com")), policy.target(snapshot, list, false, false))
+    }
+
+    @Test
+    fun `short-form and guard blocks name their app`() {
+        val shorts = ScreenSnapshot(youtube, viewIds = setOf("com.google.android.youtube:id/reel_recycler"))
+        assertEquals(BlockTarget.ShortForm(youtube), policy.target(shorts, list, true, false))
+        val guard = ScreenSnapshot(settings, guardedText = setOf("Organiza"))
+        assertEquals(BlockTarget.Guard(settings), policy.target(guard, list, false, true))
+        assertEquals(null, policy.target(ScreenSnapshot(youtube), list, true, false))
     }
 }

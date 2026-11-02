@@ -2,6 +2,7 @@ package org.organiza.domain.port
 
 import java.time.Duration
 import java.time.Instant
+import org.organiza.domain.DomainName
 import org.organiza.domain.PackageName
 
 /** The only source of time for domain logic. */
@@ -15,9 +16,28 @@ public fun interface ForegroundAppMonitor {
     public fun subscribe(listener: (PackageName) -> Unit): AutoCloseable
 }
 
-/** The visible side of a block. Android: accessibility overlay and global home action. */
+/**
+ * What an intervention is about, and what an override pass lifts (ADR-0016). [app] is the app on
+ * screen. A [Site] is keyed by the block-list [entry] it matched, so a pass covers every browser.
+ */
+public sealed interface BlockTarget {
+    public val app: PackageName
+
+    public data class App(override val app: PackageName) : BlockTarget
+
+    public data class Site(override val app: PackageName, val entry: DomainName) : BlockTarget
+
+    /** The short video feed inside [app], not the whole app. */
+    public data class ShortForm(override val app: PackageName) : BlockTarget
+
+    /** Organiza's own settings during a strict session. It never takes a pass. */
+    public data class Guard(override val app: PackageName) : BlockTarget
+}
+
+/** The visible side of a block. Android: an accessibility overlay and the global home action. */
 public interface BlockSurface {
-    public fun showOverlay(blocked: PackageName)
+    /** Shows the intervention for [target]. Calling it again replaces the target. */
+    public fun showOverlay(target: BlockTarget)
 
     public fun dismissOverlay()
 
@@ -45,7 +65,7 @@ public fun interface EnforcementCapabilities {
 
 /** A recorded [BlockSurface] call, for assertions in tests and the local audit trail. */
 public sealed interface BlockAction {
-    public data class ShowOverlay(val blocked: PackageName) : BlockAction
+    public data class ShowOverlay(val target: BlockTarget) : BlockAction
 
     public data object DismissOverlay : BlockAction
 

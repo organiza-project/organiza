@@ -3,7 +3,7 @@
 The source of truth is the scripts in
 [`schema/`](../core/storage/src/main/resources/org/organiza/storage/schema/), applied in
 order by `Migrations` and tested by `SchemaV1Test` and `MigrationsTest`. The current
-version is 4. Decisions are in ADR-0004, ADR-0006, ADR-0008, ADR-0011 and ADR-0013.
+version is 5. Decisions are in ADR-0004, ADR-0006, ADR-0008, ADR-0011, ADR-0013 and ADR-0016.
 
 | Table | Purpose | Notes |
 |-------|---------|-------|
@@ -18,6 +18,7 @@ version is 4. Decisions are in ADR-0004, ADR-0006, ADR-0008, ADR-0011 and ADR-00
 | `arena_entry` | Results received from other people | Columns are pinned by a test and carry no usage data |
 | `arena_reveal` | A member's revealed salts | Stored as the signed message they sent |
 | `tamper_event` | A capability lost during a session | Capability and time only; columns are pinned by a test |
+| `intervention_event` | A blocked app or site, and whether the person stayed focused or overrode | The block-list entry, never the URL; reason, note and pass length for overrides; columns are pinned by a test |
 
 ## Conventions
 

@@ -61,6 +61,16 @@ class MigrationsTest {
     }
 
     @Test
+    fun `version 4 data survives the upgrade to version 5`() {
+        Migrations.migrate(db, target = 4)
+        db.execute("INSERT INTO tamper_event (capability, at_ms) VALUES ('VPN', 5)")
+        Migrations.migrate(db)
+        assertEquals(5L, version())
+        assertEquals(listOf(1L), db.query("SELECT count(*) FROM tamper_event") { it.long(0) })
+        assertEquals(listOf(0L), db.query("SELECT count(*) FROM intervention_event") { it.long(0) })
+    }
+
+    @Test
     fun `a database from a newer app is refused untouched`() {
         db.execute("PRAGMA user_version = 99")
         assertEquals(MigrationResult.TooNew(99), Migrations.migrate(db))
@@ -91,6 +101,18 @@ class MigrationsTest {
         assertEquals(
             setOf("id", "session_id", "capability", "at_ms"),
             db.query("SELECT name FROM pragma_table_info('tamper_event')") { it.string(0) }.toSet(),
+        )
+    }
+
+    @Test
+    fun `interventions hold the choice, never what was on screen`() {
+        Migrations.migrate(db)
+        assertEquals(
+            setOf(
+                "id", "session_id", "kind", "app", "site", "outcome", "reason", "note", "phrase_id",
+                "pause_s", "pass_minutes", "strict", "reflected", "at_ms",
+            ),
+            db.query("SELECT name FROM pragma_table_info('intervention_event')") { it.string(0) }.toSet(),
         )
     }
 }

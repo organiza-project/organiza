@@ -9,6 +9,7 @@ import kotlin.test.assertNull
 import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
 import org.organiza.domain.port.BlockAction
+import org.organiza.domain.port.BlockTarget
 import org.organiza.domain.port.Capability
 
 private fun pkg(raw: String) = (PackageName.parse(raw) as Parsed.Valid).value
@@ -40,13 +41,13 @@ class FakesTest {
     @Test
     fun `block surface records actions in order and tracks the overlay`() {
         val surface = RecordingBlockSurface()
-        surface.showOverlay(instagram)
+        surface.showOverlay(BlockTarget.App(instagram))
         surface.goHome()
         assertEquals(true, surface.overlayVisible)
         surface.dismissOverlay()
         assertEquals(false, surface.overlayVisible)
         assertEquals(
-            listOf(BlockAction.ShowOverlay(instagram), BlockAction.GoHome, BlockAction.DismissOverlay),
+            listOf(BlockAction.ShowOverlay(BlockTarget.App(instagram)), BlockAction.GoHome, BlockAction.DismissOverlay),
             surface.actions,
         )
     }
