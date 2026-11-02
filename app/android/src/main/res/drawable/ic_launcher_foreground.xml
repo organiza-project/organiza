@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Organiza mark: an open ring around a point of focus. The gap at the upper right is the
+  pause you choose to cross, or not. Source: docs/brand/mark.svg. Everything sits inside the
+  66dp adaptive-icon safe zone.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M74.28,48.57 A21,21 0 1,1 59.44,33.72"
+        android:strokeWidth="8.5"
+        android:strokeColor="#F2F4F7"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#6EA2F2"
+        android:pathData="M48.25,54 a5.75,5.75 0 1,0 11.5,0 a5.75,5.75 0 1,0 -11.5,0" />
+</vector>
