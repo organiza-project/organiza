@@ -154,4 +154,10 @@ class FocusModelTest {
         assertEquals("2 tamper events this week", model.tamperLine)
         assertEquals("No tamper events this week", FocusModel.build(now, zone, SessionPolicy.IDLE, emptyList(), all, 0).tamperLine)
     }
+
+    @Test
+    fun `battery optimisation counts as a missing protection`() {
+        val model = FocusModel.build(now, zone, SessionPolicy.IDLE, emptyList(), all, 0, batteryExempt = false)
+        assertEquals(listOf(Protection.BATTERY), model.protection.filterNot { it.on }.map { it.kind })
+    }
 }

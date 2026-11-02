@@ -25,8 +25,9 @@ public data class DayStrip(val from: LocalTime, val bars: List<StripBar>, val no
 
 /** In order of importance: blocking first, then its back-ups. */
 public enum class Protection(public val title: String, public val detail: String, public val action: String) {
-    ACCESSIBILITY("App blocking", "Watches which app is open and sends blocked ones home", "Turn on"),
+    ACCESSIBILITY("App blocking", "Watches which app is open and pauses you before blocked ones", "Turn on"),
     VPN_CONSENT("Website blocking", "A local DNS filter. No traffic leaves through it", "Allow"),
+    BATTERY("Keep running", "Stops Android pausing Organiza to save battery", "Allow"),
     DEVICE_ADMIN("Uninstall protection", "Stops Organiza being removed in one step", "Enable"),
     USAGE("Usage access", "Lets habits judge screen time on this phone", "Allow"),
 }
@@ -53,6 +54,8 @@ public data class FocusModel(
             sessions: List<SessionView>,
             granted: Set<Capability>,
             tamperThisWeek: Int,
+            /** Whether Android exempts Organiza from battery optimisation. Not a capability, so not tamper. */
+            batteryExempt: Boolean = true,
         ): FocusModel {
             val active = sessions.filter { it.session.state == SessionState.ACTIVE }
             val state = when {
@@ -62,7 +65,7 @@ public data class FocusModel(
             }
             val until = active.maxOfOrNull { it.session.end }
             val headline = if (state == FocusState.OFF || until == null) "Off" else Format.duration(Duration.between(now, until))
-            val protection = Protection.entries.map { ProtectionItem(it, isOn(it, granted)) }
+            val protection = Protection.entries.map { ProtectionItem(it, isOn(it, granted, batteryExempt)) }
             val off = protection.count { !it.on }
             return FocusModel(
                 state = state,
@@ -76,7 +79,8 @@ public data class FocusModel(
             )
         }
 
-        private fun isOn(kind: Protection, granted: Set<Capability>) = when (kind) {
+        private fun isOn(kind: Protection, granted: Set<Capability>, batteryExempt: Boolean) = when (kind) {
+            Protection.BATTERY -> batteryExempt
             Protection.ACCESSIBILITY -> Capability.ACCESSIBILITY in granted
             Protection.VPN_CONSENT -> Capability.VPN in granted
             Protection.DEVICE_ADMIN -> Capability.DEVICE_ADMIN in granted
