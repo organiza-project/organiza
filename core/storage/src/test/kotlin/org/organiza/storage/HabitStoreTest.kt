@@ -44,4 +44,11 @@ class HabitStoreTest {
         habits.mark("a", day.plusDays(1), true)
         assertEquals(setOf(day), habits.results("a", day, day.plusDays(1)).keys)
     }
+
+    @Test
+    fun `creation time is kept for each habit`() {
+        habits.add("a", "Read", at)
+        assertEquals(at, habits.createdAt("a"))
+        assertEquals(null, habits.createdAt("missing"))
+    }
 }

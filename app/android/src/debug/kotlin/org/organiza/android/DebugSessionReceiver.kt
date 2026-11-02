@@ -91,6 +91,12 @@ class DebugSessionReceiver : BroadcastReceiver() {
                 intent.getStringExtra("kind").orEmpty(),
                 intent.getStringExtra("target").orEmpty(),
             )
+            "habitday" -> app.markHabitDaysAgoForTesting(
+                intent.getStringExtra("name").orEmpty(),
+                intent.getLongExtra("ago", 0),
+                intent.getBooleanExtra("done", true),
+            )
+            "addhabit" -> app.addHabit(intent.getStringExtra("name").orEmpty())
             "arenamark" -> app.markHabitDone(intent.getStringExtra("name").orEmpty())
             "arenasync" -> app.arenaNow()
             "arenainvite" -> Log.i("OrganizaDebug", "invite=${app.latestInvite}")

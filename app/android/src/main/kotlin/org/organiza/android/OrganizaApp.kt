@@ -57,7 +57,19 @@ import org.organiza.storage.Migrations
 import org.organiza.storage.SessionState
 import org.organiza.storage.SessionStore
 import org.organiza.storage.StoredRule
+import org.organiza.storage.RuleStore
 import org.organiza.storage.TamperStore
+import androidx.compose.runtime.mutableStateOf
+import org.organiza.android.ui.ChallengeView
+import org.organiza.android.ui.UiSnapshot
+import org.organiza.android.ui.Upcoming
+import org.organiza.presentation.ArenaModel
+import org.organiza.presentation.FocusModel
+import org.organiza.presentation.FocusState
+import org.organiza.presentation.Format
+import org.organiza.presentation.HabitInput
+import org.organiza.presentation.HabitMatrix
+import org.organiza.presentation.SessionView
 import org.organiza.voice.VoiceCommand
 import org.organiza.voice.VoicePipeline
 import org.organiza.voice.VoiceResult
@@ -71,9 +83,22 @@ class OrganizaApp : Application(), EnforcementCapabilities {
 
     @Volatile var vpnRunning = false
 
-    /** What the setup screen shows. Written on the storage thread. */
+    /** One line of feedback for the screens. Setting it redraws them. */
     @Volatile var statusMessage: String? = null
-        private set
+        private set(value) {
+            field = value
+            requestUiRefresh()
+            // Feedback is transient: it clears itself unless a newer message replaced it. A counter,
+            // not the text, decides that, because the same text can legitimately be set twice.
+            val generation = ++messageGeneration
+            if (value != null) main.postDelayed({ if (messageGeneration == generation) statusMessage = null }, MESSAGE_MS)
+        }
+
+    @Volatile private var messageGeneration = 0L
+
+    /** What the screens show, replaced whole on the main thread (ADR-0012). */
+    val uiState = mutableStateOf(UiSnapshot())
+    private val syncedAt = mutableMapOf<String, String>()
     @Volatile var storageFailure: StorageFailure? = null
         private set
     @Volatile var tamperCount = 0
@@ -100,6 +125,7 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         val aiFacts = AiFacts(db)
         val habits = HabitStore(db)
         val voice = VoiceExecutor(db, clock, scheduler)
+        val rules = RuleStore(db)
         val arena = ArenaEngine(
             db,
             clock,
@@ -153,9 +179,14 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         arena.closeDays()
         var unavailable = false
         for (challenge in arena.challenges()) {
-            if (arena.sync(challenge.id) == SyncResult.RelayUnavailable) unavailable = true
+            when (arena.sync(challenge.id)) {
+                is SyncResult.Synced -> syncedAt[challenge.id] = clock.now().atZone(ZoneId.systemDefault()).toLocalTime().toString().take(5)
+                SyncResult.RelayUnavailable -> unavailable = true
+                else -> Unit
+            }
         }
         arenaSummary = describeArena(arena) + if (unavailable) "\nRelay unavailable, results are queued" else ""
+        if (unavailable) statusMessage = "Relay unavailable, results are queued" else requestUiRefresh()
     }
 
     private fun describeArena(arena: ArenaEngine): String = arena.challenges().joinToString("\n") { challenge ->
@@ -265,6 +296,8 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         statusMessage = "Discarded"
     }
 
+    private val UPCOMING_DAY = java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", java.util.Locale.UK)
+
     override fun onCreate() {
         super.onCreate()
         // The system does not reliably call onUnbind when the service is switched off, so
@@ -352,6 +385,134 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         val untilNext = state.nextTransition?.let { Duration.between(clock.now(), it).toMillis() } ?: MAX_TICK_MS
         main.removeCallbacks(tick)
         main.postDelayed(tick, untilNext.coerceIn(MIN_TICK_MS, MAX_TICK_MS))
+        refreshUi()
+    }
+
+    fun requestUiRefresh() = onStorageThread { refreshUi() }
+
+    fun showMessage(text: String) {
+        statusMessage = text
+    }
+
+    /** Builds every screen's model from local data. Storage thread only. */
+    private fun refreshUi() {
+        val active = storage
+        val zone = ZoneId.systemDefault()
+        val now = clock.now()
+        val today = now.atZone(zone).toLocalDate()
+        val snapshot = if (active == null) {
+            UiSnapshot(storageProblem = storageFailure?.let { "Storage problem: $it. Your data has not been deleted." })
+        } else {
+            val sessions = SessionState.entries.flatMap { active.sessions.inState(it) }
+            val views = sessions.map { session ->
+                val rule = session.ruleId?.let(active.rules::find)
+                SessionView(session, rule?.calendarTag, rule?.strict == true)
+            }
+            val consented = VpnService.prepare(this) == null
+            val capabilities = granted().minus(Capability.VPN).plus(if (consented) setOf(Capability.VPN) else emptySet())
+            val weekAgo = now.minus(WEEK)
+            val focus = FocusModel.build(
+                now,
+                zone,
+                session.current,
+                views,
+                capabilities,
+                active.tamper.all().count { it.at >= weekAgo },
+            )
+            val habits = active.habits.active().map { habit ->
+                HabitInput(
+                    habit.id,
+                    habit.name,
+                    active.habits.createdAt(habit.id)?.atZone(zone)?.toLocalDate() ?: today,
+                    active.habits.results(habit.id, today.minusDays(HabitMatrix.DAYS.toLong()), today.plusDays(1)),
+                )
+            }
+            val upcoming = views
+                .filter { it.session.state == SessionState.SCHEDULED && it.session.start.isBefore(now.plus(WEEK)) }
+                .sortedBy { it.session.start }
+                .take(MAX_UPCOMING)
+                .map { view ->
+                    val start = view.session.start.atZone(zone)
+                    val day = when (start.toLocalDate()) {
+                        today -> "Today"
+                        today.plusDays(1) -> "Tomorrow"
+                        else -> start.format(UPCOMING_DAY)
+                    }
+                    Upcoming(
+                        view.tag ?: "Session",
+                        "$day ${start.toLocalTime().toString().take(5)}",
+                        Format.duration(Duration.between(view.session.start, view.session.end)),
+                    )
+                }
+            val challenges = active.arena.challenges().map { challenge ->
+                val board = active.arena.leaderboard(challenge.id)
+                ChallengeView(
+                    challenge.id,
+                    challenge.title,
+                    challenge.state,
+                    ArenaModel.build(today, challenge.startsOn, challenge.lengthDays, challenge.memberId, board, syncedAt[challenge.id]),
+                )
+            }
+            UiSnapshot(
+                focus = focus,
+                canStop = focus.state == FocusState.ACTIVE,
+                habits = HabitMatrix.build(today, habits),
+                upcoming = upcoming,
+                challenges = challenges,
+                hasApiKey = apiKeys.load() != null,
+                voiceConsent = voiceConsent,
+                pendingCommand = pendingCommand?.let { "Heard: " + it.describe() },
+                message = statusMessage,
+                storageProblem = storageFailure?.let { "Storage problem: $it. Your data has not been deleted." },
+                latestInvite = latestInvite,
+                blockedApps = session.current.blockList.packages.map(::appLabel).sorted(),
+                blockedSites = session.current.blockList.domains.map { it.value }.sorted(),
+                stored = listOf(
+                    "Sessions" to sessions.size.toString(),
+                    "Habits" to habits.size.toString(),
+                    "Challenges" to challenges.size.toString(),
+                    "Tamper events" to active.tamper.all().size.toString(),
+                ),
+            )
+        }
+        main.post { uiState.value = snapshot }
+    }
+
+    /** The installed app's name, or its package when it is not installed. */
+    private fun appLabel(app: org.organiza.domain.PackageName): String = try {
+        packageManager.getApplicationLabel(packageManager.getApplicationInfo(app.value, 0)).toString()
+    } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+        app.value
+    }
+
+    fun addHabit(name: String) = onStorageThread {
+        if (name.isBlank()) return@onStorageThread
+        val voice = storage?.voice ?: return@onStorageThread
+        statusMessage = when (voice.apply(VoiceCommand.AddHabit(name.trim()))) {
+            VoiceOutcome.Done -> "Added ${name.trim()}"
+            VoiceOutcome.AlreadyExists -> "That habit already exists"
+            else -> "Could not add that habit"
+        }
+    }
+
+    fun markHabit(name: String, done: Boolean) = onStorageThread {
+        val voice = storage?.voice ?: return@onStorageThread
+        val today = clock.now().atZone(ZoneId.systemDefault()).toLocalDate()
+        voice.apply(VoiceCommand.MarkHabit(name, today, done))
+        refreshUi()
+    }
+
+    internal fun markHabitDaysAgoForTesting(name: String, daysAgo: Long, done: Boolean) = onStorageThread {
+        val voice = storage?.voice ?: return@onStorageThread
+        val day = clock.now().atZone(ZoneId.systemDefault()).toLocalDate().minusDays(daysAgo)
+        voice.apply(VoiceCommand.MarkHabit(name, day, done))
+        refreshUi()
+    }
+
+    /** Looks up an invite on the storage thread and hands it to [use] on the main thread. */
+    fun inviteToShare(use: (String?) -> Unit) = onStorageThread {
+        val invite = latestInvite ?: storage?.arena?.let { arena -> arena.challenges().firstOrNull()?.let { arena.invite(it.id) } }
+        main.post { use(invite) }
     }
 
     private fun syncVpn(policy: SessionPolicy) {
@@ -518,6 +679,8 @@ class OrganizaApp : Application(), EnforcementCapabilities {
         private const val TAMPER_GRACE_MS = 5_000L
         private val CALENDAR_WINDOW: Duration = Duration.ofDays(60)
         private val WEEK: Duration = Duration.ofDays(7)
+        private const val MAX_UPCOMING = 5
+        private const val MESSAGE_MS = 6_000L
 
         fun from(context: Context): OrganizaApp = context.applicationContext as OrganizaApp
 

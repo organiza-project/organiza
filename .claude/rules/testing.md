@@ -8,3 +8,5 @@
 - Android changes also need `scripts/verify-android.sh` on an emulator (all checks must pass). Count checks use check_eq, because "0" also matches "10". Check that a
   new assertion can fail: the first overlay check here passed because its grep never matched.
 - The Android build needs a full JDK. If the default `java` has no compiler, set `JAVA_HOME`.
+- UI changes: run `scripts/seed-screens.sh`, then screenshot every tab in light, dark, a small phone at 1.3x font
+  and a tablet, and critique them against `taste-skill`'s app-screen rules (ADR-0012).

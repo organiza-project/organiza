@@ -76,7 +76,7 @@ shell settings put secure enabled_accessibility_services "$SERVICE" >/dev/null
 shell settings put secure accessibility_enabled 1 >/dev/null
 shell appops set "$APP" ACTIVATE_VPN allow >/dev/null
 shell dpm set-active-admin "$ADMIN" >/dev/null
-shell am start -W -n "$APP/org.organiza.android.SetupActivity" >/dev/null
+shell am start -W -n "$APP/org.organiza.android.MainActivity" >/dev/null
 # A fresh install can race the accessibility manager, which then drops the binding.
 # Wait until the service is really bound and stays bound.
 bound() { shell dumpsys accessibility | grep -q 'Bound services:{Service\[label=Organiza'; }
@@ -448,7 +448,7 @@ session start --es packages com.example.none
 sleep 6
 shell settings put secure enabled_accessibility_services "''" >/dev/null
 kill_now
-shell am start -W -n "$APP/org.organiza.android.SetupActivity" >/dev/null
+shell am start -W -n "$APP/org.organiza.android.MainActivity" >/dev/null
 sleep 8
 check "loss during a kill is recorded after restart" "ACCESSIBILITY,OVERLAY,ACCESSIBILITY" "$(debug_state)"
 session stop
@@ -460,7 +460,7 @@ before=$(in_app "wc -c < databases/organiza.db")
 check_above_zero "control: the database has content" "$before"
 in_app "echo damaged > no_backup/database.key" >/dev/null
 kill_now
-shell am start -W -n "$APP/org.organiza.android.SetupActivity" >/dev/null
+shell am start -W -n "$APP/org.organiza.android.MainActivity" >/dev/null
 sleep 5
 check "the failure is reported" "storageFailure=KEY_UNREADABLE" "$(debug_state)"
 check_eq "the database file is kept" "${before// /}" "$(in_app "wc -c < databases/organiza.db")"

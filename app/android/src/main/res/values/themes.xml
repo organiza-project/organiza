@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The window matches the Compose ground, so nothing flashes before the first frame. -->
+    <style name="OrganizaTheme" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/ground</item>
+    </style>
+    <color name="ground">#F2F4F7</color>
+</resources>

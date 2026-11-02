@@ -40,6 +40,10 @@ public class HabitStore(private val db: Database) {
             StoredHabit(row.string(0).orEmpty(), row.string(1).orEmpty())
         }
 
+    public fun createdAt(id: String): Instant? =
+        db.query("SELECT created_at_ms FROM habit WHERE id = ?", listOf(id)) { row -> row.long(0) }
+            .firstOrNull()?.let(Instant::ofEpochMilli)
+
     /** Hides a habit and keeps its history. */
     public fun archive(id: String, at: Instant) {
         db.execute("UPDATE habit SET archived_at_ms = ? WHERE id = ?", listOf(at.toEpochMilli(), id))
