@@ -40,6 +40,7 @@ Options rejected and why.
 | 0008 | Encrypted storage and deterministic calendar scheduling | Accepted | 2026-11-01 |
 | 0009 | BYOK AI pipeline and on-device sanitizer | Accepted | 2026-11-01 |
 | 0010 | Voice commands through Groq Whisper | Accepted | 2026-11-01 |
+| 0011 | Arena challenges, encrypted sync and a blind relay | Accepted | 2026-11-02 |
 
 ---
 
@@ -434,3 +435,52 @@ grammar is English; other languages rely on the model rewrite.
 Android's on-device recognizer: better for privacy, but only on Android 12+ and only where a
 language pack is present. It is a good option to add later. Letting the model return actions
 directly: more flexible, but its output would then decide what runs.
+
+---
+
+## ADR-0011: Arena challenges, encrypted sync and a blind relay
+
+- **Status:** Accepted
+- **Date:** 2026-11-02
+- **Deciders:** jackforce
+
+### Context
+Phase 4 needs peer challenges that share results and nothing else. ADR-0006 settled what a
+daily commitment is. This records how results move between people, given that CLAUDE.md allows
+only encrypted relays and rules out cloud servers for core features. No relay exists yet.
+
+### Decision
+- **Rules are a pure fold.** Each day is met, missed or tampered. A missed day uses a freeze if one
+  is left, otherwise it is a failure and resets the streak. A tampered day in a strict challenge
+  is always a failure and cannot be frozen (ADR-0005). More failures than the challenge allows
+  forfeits it. Closed days never change, and a clock moved backwards cannot reopen them.
+- **A relay is a blind mailbox.** It stores opaque bytes under a mailbox ID derived from the group
+  secret, and hands them back by cursor. It holds no keys and runs no challenge logic.
+- **Encryption.** An invite carries a random 256-bit group secret. HKDF-SHA256 derives the mailbox
+  ID and an AES-256-GCM key. Plaintext is padded to a fixed size, so a success and a failure look
+  the same to the relay. The relay can still see network addresses and when messages are sent.
+- **Identity.** Each member has a per-challenge Ed25519 key and is known by its public key plus a
+  display name they choose, visible to the group only. Android below API 33 has no Ed25519, so
+  BouncyCastle's lightweight API is added to `:core:arena`.
+- **Group model.** Anyone holding the invite can join and read. There are no admins and no
+  member removal, so an invite should be shared like a password.
+- **Verification is recomputed, never trusted.** Each member's standing is derived from their
+  signed entries. A bad signature is rejected on receipt. A broken chain, an impossible streak or
+  two different signed answers for one day mark that member invalid. Salts are revealed when a
+  member's challenge ends, which confirms their commitments.
+- **Honesty stays self-attested (ADR-0006).** Verification proves results were not rewritten, not
+  that they were true, and the leaderboard must not imply otherwise.
+- **Automatic criteria stay local.** Screen time and launch checks read usage stats on the device,
+  and only the resulting outcome is shared.
+- **Sync never affects blocking.** A relay failure leaves results queued and changes nothing else.
+
+### Consequences
+Arena needs someone to run a relay. `scripts/arena-relay.py` is a small reference relay for testing
+and self-hosting, not a hardened public service. A member who stops reporting is shown as behind,
+not failed, because silence cannot be told apart from being offline.
+
+### Alternatives Considered
+Direct peer-to-peer: phones are rarely reachable at the same moment, and it exposes addresses to
+peers. A third-party service such as Firebase: a Google dependency, against the project's privacy
+position. Pairwise encryption: stronger after a member leaves, but much more complex for
+small groups of friends sharing one invite.

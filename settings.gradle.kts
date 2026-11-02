@@ -16,4 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "organiza"
 
-include(":core:domain", ":core:testing", ":core:storage", ":core:enforcement", ":core:calendar", ":core:scheduler", ":core:ai", ":core:voice", ":app:android")
+include(":core:domain", ":core:testing", ":core:storage", ":core:enforcement", ":core:calendar", ":core:scheduler", ":core:ai", ":core:voice", ":core:arena", ":app:android")
