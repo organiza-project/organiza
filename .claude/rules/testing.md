@@ -10,3 +10,4 @@
 - The Android build needs a full JDK. If the default `java` has no compiler, set `JAVA_HOME`.
 - UI changes: run `scripts/seed-screens.sh`, then screenshot every tab in light, dark, a small phone at 1.3x font
   and a tablet, and critique them against `taste-skill`'s app-screen rules (ADR-0012).
+- Linux daemon changes also need `scripts/verify-linux-vm.sh` (a throwaway VM; never test the root daemon on this machine).

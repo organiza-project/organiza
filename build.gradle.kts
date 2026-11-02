@@ -14,7 +14,8 @@ subprojects {
                 jvmTarget.set(JvmTarget.JVM_17)
                 allWarningsAsErrors.set(true)
             }
-            explicitApi()
+            // Libraries state their API; applications under :platform have none to state.
+            if (!path.startsWith(":platform")) explicitApi()
         }
         extensions.configure<JavaPluginExtension> {
             sourceCompatibility = JavaVersion.VERSION_17

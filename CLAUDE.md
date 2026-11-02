@@ -51,5 +51,6 @@ Recorded in ADR-0002. `./gradlew test` runs everything.
 - `core/voice` — dictation pipeline and local command grammar (ADR-0010).
 - `core/arena` — challenge rules, commitments, encrypted relay sync, leaderboard (ADR-0011).
 - `core/presentation` — tested screen models for the Compose UI (ADR-0012).
+- `platform/linux` — systemd daemon and `organiza` CLI on the shared core (ADR-0013).
 - `app/android` — Phase 1: services, overlay, VPN, UI.
 - `.claude/rules/` — working rules for architecture, testing and privacy.
