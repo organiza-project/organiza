@@ -37,12 +37,16 @@ public sealed interface ArenaMessage {
 
     /** Sent when a member's challenge ends, so the group can check their commitments. */
     public data class Reveal(override val member: String, val salts: Map<String, String>, val signature: String) : ArenaMessage
+
+    /** A friendly nudge to one member on one day (ADR-0018). It carries no results or usage. */
+    public data class Nudge(override val member: String, val to: String, val date: String, val signature: String) : ArenaMessage
 }
 
 public object Messages {
     private val JOIN_TAG = "organiza-arena-join-v1".toByteArray()
     private val PROOF_TAG = "organiza-arena-proof-v1".toByteArray()
     private val REVEAL_TAG = "organiza-arena-reveal-v1".toByteArray()
+    private val NUDGE_TAG = "organiza-arena-nudge-v1".toByteArray()
 
     public fun memberId(privateKey: ByteArray): String = ArenaCrypto.publicKey(privateKey).toHex()
 
@@ -75,6 +79,12 @@ public object Messages {
         return ArenaMessage.Reveal(member, hex, signature.toHex())
     }
 
+    public fun nudge(challengeId: String, privateKey: ByteArray, to: String, date: String): ArenaMessage.Nudge {
+        val member = memberId(privateKey)
+        val signature = ArenaCrypto.sign(privateKey, nudgeBytes(challengeId, member, to, date))
+        return ArenaMessage.Nudge(member, to, date, signature.toHex())
+    }
+
     public fun verify(challengeId: String, message: ArenaMessage): Boolean {
         val key = message.member.hexToBytesOrNull() ?: return false
         return when (message) {
@@ -87,8 +97,16 @@ public object Messages {
                 val signature = message.signature.hexToBytesOrNull() ?: return false
                 ArenaCrypto.verify(key, revealBytes(challengeId, message.member, message.salts), signature)
             }
+            is ArenaMessage.Nudge -> {
+                val signature = message.signature.hexToBytesOrNull() ?: return false
+                ArenaCrypto.verify(key, nudgeBytes(challengeId, message.member, message.to, message.date), signature)
+            }
         }
     }
+
+    private fun nudgeBytes(challengeId: String, member: String, to: String, date: String) = lengthPrefixed(
+        listOf(NUDGE_TAG, challengeId.toByteArray(), member.toByteArray(), to.toByteArray(), date.toByteArray()),
+    )
 
     private fun joinBytes(challengeId: String, member: String, name: String) =
         lengthPrefixed(listOf(JOIN_TAG, challengeId.toByteArray(), member.toByteArray(), name.toByteArray()))
@@ -143,6 +161,13 @@ public object Wire {
                 putJsonObject("salts") { message.salts.forEach { (date, salt) -> put(date, salt) } }
                 put("signature", message.signature)
             }
+            is ArenaMessage.Nudge -> buildJsonObject {
+                put("type", "nudge")
+                put("member", message.member)
+                put("to", message.to)
+                put("date", message.date)
+                put("signature", message.signature)
+            }
         }.toString().toByteArray()
         val used = LENGTH_BYTES + json.size
         val blocks = (used + BLOCK_BYTES - 1) / BLOCK_BYTES
@@ -174,6 +199,12 @@ public object Wire {
                 (json["salts"] as? JsonObject)?.mapValues { (_, value) ->
                     (value as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
                 } ?: return null,
+                json.text("signature") ?: return null,
+            )
+            "nudge" -> ArenaMessage.Nudge(
+                member,
+                json.text("to")?.takeIf { it.length == HEX_32_BYTES } ?: return null,
+                json.text("date") ?: return null,
                 json.text("signature") ?: return null,
             )
             else -> null

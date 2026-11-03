@@ -58,6 +58,8 @@ public sealed interface SyncResult {
 }
 
 /** Runs challenges on this device and exchanges only signed results with the group (ADR-0011). */
+public enum class NudgeResult { Sent, AlreadyToday, UnknownMember, UnknownChallenge, SecretsMissing, RelayUnavailable }
+
 public class ArenaEngine(
     private val db: Database,
     private val clock: Clock,
@@ -198,6 +200,35 @@ public class ArenaEngine(
     }
 
     /** Publishes what is queued and reads what is new. A failure leaves everything queued. */
+    /** Sends a nudge to [to] right away, once a day. The relay sees a padded message like any other. */
+    public fun nudge(challengeId: String, to: String): NudgeResult {
+        val challenge = store.challenge(challengeId) ?: return NudgeResult.UnknownChallenge
+        if (to == challenge.memberId || to !in store.members(challengeId)) return NudgeResult.UnknownMember
+        val today = today()
+        if (store.nudged(challengeId, challenge.memberId, to, today)) return NudgeResult.AlreadyToday
+        val secret = secrets.get(secretName(challengeId, GROUP)) ?: return NudgeResult.SecretsMissing
+        val signing = secrets.get(secretName(challengeId, SIGNING)) ?: return NudgeResult.SecretsMissing
+        val keys = GroupKeys(secret)
+        val message = Messages.nudge(challengeId, signing, to, today.toString())
+        return try {
+            relayFor(challenge.relayUrl).append(
+                keys.mailboxId,
+                ArenaCrypto.seal(keys.encryptionKey, Wire.encode(message), keys.associatedData),
+            )
+            store.putNudge(challengeId, challenge.memberId, to, today)
+            NudgeResult.Sent
+        } catch (_: IOException) {
+            NudgeResult.RelayUnavailable
+        }
+    }
+
+    /** The names of members who nudged this device today. */
+    public fun nudgesForMe(challengeId: String): List<String> {
+        val challenge = store.challenge(challengeId) ?: return emptyList()
+        val names = store.members(challengeId)
+        return store.nudgesTo(challengeId, challenge.memberId, today()).map { names[it] ?: "A member" }
+    }
+
     public fun sync(challengeId: String): SyncResult {
         val challenge = store.challenge(challengeId) ?: return SyncResult.UnknownChallenge
         val secret = secrets.get(secretName(challengeId, GROUP)) ?: return SyncResult.SecretsMissing
@@ -279,6 +310,10 @@ public class ArenaEngine(
                 if (store.putEntry(challenge.id, entry) == EntryResult.DUPLICATE) return true
             }
             is ArenaMessage.Reveal -> store.putReveal(challenge.id, message.member, Wire.encode(message))
+            is ArenaMessage.Nudge -> {
+                val date = parseDate(message.date)
+                if (message.to == challenge.memberId && date != null) store.putNudge(challenge.id, message.member, message.to, date)
+            }
         }
         return true
     }

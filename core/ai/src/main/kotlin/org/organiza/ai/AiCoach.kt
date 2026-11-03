@@ -37,6 +37,14 @@ public class AiCoach(
 
     public fun copilot(facts: CopilotFacts): AiResult<CopilotAdvice> = ask(Prompts.copilot(facts, sanitizer), ::parseAdvice)
 
+    /** Weekly blocks from a timetable's text. Nothing is scheduled until the person adds them. */
+    public fun extractSchedule(text: String): AiResult<List<SuggestedBlock>> =
+        ask(Prompts.scheduleExtraction(sanitizer.clean(text.take(MAX_SCHEDULE_TEXT)))) { reply ->
+            (reply["blocks"] as? JsonArray)?.take(MAX_ITEMS)?.map { element ->
+                parseBlock(element as? JsonObject ?: return@ask null) ?: return@ask null
+            }
+        }
+
     private fun <T : Any> ask(prompt: Prompt, parse: (JsonObject) -> T?): AiResult<T> {
         val key = keys.load() ?: return AiResult.Failed(AiFailure.NO_KEY)
         return when (val reply = client.complete(key, prompt)) {
@@ -85,6 +93,7 @@ public class AiCoach(
     public companion object {
         public const val MAX_REPLY_TEXT: Int = 1000
         private const val MAX_ITEMS = 50
+        private const val MAX_SCHEDULE_TEXT = 4000
         private const val MAX_ADVICE_BLOCKS = 5
         private const val MAX_ADVICE_TEXTS = 3
         private const val MAX_BLOCK_MINUTES = 720

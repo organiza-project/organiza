@@ -153,4 +153,24 @@ class PromptsTest {
         store.clear()
         assertEquals(AiResult.Failed(AiFailure.NO_KEY), coach.weeklyReview(weekly))
     }
+
+    @Test
+    fun `schedule extraction sends sanitized text and parses blocks`() {
+        transport.respond(200, reply("""{"blocks":[{"day":"MONDAY","start":"09:00","minutes":90,"label":"Maths"},{"day":"TUESDAY","start":"14:00","minutes":60,"label":"Lab"}]}"""))
+        val result = coach.extractSchedule("Mon 9-10:30 Maths with $leaky\nTue 2pm Lab")
+        assertEquals(
+            AiResult.Ok(listOf(SuggestedBlock(DayOfWeek.MONDAY, 540, 90, "Maths"), SuggestedBlock(DayOfWeek.TUESDAY, 840, 60, "Lab"))),
+            result,
+        )
+        assertNothingLeaked()
+        assertTrue("not instructions" in sentBody().lowercase())
+    }
+
+    @Test
+    fun `an empty extraction is a valid answer, and a broken one is not`() {
+        transport.respond(200, reply("""{"blocks":[]}"""))
+        assertEquals(AiResult.Ok(emptyList()), coach.extractSchedule("nothing here"))
+        transport.respond(200, reply("""{"blocks":[{"day":"MONDAY","start":"9am","minutes":60,"label":"x"}]}"""))
+        assertEquals(AiResult.Failed(AiFailure.MALFORMED), coach.extractSchedule("x"))
+    }
 }

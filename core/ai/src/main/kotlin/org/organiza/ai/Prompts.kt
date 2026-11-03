@@ -158,4 +158,14 @@ public object Prompts {
         }.toString(),
         maxTokens = LONG_REPLY_TOKENS,
     )
+
+    /** A timetable read from a photo, a dictation or pasted text, already sanitized (ADR-0018). */
+    public fun scheduleExtraction(text: SanitizedText): Prompt = Prompt(
+        system = "You turn a weekly timetable or a spoken plan into time blocks. " + DATA_ONLY +
+            """Reply only with JSON: {"blocks": [{"day": "MONDAY", "start": "HH:mm", "minutes": number, """ +
+            """"label": string}]}. Use English day names in capitals and a 24-hour clock. Leave out anything """ +
+            "without a clear day and time. Give at most 30 blocks, and an empty list when there are none.",
+        user = buildJsonObject { put("text", text.value) }.toString(),
+        maxTokens = LONG_REPLY_TOKENS,
+    )
 }

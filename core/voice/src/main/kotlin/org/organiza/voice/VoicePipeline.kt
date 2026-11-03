@@ -38,6 +38,9 @@ public sealed interface VoiceResult {
     public data object TooLong : VoiceResult
 
     public data class Failed(val failure: AiFailure) : VoiceResult
+
+    /** Plain text for a dictated schedule, which is sanitized later, before any prompt (ADR-0018). */
+    public data class Transcript(val text: String) : VoiceResult
 }
 
 /** Turns speech into a command. Only the local grammar can produce one (ADR-0010). */
@@ -58,6 +61,17 @@ public class VoicePipeline(
         return when (val text = client.transcribe(key, Wav.encode(samples, sampleRate))) {
             is AiResult.Failed -> VoiceResult.Failed(text.failure)
             is AiResult.Ok -> fromTranscript(text.value, now, knownHabits)
+        }
+    }
+
+    /** Transcribes a dictation without reading it as a command. */
+    public fun transcript(samples: ShortArray, sampleRate: Int): VoiceResult {
+        if (samples.size > sampleRate.toLong() * MAX_SECONDS) return VoiceResult.TooLong
+        if (isSilent(samples)) return VoiceResult.Silent
+        val key = keys.load() ?: return VoiceResult.Failed(AiFailure.NO_KEY)
+        return when (val text = client.transcribe(key, Wav.encode(samples, sampleRate))) {
+            is AiResult.Failed -> VoiceResult.Failed(text.failure)
+            is AiResult.Ok -> VoiceResult.Transcript(text.value.trim())
         }
     }
 

@@ -140,4 +140,13 @@ class VoicePipelineTest {
         assertEquals("Mark stretch done on 2026-11-01", VoiceCommand.MarkHabit("stretch", today, true).describe())
         assertEquals("Mark stretch missed on 2026-11-01", VoiceCommand.MarkHabit("stretch", today, false).describe())
     }
+
+    @Test
+    fun `dictation returns the transcript itself, and never sends silence`() {
+        transport.respond(200, transcribed(" Monday nine to eleven, maths."))
+        assertEquals(VoiceResult.Transcript("Monday nine to eleven, maths."), pipeline.transcript(speech, 16_000))
+        val before = transport.requests.size
+        assertEquals(VoiceResult.Silent, pipeline.transcript(silence, 16_000))
+        assertEquals(before, transport.requests.size)
+    }
 }

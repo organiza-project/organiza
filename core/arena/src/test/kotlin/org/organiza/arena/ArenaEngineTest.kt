@@ -249,8 +249,10 @@ class ArenaEngineTest {
     @Test
     fun `sync resumes from its cursor after a restart`() {
         val id = twoMembers()
+        // Each side learns of the other from the relay: Alice needs Bob's join before she can nudge him.
         alice.engine.sync(id)
         bob.engine.sync(id)
+        alice.engine.sync(id)
         val cursor = bob.store.challenge(id)?.syncCursor
         assertTrue((cursor ?: 0) > 0)
         val received = (bob.newEngine().sync(id) as SyncResult.Synced).received
@@ -385,5 +387,53 @@ class ArenaEngineTest {
             (0..14).joinToString(",") { row.string(it).orEmpty() }
         }.single()
         assertFalse(hex in rows)
+    }
+
+    @Test
+    fun `a nudge reaches the named member once a day and nobody else reads it as theirs`() {
+        val id = twoMembers()
+        // Each side learns of the other from the relay: Alice needs Bob's join before she can nudge him.
+        alice.engine.sync(id)
+        bob.engine.sync(id)
+        alice.engine.sync(id)
+        val bobId = bob.store.challenge(id)?.memberId.orEmpty()
+        val aliceId = alice.store.challenge(id)?.memberId.orEmpty()
+        assertEquals(NudgeResult.Sent, alice.engine.nudge(id, bobId))
+        assertEquals(NudgeResult.AlreadyToday, alice.engine.nudge(id, bobId))
+        bob.engine.sync(id)
+        assertEquals(listOf("alice"), bob.engine.nudgesForMe(id))
+        alice.engine.sync(id)
+        assertEquals(emptyList(), alice.engine.nudgesForMe(id))
+        nextDay()
+        assertEquals(emptyList(), bob.engine.nudgesForMe(id))
+        assertEquals(NudgeResult.Sent, alice.engine.nudge(id, bobId))
+        assertEquals(NudgeResult.UnknownMember, alice.engine.nudge(id, "f".repeat(64)))
+        assertEquals(NudgeResult.UnknownMember, alice.engine.nudge(id, aliceId))
+    }
+
+    @Test
+    fun `a nudge is padded like every other message`() {
+        val id = twoMembers()
+        // Each side learns of the other from the relay: Alice needs Bob's join before she can nudge him.
+        alice.engine.sync(id)
+        bob.engine.sync(id)
+        alice.engine.sync(id)
+        val sizes = relay.stored.values.flatten().map { it.size }.toSet()
+        alice.engine.nudge(id, bob.store.challenge(id)?.memberId.orEmpty())
+        assertEquals(sizes, relay.stored.values.flatten().map { it.size }.toSet())
+    }
+
+    @Test
+    fun `a nudge offline is reported and not counted`() {
+        val id = twoMembers()
+        // Each side learns of the other from the relay: Alice needs Bob's join before she can nudge him.
+        alice.engine.sync(id)
+        bob.engine.sync(id)
+        alice.engine.sync(id)
+        relay.offline = true
+        val bobId = bob.store.challenge(id)?.memberId.orEmpty()
+        assertEquals(NudgeResult.RelayUnavailable, alice.engine.nudge(id, bobId))
+        relay.offline = false
+        assertEquals(NudgeResult.Sent, alice.engine.nudge(id, bobId))
     }
 }
