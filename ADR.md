@@ -47,6 +47,7 @@ Options rejected and why.
 | 0015 | Backend choice: local only, hosted Supabase or self-hosted | Accepted | 2026-11-02 |
 | 0016 | Mindful friction: typed-phrase overrides instead of hard lockouts | Accepted | 2026-11-02 |
 | 0017 | AI copilot insights and override reflection | Accepted | 2026-11-02 |
+| 0018 | Wireframe redesign: limits, habit plans, schedule import, XP and nudges | Accepted | 2026-11-03 |
 
 ---
 
@@ -766,3 +767,61 @@ Groq's terms still apply to whatever is sent, which the onboarding AI step says.
 Sending per-app usage: more precise advice, but it reveals what someone uses. An on-device language
 model: private, but too large for this milestone. Letting the model decide overrides: it would
 fail closed or fail open, and both are wrong for a reflection.
+
+---
+
+## ADR-0018: Wireframe redesign: limits, habit plans, schedule import, XP and nudges
+
+- **Status:** Accepted
+- **Date:** 2026-11-03
+- **Deciders:** jackforce
+
+### Context
+The maintainer's wireframe (ten screens) asks for a home dial, weekly and monthly habits with targets
+and reminders, an agenda grid, a schedule import hub, a distraction hub with daily limits and
+separate Reels and Shorts switches, a "Limit reached" pause, a podium with nudges, and a profile with
+levels and badges. Most of these are new features. They must keep the privacy rules: nothing about
+usage leaves the phone, and the relay learns nothing new.
+
+### Decision
+- **Style.** The achromatic ledger (ADR-0012) stays, with the wireframe's face: crisp ink outlines on
+  cards and controls instead of hairlines, a 16dp card and 12dp control radius, one outline icon set
+  drawn in code, and the daily-goal dial as the signature element. The ink borders go past
+  taste-skill's border limit on purpose, because the brief asks for high-contrast functionalism.
+  Colour stays on data: the dial, today and now.
+- **Navigation.** Five destinations: Habits, Arena, Home in the middle, Metrics and Profile. The agenda,
+  import hub, dictation, new habit and distraction hub open on top with a back stack.
+- **Daily limits.** Each app may have a daily foreground limit, from 5 minutes to 3 hours, read from
+  UsageStats. Over the limit, the app gets the pause screen as "Limit reached", in or out of a
+  session. An override grants a pass as usual. `intervention_event` gains the `limit` kind.
+- **Short video feeds.** YouTube Shorts and Instagram Reels each have an always-on switch, applied by
+  the same content policy that sessions use. A session's "Shorts and Reels" still means every feed.
+- **Habit plans.** A habit is daily, weekly or monthly, with a target of met days per period (always 1
+  when daily) and an optional reminder time. Reminders are local alarms and notifications; the
+  habit's name appears only on this phone. Only daily habits can join challenges, as before.
+- **Schedule import.** A timetable photo is read on the phone with Tesseract (Apache-2.0, through
+  JitPack, the only place it is published), with English data from `tessdata_fast` bundled. The
+  photo never leaves the phone. Its text, a dictation transcript or pasted text is sanitized and sent
+  to the BYOK model, which returns weekly blocks. Nothing is scheduled until the person adds them,
+  and only times are stored, never the labels. ML Kit was rejected because it reports usage metrics
+  to Google.
+- **XP, levels and badges** are computed on the phone from local results: 10 XP per met habit day, 1
+  per 5 focus minutes, 5 per time the person stayed focused, 100 per completed challenge. Level n
+  starts at 50 n (n - 1) XP. None of it is shared.
+- **Challenge XP and nudges.** Friends are the members of a challenge. Their XP is computed from the
+  results they already share (10 per met day, 2 per streak day), so nothing new is sent. A nudge is a
+  fourth signed message type, padded like the others, so the relay cannot tell it apart. Each member
+  can nudge another once a day.
+- **Signing.** A dogfood key is checked in at `app/android/debug.keystore`, so every machine and CI
+  builds APKs that update each other. `dogfoodApks` re-signs both APKs with v1, v2 and v3 schemes for
+  vendor installers. It is a test key and must never sign a store release.
+- Schema v6 holds the habit plan columns and the `usage_limit`, `setting` and `arena_nudge` tables.
+
+### Consequences
+Limits need usage access; without it they cannot be enforced, and the hub says so. Photo OCR adds
+about 9 MB and is weaker on handwriting than cloud OCR. Nudges arrive at the next sync, not instantly.
+
+### Alternatives Considered
+Sharing XP with friends: it would reveal focus minutes and habit counts. Google sign-in: deferred, to
+keep Google out of the app. Cloud OCR: the image cannot be sanitized.
+
