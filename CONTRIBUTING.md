@@ -88,8 +88,11 @@ Use the anon or publishable key only. The app refuses service-role and secret ke
 The backend only stores accounts and encrypted challenge messages. To run your own:
 
 1. Create a Supabase project, or run Supabase yourself.
-2. Apply `supabase/migrations` with `supabase db push`, or paste the SQL into the SQL editor.
+2. Run `supabase/setup.sql` in the SQL Editor, or `supabase db push` for the migration alone.
 3. In the app, choose "My own Supabase" and enter the project URL and anon key.
+
+[`docs/supabase-setup.md`](docs/supabase-setup.md) has the authentication settings and what the
+backend can see. `supabase/setup.sql` must contain each migration unchanged; a test checks it.
 
 Each signed-in user may append 500 messages a day. Messages are kept until you delete them.
 
@@ -105,7 +108,12 @@ Each signed-in user may append 500 messages a day. Messages are kept until you d
 
 Core tests use the fakes in `core/testing`, never mocks of framework classes, and time always comes
 from the `Clock` port. A schema change is a new `vN.sql` with migration tests; released versions
-are never edited. The six `RealGroqTest` tests run only with `GROQ_API_KEY` set.
+are never edited. The seven `RealGroqTest` tests run only with `GROQ_API_KEY` set, and
+`ORGANIZA_GROQ_MODEL` tries another chat model than the default:
+
+```bash
+GROQ_API_KEY=$(cat ~/.config/organiza/groq.key) ./gradlew :core:voice:test --tests '*RealGroqTest*'
+```
 
 ## Commits and pull requests
 

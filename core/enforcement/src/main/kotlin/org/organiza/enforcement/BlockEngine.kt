@@ -17,7 +17,9 @@ import org.organiza.domain.port.Clock
  * must stay reachable whatever the list says, to prevent lockout (ADR-0007).
  *
  * A block sends the person home and shows the intervention there. It stays up on [homes]
- * until the person chooses (ADR-0016), and closes when they reach any other allowed app.
+ * until the person chooses (ADR-0016), and closes when they reach any other allowed app. An app
+ * just sent home can still report a window for a moment, as Chrome does, so for [SETTLE] its own
+ * events are not taken as the person going back to it.
  */
 public class BlockEngine(
     private val surface: BlockSurface,
@@ -33,6 +35,7 @@ public class BlockEngine(
     private var foreground: PackageName? = null
     private var handledAt: Instant = Instant.MIN
     private var shown: BlockTarget? = null
+    private var sentHomeAt: Instant = Instant.MIN
 
     /** [active] is false once no session runs, which also closes a short-form or guard intervention. */
     public fun update(list: BlockList, active: Boolean = list != BlockList.EMPTY) {
@@ -51,6 +54,7 @@ public class BlockEngine(
         when {
             blocksApp(app) -> block(BlockTarget.App(app))
             app in homes -> Unit
+            app == shown?.app && Duration.between(sentHomeAt, now) < SETTLE -> Unit
             else -> dismiss()
         }
     }
@@ -62,6 +66,7 @@ public class BlockEngine(
         foreground = target.app
         handledAt = clock.now()
         shown = target
+        sentHomeAt = handledAt
         surface.showOverlay(target)
         surface.goHome()
     }
@@ -86,5 +91,10 @@ public class BlockEngine(
         is BlockTarget.App -> blockList.blocks(target.app)
         is BlockTarget.Site -> target.entry in blockList.domains
         is BlockTarget.ShortForm, is BlockTarget.Guard -> sessionActive
+    }
+
+    public companion object {
+        /** How long events from an app just sent home are taken as stale. */
+        public val SETTLE: Duration = Duration.ofSeconds(2)
     }
 }

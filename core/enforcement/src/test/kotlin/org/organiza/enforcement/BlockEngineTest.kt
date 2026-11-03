@@ -177,4 +177,24 @@ class BlockEngineTest {
         engine.update(BlockList.EMPTY)
         assertEquals(false, surface.overlayVisible)
     }
+
+    @Test
+    fun `a late event from the app just sent home does not close a site intervention`() {
+        val chrome = pkg("com.android.chrome")
+        engine.block(BlockTarget.Site(chrome, domain("reddit.com")))
+        engine.onForeground(home)
+        clock.advance(Duration.ofMillis(800))
+        engine.onForeground(chrome)
+        assertEquals(true, surface.overlayVisible)
+    }
+
+    @Test
+    fun `going back to that app later closes it, so another page can open`() {
+        val chrome = pkg("com.android.chrome")
+        engine.block(BlockTarget.Site(chrome, domain("reddit.com")))
+        engine.onForeground(home)
+        clock.advance(BlockEngine.SETTLE)
+        engine.onForeground(chrome)
+        assertEquals(false, surface.overlayVisible)
+    }
 }

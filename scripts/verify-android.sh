@@ -170,6 +170,9 @@ shell am start -W -a android.intent.action.VIEW -d https://example.com/ com.andr
 check "allowed site stays open in chrome" "com.android.chrome" "$(top_app)"
 shell am start -W -a android.intent.action.VIEW -d https://old.reddit.com/ com.android.chrome >/dev/null; sleep 6
 check_not "blocked site in chrome is sent home" "com.android.chrome" "$(top_app)"
+# Chrome reports one more window after it is sent home, which once closed the intervention.
+sleep 3
+check_eq "the site intervention stays up" "1" "$(overlays)"
 session stop
 shell am clear-debug-app >/dev/null
 shell input keyevent KEYCODE_HOME >/dev/null; sleep 1

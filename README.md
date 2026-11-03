@@ -29,7 +29,10 @@ adb install -r app/android/build/outputs/apk/release/android-release.apk
 
 Without a configured release key the APK is signed with the debug key. Android 13 and later may
 ask you to "Allow restricted settings" in Organiza's App info before the accessibility service can
-be turned on, because the app does not come from a store.
+be turned on, because the app does not come from a store. If the install fails, see
+[`docs/install.md`](docs/install.md).
+
+Screenshots of every screen are in [`docs/screenshots`](docs/screenshots).
 
 ## How it works
 
@@ -48,7 +51,8 @@ losing a permission during a session is recorded. ADR-0005 explains the threat m
 - [`ADR.md`](ADR.md): every architectural decision and its reasons.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md): building, testing and proposing changes.
 - [`docs/schema.md`](docs/schema.md): the local database.
-- [`supabase/`](supabase): the backend schema for hosted and self-hosted sync.
+- [`docs/supabase-setup.md`](docs/supabase-setup.md): the backend schema, authentication settings and keys.
+- [`docs/install.md`](docs/install.md): installing an APK and what install errors mean.
 
 ## License
 

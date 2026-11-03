@@ -2,7 +2,8 @@
 """A local stand-in for Groq's chat endpoint, used by verify-android.sh.
 
 It records every request so the script can check exactly what left the device.
-Usage: fake-groq.py PORT LOG_FILE MODE_FILE. The mode file holds grant, garbage or error.
+Usage: fake-groq.py PORT LOG_FILE MODE_FILE. The mode file holds grant, garbage, error or demo.
+Demo mode answers the copilot with believable sample advice, for screenshots only.
 Transcriptions return the contents of MODE_FILE.transcript.
 """
 import json
@@ -25,6 +26,15 @@ def content_for(body):
     if "fixed grammar" in system:
         hallucinated = "Thank you" in body["messages"][1]["content"]
         return {"command": None if hallucinated else "mark stretch as done"}
+    if "focus copilot" in system and mode() == "demo":
+        return {
+            "focusBlocks": [
+                {"day": "TUESDAY", "start": "09:30", "minutes": 90, "label": "Deep work before messages"},
+                {"day": "WEDNESDAY", "start": "20:30", "minutes": 60, "label": "Evening wind-down, phone away"},
+            ],
+            "warnings": ["Most blocked attempts land in the hour after 10:00. Start a session at 09:50 to cover it."],
+            "habitTips": ["Read 20 pages slips on Thursdays. Try reading right after dinner instead of in bed."],
+        }
     if "focus copilot" in system:
         return {"focusBlocks": [{"day": "MONDAY", "start": "21:00", "minutes": 45, "label": "Test"}],
                 "warnings": ["Test warning"], "habitTips": []}

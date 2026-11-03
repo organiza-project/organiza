@@ -10,6 +10,8 @@ import kotlin.test.assertTrue
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import org.organiza.ai.AiCoach
 import org.organiza.ai.AiResult
+import org.organiza.ai.BusyBlock
+import org.organiza.ai.CopilotFacts
 import org.organiza.ai.ApiKey
 import org.organiza.ai.GroqClient
 import org.organiza.ai.GroqEndpoint
@@ -23,14 +25,19 @@ import org.organiza.testing.FakeApiKeyStore
 
 /**
  * Calls the real Groq API, so it runs only when GROQ_API_KEY is set locally. CI skips it, and the
- * key is never stored in the repository. ORGANIZA_VOICE_SAMPLES points at folder of test recordings.
+ * key is never stored in the repository. ORGANIZA_VOICE_SAMPLES points at folder of test recordings,
+ * and ORGANIZA_GROQ_MODEL tries another chat model than the default.
  */
 @EnabledIfEnvironmentVariable(named = "GROQ_API_KEY", matches = ".+")
 class RealGroqTest {
     private val store = FakeApiKeyStore().apply {
         save((ApiKey.parse(System.getenv("GROQ_API_KEY").orEmpty()) as Parsed.Valid).value)
     }
-    private val client = GroqClient(UrlConnectionTransport(), GroqEndpoint.PRODUCTION)
+    private val client = GroqClient(
+        UrlConnectionTransport(),
+        GroqEndpoint.PRODUCTION,
+        System.getenv("ORGANIZA_GROQ_MODEL")?.takeIf(String::isNotBlank) ?: GroqClient.DEFAULT_MODEL,
+    )
     private val sanitizer = Sanitizer()
     private val coach = AiCoach(store, client, sanitizer)
     private val pipeline = VoicePipeline(store, client, sanitizer)
@@ -49,6 +56,21 @@ class RealGroqTest {
         val result = coach.suggestSchedule("Write my thesis for two hours each morning", emptyList())
         assertTrue(result is AiResult.Ok, "$result")
         assertTrue(result.value.blocks.isNotEmpty())
+    }
+
+    @Test
+    fun `the copilot proposes blocks from counts on the real model`() {
+        val facts = CopilotFacts(
+            days = 14,
+            attemptsByHour = List(24) { hour -> if (hour in 21..22) 6 else if (hour == 9) 3 else 0 },
+            overridesByHour = List(24) { hour -> if (hour == 22) 3 else 0 },
+            focusMinutes = 540,
+            habits = listOf(HabitFacts(sanitizer.clean("Read"), 4, 7)),
+            busy = listOf(BusyBlock(java.time.DayOfWeek.MONDAY, 9 * 60, 60, "#standup")),
+        )
+        val result = coach.copilot(facts)
+        assertTrue(result is AiResult.Ok, "$result")
+        assertTrue(result.value.focusBlocks.isNotEmpty() || result.value.warnings.isNotEmpty(), "${result.value}")
     }
 
     @Test
