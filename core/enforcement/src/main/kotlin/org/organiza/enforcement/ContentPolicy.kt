@@ -19,6 +19,9 @@ public data class ScreenSnapshot(
 
 public enum class ContentDecision { ALLOW, BLOCK_DOMAIN, BLOCK_SHORT_FORM, BLOCK_TAMPER }
 
+/** A short video feed that can be blocked on its own, inside the app or in a browser (ADR-0018). */
+public enum class ShortFormFeed { YOUTUBE_SHORTS, INSTAGRAM_REELS, FACEBOOK_REELS, TIKTOK }
+
 public class ContentPolicy(private val appLabel: String) {
     public fun decide(
         snapshot: ScreenSnapshot,
@@ -29,20 +32,27 @@ public class ContentPolicy(private val appLabel: String) {
         is BlockTarget.Guard -> ContentDecision.BLOCK_TAMPER
         is BlockTarget.Site -> ContentDecision.BLOCK_DOMAIN
         is BlockTarget.ShortForm -> ContentDecision.BLOCK_SHORT_FORM
-        is BlockTarget.App, null -> ContentDecision.ALLOW
+        is BlockTarget.App, is BlockTarget.Limit, null -> ContentDecision.ALLOW
     }
 
-    /** What to intervene on for this screen, or null to allow it. */
+    /** What to intervene on for this screen, or null to allow it. [blockShortForm] means every feed. */
     public fun target(
         snapshot: ScreenSnapshot,
         blockList: BlockList,
         blockShortForm: Boolean,
         strict: Boolean,
+    ): BlockTarget? = target(snapshot, blockList, if (blockShortForm) ShortFormFeed.entries.toSet() else emptySet(), strict)
+
+    public fun target(
+        snapshot: ScreenSnapshot,
+        blockList: BlockList,
+        feeds: Set<ShortFormFeed>,
+        strict: Boolean,
     ): BlockTarget? {
         if (strict && namesThisApp(snapshot)) return BlockTarget.Guard(snapshot.app)
         val url = urlBarId(snapshot.app)?.let { snapshot.urlBarText }?.let(::parseUrl)
         url?.let { blockList.entryFor(it.host) }?.let { return BlockTarget.Site(snapshot.app, it) }
-        if (blockShortForm && (url.isShortForm() || snapshot.viewIds.any(SHORT_FORM_VIEW_IDS::contains))) {
+        if (url.isShortForm(feeds) || snapshot.viewIds.any { SHORT_FORM_VIEW_IDS[it] in feeds }) {
             return BlockTarget.ShortForm(snapshot.app)
         }
         return null
@@ -65,10 +75,10 @@ public class ContentPolicy(private val appLabel: String) {
         return ParsedUrl(host.value, path)
     }
 
-    private fun ParsedUrl?.isShortForm(): Boolean {
+    private fun ParsedUrl?.isShortForm(feeds: Set<ShortFormFeed>): Boolean {
         val url = this ?: return false
-        return SHORT_FORM_PATHS.any { (site, prefix) ->
-            site.covers(url.host) && (url.path == prefix || url.path.startsWith("$prefix/"))
+        return SHORT_FORM_PATHS.any { (feed, site, prefix) ->
+            feed in feeds && site.covers(url.host) && (url.path == prefix || url.path.startsWith("$prefix/"))
         }
     }
 
@@ -89,19 +99,19 @@ public class ContentPolicy(private val appLabel: String) {
         )
 
         private val SHORT_FORM_PATHS = listOf(
-            site("youtube.com") to "/shorts",
-            site("instagram.com") to "/reels",
-            site("instagram.com") to "/reel",
-            site("facebook.com") to "/reel",
-            site("tiktok.com") to "",
+            Triple(ShortFormFeed.YOUTUBE_SHORTS, site("youtube.com"), "/shorts"),
+            Triple(ShortFormFeed.INSTAGRAM_REELS, site("instagram.com"), "/reels"),
+            Triple(ShortFormFeed.INSTAGRAM_REELS, site("instagram.com"), "/reel"),
+            Triple(ShortFormFeed.FACEBOOK_REELS, site("facebook.com"), "/reel"),
+            Triple(ShortFormFeed.TIKTOK, site("tiktok.com"), ""),
         )
 
         // Private view IDs, which apps can rename in any release. A Shorts tab label would
         // be no use here: it is on screen all the time, so matching it blocks the whole app.
-        private val SHORT_FORM_VIEW_IDS = setOf(
-            "com.google.android.youtube:id/reel_recycler",
-            "com.google.android.youtube:id/reel_player_page_container",
-            "com.instagram.android:id/clips_viewer_view_pager",
+        private val SHORT_FORM_VIEW_IDS = mapOf(
+            "com.google.android.youtube:id/reel_recycler" to ShortFormFeed.YOUTUBE_SHORTS,
+            "com.google.android.youtube:id/reel_player_page_container" to ShortFormFeed.YOUTUBE_SHORTS,
+            "com.instagram.android:id/clips_viewer_view_pager" to ShortFormFeed.INSTAGRAM_REELS,
         )
 
         private fun site(raw: String): DomainName = (DomainName.parse(raw) as Parsed.Valid).value

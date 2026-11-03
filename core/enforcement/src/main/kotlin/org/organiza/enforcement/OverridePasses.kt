@@ -19,6 +19,8 @@ public class OverridePasses(private val clock: Clock) {
         data class Site(val entry: DomainName) : Key
 
         data class ShortForm(val app: PackageName) : Key
+
+        data class Limit(val app: PackageName) : Key
     }
 
     private val passes = ConcurrentHashMap<Key, Instant>()
@@ -63,6 +65,7 @@ public class OverridePasses(private val clock: Clock) {
         is BlockTarget.App -> Key.App(target.app)
         is BlockTarget.Site -> Key.Site(target.entry)
         is BlockTarget.ShortForm -> Key.ShortForm(target.app)
+        is BlockTarget.Limit -> Key.Limit(target.app)
         is BlockTarget.Guard -> null
     }
 

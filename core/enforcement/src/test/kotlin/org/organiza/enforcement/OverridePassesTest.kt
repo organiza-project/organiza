@@ -78,4 +78,11 @@ class OverridePassesTest {
         passes.clear()
         assertFalse(passes.allows(BlockTarget.App(instagram)))
     }
+
+    @Test
+    fun `a limit pass is for that app's limit only`() {
+        passes.grant(BlockTarget.Limit(instagram), Duration.ofMinutes(5))
+        assertTrue(passes.allows(BlockTarget.Limit(instagram)))
+        assertFalse(passes.allows(BlockTarget.App(instagram)))
+    }
 }

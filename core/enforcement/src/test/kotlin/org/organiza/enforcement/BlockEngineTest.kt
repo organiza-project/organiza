@@ -197,4 +197,11 @@ class BlockEngineTest {
         engine.onForeground(chrome)
         assertEquals(false, surface.overlayVisible)
     }
+
+    @Test
+    fun `a limit intervention stays when no session runs`() {
+        engine.block(BlockTarget.Limit(instagram))
+        engine.update(BlockList.EMPTY, active = false)
+        assertEquals(true, surface.overlayVisible)
+    }
 }

@@ -126,4 +126,22 @@ class ContentPolicyTest {
         assertEquals(BlockTarget.Guard(settings), policy.target(guard, list, false, true))
         assertEquals(null, policy.target(ScreenSnapshot(youtube), list, true, false))
     }
+
+    @Test
+    fun `each short video feed can be blocked on its own`() {
+        val instagram = pkg("com.instagram.android")
+        val reels = ScreenSnapshot(instagram, viewIds = setOf("com.instagram.android:id/clips_viewer_view_pager"))
+        val shorts = ScreenSnapshot(youtube, viewIds = setOf("com.google.android.youtube:id/reel_recycler"))
+        val reelsOnly = setOf(ShortFormFeed.INSTAGRAM_REELS)
+        assertEquals(BlockTarget.ShortForm(instagram), policy.target(reels, list, reelsOnly, false))
+        assertEquals(null, policy.target(shorts, list, reelsOnly, false))
+        assertEquals(BlockTarget.ShortForm(youtube), policy.target(shorts, list, setOf(ShortFormFeed.YOUTUBE_SHORTS), false))
+    }
+
+    @Test
+    fun `short video paths in a browser follow the same feeds`() {
+        val shortsUrl = ScreenSnapshot(chrome, urlBarText = "m.youtube.com/shorts/abc")
+        assertEquals(null, policy.target(shortsUrl, list, setOf(ShortFormFeed.INSTAGRAM_REELS), false))
+        assertEquals(BlockTarget.ShortForm(chrome), policy.target(shortsUrl, list, setOf(ShortFormFeed.YOUTUBE_SHORTS), false))
+    }
 }

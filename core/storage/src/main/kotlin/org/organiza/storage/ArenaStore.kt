@@ -43,6 +43,30 @@ public data class StoredEntry(
 public enum class EntryResult { ADDED, DUPLICATE, CONFLICT }
 
 public class ArenaStore(private val db: Database) {
+    /** Keeps a nudge once per sender, receiver and day. False when it was already there. */
+    public fun putNudge(challengeId: String, from: String, to: String, date: java.time.LocalDate): Boolean {
+        val before = nudgeCount(challengeId, from, to, date)
+        db.execute(
+            "INSERT OR IGNORE INTO arena_nudge (challenge_id, from_member, to_member, local_date) VALUES (?, ?, ?, ?)",
+            listOf(challengeId, from, to, date.toString()),
+        )
+        return nudgeCount(challengeId, from, to, date) > before
+    }
+
+    public fun nudged(challengeId: String, from: String, to: String, date: java.time.LocalDate): Boolean =
+        nudgeCount(challengeId, from, to, date) > 0
+
+    /** Who nudged [member] on [date]. */
+    public fun nudgesTo(challengeId: String, member: String, date: java.time.LocalDate): List<String> = db.query(
+        "SELECT from_member FROM arena_nudge WHERE challenge_id = ? AND to_member = ? AND local_date = ? ORDER BY from_member",
+        listOf(challengeId, member, date.toString()),
+    ) { it.string(0).orEmpty() }
+
+    private fun nudgeCount(challengeId: String, from: String, to: String, date: java.time.LocalDate): Long = db.query(
+        "SELECT count(*) FROM arena_nudge WHERE challenge_id = ? AND from_member = ? AND to_member = ? AND local_date = ?",
+        listOf(challengeId, from, to, date.toString()),
+    ) { it.long(0) }.single() ?: 0
+
     public fun createChallenge(challenge: StoredChallenge) {
         db.execute(
             "INSERT INTO challenge (id, habit_id, title, starts_on, length_days, freeze_allowance, max_failures, strict, " +

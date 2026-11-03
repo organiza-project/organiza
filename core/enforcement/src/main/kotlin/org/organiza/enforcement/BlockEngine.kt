@@ -91,6 +91,8 @@ public class BlockEngine(
         is BlockTarget.App -> blockList.blocks(target.app)
         is BlockTarget.Site -> target.entry in blockList.domains
         is BlockTarget.ShortForm, is BlockTarget.Guard -> sessionActive
+        // A daily limit holds all day, with or without a session (ADR-0018).
+        is BlockTarget.Limit -> true
     }
 
     public companion object {

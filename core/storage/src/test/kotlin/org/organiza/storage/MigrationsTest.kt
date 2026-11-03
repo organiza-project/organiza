@@ -64,7 +64,7 @@ class MigrationsTest {
     fun `version 4 data survives the upgrade to version 5`() {
         Migrations.migrate(db, target = 4)
         db.execute("INSERT INTO tamper_event (capability, at_ms) VALUES ('VPN', 5)")
-        Migrations.migrate(db)
+        Migrations.migrate(db, target = 5)
         assertEquals(5L, version())
         assertEquals(listOf(1L), db.query("SELECT count(*) FROM tamper_event") { it.long(0) })
         assertEquals(listOf(0L), db.query("SELECT count(*) FROM intervention_event") { it.long(0) })

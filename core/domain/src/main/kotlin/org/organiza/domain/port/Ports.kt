@@ -32,6 +32,9 @@ public sealed interface BlockTarget {
 
     /** Organiza's own settings during a strict session. It never takes a pass. */
     public data class Guard(override val app: PackageName) : BlockTarget
+
+    /** [app] has used up its daily limit (ADR-0018). A pass adds minutes to today only. */
+    public data class Limit(override val app: PackageName) : BlockTarget
 }
 
 /** The visible side of a block. Android: an accessibility overlay and the global home action. */

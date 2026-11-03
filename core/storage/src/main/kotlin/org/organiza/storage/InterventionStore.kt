@@ -32,6 +32,7 @@ public class InterventionStore(private val db: Database) {
             is BlockTarget.Site -> "site" to target.entry.value
             is BlockTarget.ShortForm -> "short_form" to null
             is BlockTarget.Guard -> "guard" to null
+            is BlockTarget.Limit -> "limit" to null
         }
         db.execute(
             "INSERT INTO intervention_event (session_id, kind, app, site, outcome, reason, note, phrase_id, pause_s, " +
@@ -87,6 +88,7 @@ public class InterventionStore(private val db: Database) {
             "app" -> BlockTarget.App(pkg)
             "site" -> BlockTarget.Site(pkg, (DomainName.parse(site.orEmpty()) as? Parsed.Valid)?.value ?: error("stored site is invalid"))
             "short_form" -> BlockTarget.ShortForm(pkg)
+            "limit" -> BlockTarget.Limit(pkg)
             else -> BlockTarget.Guard(pkg)
         }
     }

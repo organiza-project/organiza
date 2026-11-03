@@ -11,6 +11,20 @@ public enum class HabitKind(internal val column: String) {
     ZERO_LAUNCHES("zero_launches"),
 }
 
+public enum class HabitFrequency { DAILY, WEEKLY, MONTHLY }
+
+/**
+ * How often a habit is due (ADR-0018). [target] is the number of met days a period needs: always 1
+ * for a daily habit. [reminderMinute] is a local time of day, or null for no reminder.
+ */
+public data class HabitPlan(val frequency: HabitFrequency, val target: Int, val reminderMinute: Int?) {
+    public companion object {
+        public val DAILY: HabitPlan = HabitPlan(HabitFrequency.DAILY, 1, null)
+    }
+}
+
+public data class HabitReminder(val id: String, val name: String, val minute: Int)
+
 /** How a habit is judged. [target] is a package name, and [limitMillis] a daily limit. */
 public data class HabitCriterion(val kind: HabitKind, val target: String?, val limitMillis: Long?)
 
@@ -29,6 +43,31 @@ public class HabitStore(private val db: Database) {
             listOf(id, name, criterion.kind.column, criterion.target, criterion.limitMillis, at.toEpochMilli()),
         )
     }
+
+    public fun add(id: String, name: String, plan: HabitPlan, at: Instant) {
+        db.execute(
+            "INSERT INTO habit (id, name, criterion_kind, created_at_ms, frequency, target, reminder_minute) " +
+                "VALUES (?, ?, 'manual', ?, ?, ?, ?)",
+            listOf(id, name, at.toEpochMilli(), plan.frequency.name.lowercase(), plan.target.toLong(), plan.reminderMinute?.toLong()),
+        )
+    }
+
+    public fun plan(id: String): HabitPlan? =
+        db.query("SELECT frequency, target, reminder_minute FROM habit WHERE id = ?", listOf(id)) { row ->
+            HabitPlan(HabitFrequency.valueOf(row.string(0).orEmpty().uppercase()), row.long(1)?.toInt() ?: 1, row.long(2)?.toInt())
+        }.firstOrNull()
+
+    public fun setPlan(id: String, plan: HabitPlan) {
+        db.execute(
+            "UPDATE habit SET frequency = ?, target = ?, reminder_minute = ? WHERE id = ?",
+            listOf(plan.frequency.name.lowercase(), plan.target.toLong(), plan.reminderMinute?.toLong(), id),
+        )
+    }
+
+    /** Active habits with a reminder, for the alarm scheduler. */
+    public fun reminders(): List<HabitReminder> = db.query(
+        "SELECT id, name, reminder_minute FROM habit WHERE archived_at_ms IS NULL AND reminder_minute IS NOT NULL ORDER BY reminder_minute",
+    ) { row -> HabitReminder(row.string(0).orEmpty(), row.string(1).orEmpty(), row.long(2)?.toInt() ?: 0) }
 
     public fun criterion(id: String): HabitCriterion? =
         db.query("SELECT criterion_kind, criterion_target, criterion_limit_ms FROM habit WHERE id = ?", listOf(id)) { row ->
