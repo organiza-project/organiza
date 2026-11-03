@@ -124,3 +124,6 @@ jacoco.exec
 .claude/statsig/
 .claude/projects/
 CLAUDE.local.md
+
+# Sideload copies made by :app:android:dogfoodApks
+dist/

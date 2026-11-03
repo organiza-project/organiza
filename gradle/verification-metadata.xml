@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Checksums for the one dependency that comes from JitPack, which builds straight from GitHub
+  (ADR-0018). Every other artifact is trusted as before. After changing the Tesseract version, run
+  Gradle with the write-verification-metadata option (sha256) and check the new values by hand.
+-->
+<verification-metadata xmlns="https://schema.gradle.org/dependency-verification"
+                       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                       xsi:schemaLocation="https://schema.gradle.org/dependency-verification https://schema.gradle.org/dependency-verification/dependency-verification-1.3.xsd">
+   <configuration>
+      <verify-metadata>true</verify-metadata>
+      <verify-signatures>false</verify-signatures>
+      <trusted-artifacts>
+         <trust group="^(?!com[.]github[.]adaptech-cz).*$" regex="true"/>
+      </trusted-artifacts>
+   </configuration>
+   <components>
+      <component group="com.github.adaptech-cz.Tesseract4Android" name="tesseract4android" version="4.8.0">
+         <artifact name="tesseract4android-4.8.0.aar">
+            <sha256 value="5bcff63c12baf46bfad9776292c93df62421cec3fe52eb62f03202f49bda8c34" origin="Downloaded from JitPack and checked on 2026-11-03"/>
+         </artifact>
+         <artifact name="tesseract4android-4.8.0.module">
+            <sha256 value="b593ef9cbc0f49af0948679b090aebcee2e4bc7159aefbec5bd11453ddb30e41" origin="Downloaded from JitPack and checked on 2026-11-03"/>
+         </artifact>
+         <artifact name="tesseract4android-4.8.0.pom">
+            <sha256 value="802f9b70226cbd48a4b471da296715abbc3d0adc9789f37296267399697af800" origin="Downloaded from JitPack and checked on 2026-11-03"/>
+         </artifact>
+      </component>
+   </components>
+</verification-metadata>

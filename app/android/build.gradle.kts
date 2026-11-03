@@ -23,12 +23,27 @@ android {
     // A release key is read from properties kept outside the repository (CONTRIBUTING.md).
     val releaseStore = providers.gradleProperty("organiza.release.storeFile").orNull
     signingConfigs {
+        // The dogfood key is checked in, so every machine and CI signs alike and builds update each
+        // other in place. It is a test key: never publish to a store with it (ADR-0014).
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            // v1 is redundant from API 24, but some vendor installers still check it.
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+        }
         if (releaseStore != null) {
             create("release") {
                 storeFile = file(releaseStore)
                 storePassword = providers.gradleProperty("organiza.release.storePassword").get()
                 keyAlias = providers.gradleProperty("organiza.release.keyAlias").get()
                 keyPassword = providers.gradleProperty("organiza.release.keyPassword").get()
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
@@ -60,6 +75,30 @@ composeCompiler {
     includeComposeMappingFile.set(false)
 }
 
+// Sideload-ready copies in dist/, re-signed with the dogfood key by apksigner, because AGP leaves
+// out v1 signing at this minSdk and some vendor installers still look for it (docs/install.md).
+val buildTools: String = androidComponents.sdkComponents.sdkDirectory.get().asFile.resolve("build-tools")
+    .listFiles().orEmpty().filter { it.isDirectory }.maxByOrNull { it.name }?.absolutePath.orEmpty()
+val dogfoodSigned = listOf("debug", "release").map { variant ->
+    tasks.register<Exec>("dogfood${variant.replaceFirstChar(Char::uppercase)}Apk") {
+        dependsOn("assemble${variant.replaceFirstChar(Char::uppercase)}")
+        val input = layout.buildDirectory.file("outputs/apk/$variant/android-$variant.apk")
+        val output = rootProject.layout.projectDirectory.file("dist/organiza-$variant.apk")
+        inputs.file(input)
+        outputs.file(output)
+        doFirst { output.asFile.parentFile.mkdirs() }
+        commandLine(
+            "$buildTools/apksigner", "sign",
+            "--ks", file("debug.keystore").absolutePath, "--ks-pass", "pass:android",
+            "--ks-key-alias", "androiddebugkey", "--key-pass", "pass:android",
+            "--v1-signing-enabled", "true", "--v2-signing-enabled", "true", "--v3-signing-enabled", "true",
+            "--min-sdk-version", "24",
+            "--out", output.asFile.absolutePath, input.get().asFile.absolutePath,
+        )
+    }
+}
+tasks.register("dogfoodApks") { dependsOn(dogfoodSigned) }
+
 fun quoted(value: String?): String = "\"" + value.orEmpty().replace("\\", "").replace("\"", "") + "\""
 
 dependencies {
@@ -73,6 +112,7 @@ dependencies {
     implementation(project(":core:scheduler"))
     implementation(libs.sqlcipher)
     implementation(libs.androidx.sqlite)
+    implementation(libs.tesseract)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.runner)

@@ -11,6 +11,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Tesseract for Android is published only here, so nothing else may come from it (ADR-0018).
+        maven("https://jitpack.io") {
+            content { includeGroupByRegex("com\\.github\\.adaptech-cz(\\..+)?") }
+        }
     }
 }
 
