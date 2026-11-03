@@ -58,7 +58,7 @@ fun TitleBlock(title: String, subline: String?) {
     }
 }
 
-/** A white panel on the ground, separated by a 1px edge and never a shadow. */
+/** A white card drawn with an ink line, never a shadow (ADR-0018). */
 @Composable
 fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val colors = Theme.colors
@@ -67,7 +67,7 @@ fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> 
         modifier
             .fillMaxWidth()
             .background(colors.surface, shape)
-            .border(1.dp, colors.border, shape)
+            .border(Space.stroke, colors.border, shape)
             .padding(Space.pad),
         content = content,
     )
@@ -94,9 +94,10 @@ fun Action(
     val colors = Theme.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    // Primary is filled ink; secondary is an ink outline, as the wireframe draws its buttons.
     val (fill, ink) = when (kind) {
         ButtonKind.PRIMARY -> colors.primary to colors.onPrimary
-        ButtonKind.SECONDARY -> colors.secondary to colors.text
+        ButtonKind.SECONDARY -> colors.surface to colors.text
         ButtonKind.TEXT -> Color.Transparent to colors.text
         ButtonKind.DANGER -> Color.Transparent to colors.negative
     }
@@ -106,7 +107,13 @@ fun Action(
             .defaultMinSize(minHeight = Space.target)
             .alpha(if (!enabled) 0.55f else if (pressed) 0.8f else 1f)
             .background(fill, shape)
-            .then(if (kind == ButtonKind.DANGER) Modifier.border(1.dp, colors.negative, shape) else Modifier)
+            .then(
+                when (kind) {
+                    ButtonKind.DANGER -> Modifier.border(Space.stroke, colors.negative, shape)
+                    ButtonKind.SECONDARY -> Modifier.border(Space.stroke, colors.border, shape)
+                    else -> Modifier
+                },
+            )
             .clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = if (kind == ButtonKind.TEXT) 4.dp else 14.dp),
         contentAlignment = Alignment.Center,
@@ -139,7 +146,7 @@ fun Field(
                 .fillMaxWidth()
                 .heightIn(min = Space.target)
                 .background(colors.surface, RoundedCornerShape(Space.radiusControl))
-                .border(1.dp, colors.control, RoundedCornerShape(Space.radiusControl))
+                .border(Space.stroke, colors.control, RoundedCornerShape(Space.radiusControl))
                 .padding(horizontal = 12.dp, vertical = 12.dp),
         )
     }
@@ -211,7 +218,7 @@ fun ChoiceRow(title: String, detail: String?, chosen: Boolean, enabled: Boolean 
             .fillMaxWidth()
             .heightIn(min = Space.target)
             .alpha(if (enabled) 1f else 0.55f)
-            .border(if (chosen) 2.dp else 1.dp, if (chosen) colors.text else colors.border, shape)
+            .border(if (chosen) 2.5.dp else Space.stroke, if (chosen) colors.text else colors.rule, shape)
             .clickable(enabled = enabled, role = Role.RadioButton, onClick = onClick)
             .semantics { stateDescription = if (chosen) "Selected" else "Not selected" }
             .padding(horizontal = 12.dp, vertical = 10.dp),

@@ -5,12 +5,14 @@ without uninstalling:
 
 | File | Built with | Use it to |
 |------|------------|-----------|
-| `android-release.apk` | `./gradlew :app:android:assembleRelease` | Dogfood: minified with R8, about 9 MB |
-| `android-debug.apk` | `./gradlew :app:android:assembleDebug` | Rule out R8: not minified, debuggable, about 19 MB |
+| `dist/organiza-release.apk` | `./gradlew :app:android:dogfoodApks` | Dogfood: minified with R8, about 40 MB |
+| `dist/organiza-debug.apk` | the same task | Rule out R8: not minified, debuggable, about 50 MB |
 
 Both need Android 8.0 (API 26) or later and contain native code for `arm64-v8a`, `armeabi-v7a`,
-`x86` and `x86_64`. Without a configured release key (`CONTRIBUTING.md`), both are signed with the
-build machine's debug key.
+`x86` and `x86_64`; most of their size is the on-phone OCR engine. Both are signed with the
+checked-in dogfood key, `app/android/debug.keystore`, with v1, v2 and v3 signatures, so a build
+from any machine or CI updates the one on your phone. An Organiza installed before November 2026
+was signed with a different key: uninstall it once.
 
 ## Install over USB
 
@@ -22,7 +24,7 @@ adb devices
 ```
 
 ```bash
-adb install -r -d android-release.apk
+adb install -r -d dist/organiza-release.apk
 ```
 
 `-r` replaces an installed copy and `-d` allows a lower version code. If it fails, adb prints the

@@ -61,6 +61,9 @@ import org.organiza.android.ui.Action
 import org.organiza.android.ui.ButtonKind
 import org.organiza.android.ui.ChoiceRow
 import org.organiza.android.ui.Field
+import org.organiza.android.ui.Glyph
+import org.organiza.android.ui.Icon
+import org.organiza.android.ui.Pill
 import org.organiza.android.ui.Panel
 import org.organiza.android.ui.Space
 import org.organiza.android.ui.Theme
@@ -142,13 +145,19 @@ fun InterventionScreen(flow: InterventionFlow, app: InterventionHost, onDone: (I
 private fun Header(flow: InterventionFlow, app: InterventionHost) {
     val colors = Theme.colors
     val name = app.targetLabel(flow.target)
-    val title = when (flow.target) {
-        is BlockTarget.Guard -> "Organiza's settings are locked"
-        is BlockTarget.ShortForm -> "$name is paused"
-        else -> "$name is blocked"
+    val (title, subline) = when (val target = flow.target) {
+        is BlockTarget.Guard -> "Organiza's settings are locked" to app.sessionLine(flow.strict)
+        is BlockTarget.ShortForm -> "$name is paused" to app.sessionLine(flow.strict)
+        is BlockTarget.Limit -> "Limit reached" to "(${app.targetLabel(BlockTarget.App(target.app))} locked for today)"
+        else -> "$name is blocked" to app.sessionLine(flow.strict)
     }
-    Txt(title, Type.title, modifier = Modifier.semantics { heading() })
-    Txt(app.sessionLine(flow.strict), Type.body, colors.muted)
+    // The wireframe's centred card: a shield, the title, and what is locked (ADR-0018).
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(Glyph.SHIELD, colors.text, 44.dp)
+        Spacer(Modifier.height(12.dp))
+        Txt(title, Type.title.copy(textAlign = TextAlign.Center), modifier = Modifier.fillMaxWidth().semantics { heading() })
+        Txt(subline, Type.body.copy(textAlign = TextAlign.Center), colors.muted, Modifier.fillMaxWidth())
+    }
 }
 
 @Composable
@@ -158,7 +167,12 @@ private fun ChoiceStep(flow: InterventionFlow, changed: () -> Unit) {
         Txt("A strict session protects the settings that run it. They open again when the session ends.", Type.body)
         return
     }
-    Txt("You chose to protect this time. The urge to check usually fades within a minute.", Type.body)
+    val opening = if (flow.target is BlockTarget.Limit) {
+        "You set a daily limit for this app, and today's time is used up. It opens again tomorrow."
+    } else {
+        "You chose to protect this time. The urge to check usually fades within a minute."
+    }
+    Txt(opening, Type.body)
     Txt(
         "To open it anyway: a ${seconds(flow.pause)} pause, a reason, and a phrase to type. It is logged as your choice.",
         Type.small,
@@ -263,7 +277,7 @@ private fun TypeStep(flow: InterventionFlow, wordsCorrect: Int, matches: Boolean
             changed()
         }
     }
-    Txt("Type this, word by word", Type.section)
+    Txt("Type this passage, word by word", Type.section)
     Panel { Txt(flow.phrase.text, Type.section) }
     // No copy or paste menu: the phrase has to be typed.
     CompositionLocalProvider(LocalTextToolbar provides NoTextToolbar) {
@@ -282,8 +296,9 @@ private fun TypeStep(flow: InterventionFlow, wordsCorrect: Int, matches: Boolean
                 .semantics { contentDescription = "Type the phrase" },
         )
     }
-    Row(Modifier.fillMaxWidth()) {
-        Txt("$wordsCorrect of $words words", Type.small, colors.muted, Modifier.weight(1f))
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Pill("$wordsCorrect/$words words typed", colors.raised, colors.text)
+        Spacer(Modifier.weight(1f))
         if (pasted) Txt("Pasting is off. Type it instead", Type.small, colors.negative)
     }
     Action("Continue", ButtonKind.SECONDARY, enabled = matches) {

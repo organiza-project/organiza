@@ -34,11 +34,15 @@ import androidx.compose.ui.unit.dp
 import org.organiza.android.ui.*
 
 @Composable
-fun HabitsScreen(ui: UiSnapshot, actions: Actions) {
+fun HabitsScreen(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit) {
     val matrix = ui.habits ?: return
     val colors = Theme.colors
-    var newHabit by rememberSaveable { mutableStateOf("") }
     TitleBlock("Habits", matrix.finding)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Action("New habit", ButtonKind.PRIMARY) { open(Route.NEW_HABIT) }
+        Action("Agenda", ButtonKind.SECONDARY) { open(Route.AGENDA) }
+        Action("Import schedule", ButtonKind.SECONDARY) { open(Route.IMPORT) }
+    }
     Panel {
         PanelHeader("Last 30 days") { Txt("Today", Type.small, colors.data) }
         if (matrix.rows.isEmpty()) {
@@ -91,15 +95,10 @@ fun HabitsScreen(ui: UiSnapshot, actions: Actions) {
         }
     }
     Panel {
-        PanelHeader("Add a habit")
-        Field(newHabit, { newHabit = it }, "Name")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Action("Add", ButtonKind.SECONDARY) {
-                actions.addHabit(newHabit)
-                newHabit = ""
-            }
-            Action("Weekly review", ButtonKind.TEXT) { actions.weeklyReview() }
-        }
+        PanelHeader("Weekly review")
+        Txt("A short, honest summary of your week from your AI coach.", Type.small, colors.muted)
+        Spacer(Modifier.height(8.dp))
+        Action("Ask for a review", ButtonKind.SECONDARY) { actions.weeklyReview() }
     }
 }
 

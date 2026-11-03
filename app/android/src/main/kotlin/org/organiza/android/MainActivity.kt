@@ -36,13 +36,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import java.io.IOException
 import java.time.Duration
+import androidx.activity.compose.BackHandler
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import org.organiza.android.feature.arena.ArenaScreen
-import org.organiza.android.feature.focus.FocusScreen
+import org.organiza.android.feature.blocker.BlockerHubScreen
 import org.organiza.android.feature.focus.SessionInput
 import org.organiza.android.feature.habits.HabitsScreen
+import org.organiza.android.feature.habits.NewHabitScreen
+import org.organiza.android.feature.home.HomeScreen
+import org.organiza.android.feature.metrics.MetricsScreen
 import org.organiza.android.feature.onboarding.OnboardingScreen
 import org.organiza.android.feature.onboarding.Permissions
-import org.organiza.android.feature.vault.VaultScreen
+import org.organiza.android.feature.profile.ProfileScreen
+import org.organiza.android.feature.schedule.AgendaScreen
+import org.organiza.android.feature.schedule.DictationScreen
+import org.organiza.android.feature.schedule.ImportScreen
+import org.organiza.android.ui.Route
+import org.organiza.android.ui.Tab
+import org.organiza.enforcement.ShortFormFeed
+import org.organiza.storage.HabitFrequency
+import org.organiza.storage.HabitPlan
 import org.organiza.android.feature.voice.VoiceRecorder
 import org.organiza.android.ui.Actions
 import org.organiza.android.ui.BottomBar
@@ -72,6 +88,14 @@ class MainActivity : ComponentActivity(), Actions {
     private val microphone = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (!granted) app.showMessage("Voice needs the microphone permission")
     }
+    private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) app.showMessage("Reminders need notifications. Turn them on in Settings to see them")
+    }
+    // The system photo picker needs no storage permission, and hands over only the chosen photo.
+    private val timetablePhoto = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
+        uri?.let(app.schedule::readPhoto)
+    }
+    private var dictation: VoiceRecorder? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -89,6 +113,8 @@ class MainActivity : ComponentActivity(), Actions {
         // Recording never continues once the screen is left (ADR-0010).
         recorder?.stop()
         recorder = null
+        dictation?.stop()
+        dictation = null
         super.onPause()
     }
 
@@ -136,6 +162,55 @@ class MainActivity : ComponentActivity(), Actions {
     override fun runCopilot() = app.copilot.run()
 
     override fun addHabit(name: String) = app.addHabit(name)
+
+    override fun addHabitPlan(name: String, frequency: HabitFrequency, target: Int, reminderMinute: Int?) {
+        app.addHabitPlan(name, HabitPlan(frequency, target, reminderMinute))
+        val needs = reminderMinute != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        if (needs) notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    override fun startFocus(minutes: Int, strict: Boolean, shortForm: Boolean) = app.startFocus(minutes, strict, shortForm)
+
+    override fun setFocusApp(pkg: String, on: Boolean) = app.hub.setApp(pkg, on)
+
+    override fun addFocusSite(raw: String) = app.hub.addSite(raw)
+
+    override fun removeFocusSite(domain: String) = app.hub.removeSite(domain)
+
+    override fun setLimit(pkg: String, minutes: Long?) = app.hub.setLimit(pkg, minutes)
+
+    override fun setFeed(feed: ShortFormFeed, on: Boolean) = app.hub.setFeed(feed, on)
+
+    override fun nudge(challengeId: String, memberId: String) = app.nudge(challengeId, memberId)
+
+    override fun pickTimetablePhoto() = timetablePhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+
+    override fun setImportText(text: String) = app.schedule.setText(text)
+
+    override fun extractSchedule() = app.schedule.extract()
+
+    override fun addScheduleBlocks() = app.schedule.add()
+
+    override fun clearImport() = app.schedule.clear()
+
+    override fun startDictation() {
+        if (!app.voiceConsent) return startTalking()
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            microphone.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+        dictation = VoiceRecorder().takeIf(VoiceRecorder::start)
+        if (dictation == null) app.showMessage("Could not start the microphone")
+    }
+
+    override fun stopDictation() {
+        val active = dictation ?: return
+        dictation = null
+        app.schedule.dictated(active.stop(), VoiceRecorder.SAMPLE_RATE)
+    }
+
+    override fun dictationLevel(): Float = dictation?.level ?: 0f
 
     override fun markToday(habitId: String, name: String, done: Boolean) = app.markHabit(name, done)
 
@@ -207,11 +282,17 @@ class MainActivity : ComponentActivity(), Actions {
 
 @Composable
 private fun Root(ui: UiSnapshot, actions: Actions) {
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
+    // Screens opened on top of a tab (ADR-0018). Back closes the top one.
+    val stack = remember { mutableStateListOf<Route>() }
+    val open: (Route) -> Unit = { stack.add(it) }
+    val back: () -> Unit = { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }
+    BackHandler(enabled = stack.isNotEmpty() && !ui.onboarding) { back() }
     val colors = Theme.colors
     Column(Modifier.fillMaxSize().background(colors.ground).windowInsetsPadding(WindowInsets.safeDrawing)) {
-        // Each tab keeps its own scroll position, so switching never opens one halfway down.
-        val scroll = rememberSaveable(tab, saver = androidx.compose.foundation.ScrollState.Saver) {
+        val route = stack.lastOrNull()
+        // Each tab and screen keeps its own scroll position, so switching never opens one halfway down.
+        val scroll = rememberSaveable(tab, route, saver = androidx.compose.foundation.ScrollState.Saver) {
             androidx.compose.foundation.ScrollState(0)
         }
         // Content stops at 720dp and centres on a tablet, so short panels never stretch across it.
@@ -227,13 +308,19 @@ private fun Root(ui: UiSnapshot, actions: Actions) {
         ) {
             when {
                 ui.onboarding -> OnboardingScreen(ui, actions)
-                tab == 0 -> FocusScreen(ui, actions)
-                tab == 1 -> HabitsScreen(ui, actions)
-                tab == 2 -> ArenaScreen(ui, actions)
-                else -> VaultScreen(ui, actions)
+                route == Route.NEW_HABIT -> NewHabitScreen(actions, back)
+                route == Route.AGENDA -> AgendaScreen(ui, back, open)
+                route == Route.IMPORT -> ImportScreen(ui, actions, back, open)
+                route == Route.DICTATION -> DictationScreen(ui, actions, back)
+                route == Route.BLOCKER -> BlockerHubScreen(ui, actions, back)
+                tab == Tab.HOME -> HomeScreen(ui, actions, open) { tab = it }
+                tab == Tab.HABITS -> HabitsScreen(ui, actions, open)
+                tab == Tab.ARENA -> ArenaScreen(ui, actions)
+                tab == Tab.METRICS -> MetricsScreen(ui, actions)
+                else -> ProfileScreen(ui, actions)
             }
             Spacer(Modifier.height(8.dp))
         }
-        if (!ui.onboarding) BottomBar(tab) { tab = it }
+        if (!ui.onboarding && route == null) BottomBar(tab) { tab = it }
     }
 }

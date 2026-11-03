@@ -35,7 +35,7 @@ fun CopilotPanel(ui: UiSnapshot, actions: Actions) {
         PanelHeader("Copilot") { copilot.ranOn?.let { Txt(it, Type.small, colors.muted) } }
         if (!ui.hasApiKey) {
             Txt(
-                "Add your Groq key in the Vault for weekly focus blocks and habit tips. Your hardest hours are worked out on this phone without one.",
+                "Add your Groq key in Profile for weekly focus blocks and habit tips. Your hardest hours are worked out on this phone without one.",
                 Type.small,
                 colors.muted,
             )
@@ -66,7 +66,7 @@ fun CopilotPanel(ui: UiSnapshot, actions: Actions) {
     }
 }
 
-/** The BYOK key form, shared by onboarding and the Vault (ADR-0009). */
+/** The BYOK key form, shared by onboarding and Profile (ADR-0009). */
 @Composable
 fun AiKeyPanel(ui: UiSnapshot, actions: Actions, title: String = "AI coach") {
     val colors = Theme.colors

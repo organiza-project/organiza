@@ -42,7 +42,7 @@ import org.organiza.presentation.Onboarding
 import org.organiza.presentation.OnboardingStep
 import org.organiza.presentation.PermissionRow
 
-/** The first run (ADR-0014). Every step can be left for later, and the Vault can run it again. */
+/** The first run (ADR-0014). Every step can be left for later, and Profile can run it again. */
 @Composable
 fun OnboardingScreen(ui: UiSnapshot, actions: Actions) {
     var step by rememberSaveable { mutableStateOf(OnboardingStep.WELCOME) }
@@ -60,7 +60,7 @@ fun OnboardingScreen(ui: UiSnapshot, actions: Actions) {
             BackendPanel(ui.account, actions)
         }
         OnboardingStep.AI -> {
-            TitleBlock("AI coach", "Optional. Bring your own Groq key, or skip and add one later in the Vault.")
+            TitleBlock("AI coach", "Optional. Bring your own Groq key, or skip and add one later in Profile.")
             AiKeyPanel(ui, actions, title = "Groq key")
         }
         OnboardingStep.DONE -> Unit

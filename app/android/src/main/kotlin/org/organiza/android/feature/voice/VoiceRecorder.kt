@@ -13,6 +13,10 @@ class VoiceRecorder {
     private val samples = ShortArray(SAMPLE_RATE * VoicePipeline.MAX_SECONDS)
     @Volatile private var count = 0
 
+    /** The loudness of the last chunk, from 0 to 1, for the dictation waveform. */
+    @Volatile var level: Float = 0f
+        private set
+
     /** The caller holds the microphone permission. Returns false if recording could not start. */
     @SuppressLint("MissingPermission")
     fun start(): Boolean {
@@ -37,6 +41,9 @@ class VoiceRecorder {
             while (!Thread.currentThread().isInterrupted && count < samples.size) {
                 val read = audio.read(samples, count, minOf(READ_CHUNK, samples.size - count))
                 if (read <= 0) break
+                var peak = 0
+                for (index in count until count + read) peak = maxOf(peak, kotlin.math.abs(samples[index].toInt()))
+                level = (peak / Short.MAX_VALUE.toFloat()).coerceIn(0f, 1f)
                 count += read
             }
         }, "voice-recorder").apply { start() }

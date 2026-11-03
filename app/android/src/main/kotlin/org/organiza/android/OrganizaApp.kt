@@ -35,6 +35,9 @@ import org.organiza.android.data.StorageException
 import org.organiza.android.data.StorageFailure
 import org.organiza.android.feature.ai.CopilotController
 import org.organiza.android.feature.blocker.DnsVpnService
+import org.organiza.android.feature.blocker.HubController
+import org.organiza.android.feature.habits.Reminders
+import org.organiza.android.feature.schedule.ScheduleController
 import org.organiza.android.feature.blocker.InterventionHost
 import org.organiza.android.feature.blocker.OrganizaAccessibilityService
 import org.organiza.android.feature.blocker.OrganizaDeviceAdminReceiver
@@ -44,6 +47,7 @@ import org.organiza.arena.ArenaEngine
 import org.organiza.arena.ChallengeRules
 import org.organiza.arena.CreateResult
 import org.organiza.arena.JoinResult
+import org.organiza.arena.NudgeResult
 import org.organiza.arena.SyncResult
 import org.organiza.calendar.IcsCalendar
 import org.organiza.domain.PackageName
@@ -69,7 +73,10 @@ import org.organiza.scheduler.VoiceOutcome
 import org.organiza.storage.Database
 import org.organiza.storage.HabitCriterion
 import org.organiza.storage.HabitKind
+import org.organiza.storage.HabitPlan
 import org.organiza.storage.HabitStore
+import org.organiza.storage.SettingsStore
+import org.organiza.storage.UsageLimitStore
 import org.organiza.storage.InterventionChoice
 import org.organiza.storage.InterventionStore
 import org.organiza.storage.MigrationResult
@@ -84,7 +91,13 @@ import androidx.compose.runtime.mutableStateOf
 import org.organiza.android.ui.ChallengeView
 import org.organiza.android.ui.UiSnapshot
 import org.organiza.android.ui.Upcoming
+import org.organiza.presentation.AgendaModel
 import org.organiza.presentation.ArenaModel
+import org.organiza.presentation.FocusWeek
+import org.organiza.presentation.HomeHabitInput
+import org.organiza.presentation.HomeModel
+import org.organiza.presentation.ProgressFacts
+import org.organiza.presentation.Progression
 import org.organiza.presentation.ChoicesModel
 import org.organiza.presentation.FocusModel
 import org.organiza.presentation.FocusState
@@ -145,6 +158,13 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
     // AI calls can take many seconds, so they must not hold up enforcement work.
     private val aiThread = Executors.newSingleThreadExecutor()
     private val apiKeys by lazy { KeystoreApiKeyStore(this) }
+
+    /** The BYOK key store, for feature controllers that call Groq themselves. */
+    val keys: KeystoreApiKeyStore get() = apiKeys
+
+    val hub by lazy { HubController(this) }
+    val schedule by lazy { ScheduleController(this) }
+    private var reminderIds: Set<String> = emptySet()
     internal var aiEndpoint: GroqEndpoint = GroqEndpoint.PRODUCTION
     private val main by lazy { Handler(Looper.getMainLooper()) }
     private var storage: Storage? = null
@@ -157,6 +177,8 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
     inner class Storage(val db: Database, val clock: Clock) {
         val scheduler = SessionScheduler(db, clock)
         val interventions = InterventionStore(db)
+        val limits = UsageLimitStore(db)
+        val settings = SettingsStore(db)
         val sessions = SessionStore(db)
         val tamper = TamperStore(db)
         val aiFacts = AiFacts(db)
@@ -240,6 +262,55 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
         return UUID.randomUUID().toString().also { habits.add(it, name.trim(), clock.now()) }
     }
 
+    /** Sets every habit reminder again, after a change, a reminder firing or a reboot. */
+    fun rescheduleReminders() = onStorageThread {
+        val active = storage ?: return@onStorageThread
+        val reminders = active.habits.reminders()
+        Reminders.schedule(this, reminders, reminderIds)
+        reminderIds = reminders.map { it.id }.toSet()
+    }
+
+    fun addHabitPlan(name: String, plan: HabitPlan) = onStorageThread {
+        val active = storage ?: return@onStorageThread
+        val clean = name.trim()
+        if (clean.isEmpty()) return@onStorageThread
+        val existing = active.habits.active().firstOrNull { it.name.equals(clean, ignoreCase = true) }
+        if (existing != null) {
+            active.habits.setPlan(existing.id, plan)
+            statusMessage = "Updated $clean"
+        } else {
+            active.habits.add(UUID.randomUUID().toString(), clean, plan, clock.now())
+            statusMessage = "Added $clean"
+        }
+        rescheduleReminders()
+        refreshUi()
+    }
+
+    /** Starts a session on the focus list the distraction hub edits. */
+    fun startFocus(minutes: Int, strict: Boolean, shortForm: Boolean) = onStorageThread {
+        val active = storage ?: return@onStorageThread
+        val rule = hub.focusRule(active)
+        if (rule.packages.isEmpty() && rule.domains.isEmpty() && !shortForm) {
+            statusMessage = "Add apps or sites in the distraction blocker hub first"
+            return@onStorageThread
+        }
+        statusMessage = when (active.scheduler.startManual(ManualRequest(rule.packages, rule.domains, strict, shortForm), Duration.ofMinutes(minutes.toLong()))) {
+            StartResult.Started -> "Session started"
+            StartResult.InvalidDuration -> "Length not allowed. Strict sessions can run up to 24 hours."
+        }
+        reconcile()
+    }
+
+    fun nudge(challengeId: String, memberId: String) = onArenaThread {
+        val arena = storage?.arena ?: return@onArenaThread
+        statusMessage = when (arena.nudge(challengeId, memberId)) {
+            NudgeResult.Sent -> "Nudge sent"
+            NudgeResult.AlreadyToday -> "You already nudged them today"
+            NudgeResult.RelayUnavailable -> "The relay could not be reached. Try again later"
+            else -> "That member could not be nudged"
+        }
+    }
+
     fun createChallenge(habitName: String, title: String, rules: ChallengeRules, relayUrl: String, displayName: String) =
         onStorageThread {
             val arena = storage?.arena ?: return@onStorageThread
@@ -309,6 +380,7 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
             VoiceResult.Silent -> "Voice: nothing heard, nothing was sent"
             VoiceResult.TooLong -> "Voice: too long, nothing was sent"
             is VoiceResult.Failed -> "Voice failed: ${result.failure}"
+            is VoiceResult.Transcript -> "Voice: not understood, nothing was changed"
         }
     }
 
@@ -380,7 +452,8 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
                 key.fill(0)
             }
             if (Migrations.migrate(db) is MigrationResult.TooNew) throw StorageException(StorageFailure.DATABASE_TOO_NEW)
-            storage = Storage(db, clock)
+            storage = Storage(db, clock).also { hub.load(it) }
+            rescheduleReminders()
         } catch (failure: StorageException) {
             // Never delete or recreate the database here (ADR-0008).
             storageFailure = failure.failure
@@ -514,7 +587,41 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
                     ArenaModel.build(today, challenge.startsOn, challenge.lengthDays, challenge.memberId, board, syncedAt[challenge.id]),
                 )
             }
+            val plans = active.habits.active().map { habit ->
+                HomeHabitInput(
+                    habit.id,
+                    habit.name,
+                    active.habits.plan(habit.id) ?: HabitPlan.DAILY,
+                    active.habits.results(habit.id, today.minusDays(HOME_DAYS), today.plusDays(1)),
+                )
+            }
+            val allSessions = sessions
+            val stayed = active.interventions.between(Instant.EPOCH, now.plusSeconds(1)).count { it.choice == InterventionChoice.STAYED }
+            val metDays = plans.sumOf { input -> active.habits.results(input.id, LocalDate.EPOCH, today.plusDays(1)).count { it.value } }
+            val streak = plans.maxOfOrNull { input -> longestStreak(active.habits.results(input.id, LocalDate.EPOCH, today.plusDays(1))) } ?: 0
+            val arenaList = active.arena.challenges()
+            val progression = Progression.build(
+                ProgressFacts(
+                    habitDaysMet = metDays,
+                    focusMinutes = allSessions.filter { it.state == SessionState.COMPLETED }
+                        .sumOf { Duration.between(it.start, it.finishedAt ?: it.end).toMinutes().coerceAtLeast(0) },
+                    stayedFocused = stayed,
+                    longestStreak = streak,
+                    challengesJoined = arenaList.size,
+                    challengesCompleted = arenaList.count { it.state == "completed" },
+                ),
+            )
+            val nudges = arenaList.flatMap { challenge -> active.arena.nudgesForMe(challenge.id).map { "$it nudged you in ${challenge.title}" } }
             UiSnapshot(
+                home = HomeModel.build(today, plans),
+                agendaToday = AgendaModel.build(now, zone, today, views),
+                agendaTomorrow = AgendaModel.build(now, zone, today.plusDays(1), views),
+                progression = progression,
+                week = FocusWeek.build(today, zone, allSessions),
+                hub = hub.view(active, zone),
+                schedule = schedule.view,
+                nudges = nudges,
+                selfName = arenaList.firstOrNull()?.displayName?.takeIf(String::isNotBlank) ?: "You",
                 onboarding = onboarding,
                 permissions = permissions,
                 focus = focus,
@@ -806,6 +913,20 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
         private val CALENDAR_WINDOW: Duration = Duration.ofDays(60)
         private val WEEK: Duration = Duration.ofDays(7)
         private const val MAX_UPCOMING = 5
+        private const val HOME_DAYS = 40L
+
+        /** The longest run of consecutive met days in [results]. */
+        internal fun longestStreak(results: Map<LocalDate, Boolean>): Int {
+            var best = 0
+            var run = 0
+            var previous: LocalDate? = null
+            for ((day, met) in results.toSortedMap()) {
+                run = if (met && previous != null && day == previous.plusDays(1)) run + 1 else if (met) 1 else 0
+                best = maxOf(best, run)
+                previous = day
+            }
+            return best
+        }
         private const val MESSAGE_MS = 6_000L
 
         fun from(context: Context): OrganizaApp = context.applicationContext as OrganizaApp

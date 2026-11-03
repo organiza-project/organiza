@@ -74,7 +74,7 @@ class InterventionScreenTest {
         compose.onNodeWithText("Work").performClick()
         compose.onNodeWithText("Continue").performScrollTo().performClick()
         typeWordByWord("I choose where my attention goes now")
-        compose.onNodeWithText("7 of 7 words").assertExists()
+        compose.onNodeWithText("7/7 words typed").assertExists()
         compose.onNodeWithText("Continue").performScrollTo().performClick()
         compose.onNodeWithText("5 min").performClick()
         assertEquals(listOf(InterventionOutcome.Overrode(5, OverrideReason.WORK, "", Duration.ofSeconds(10), reflected = false)), outcomes)
@@ -88,7 +88,7 @@ class InterventionScreenTest {
         compose.onNodeWithText("Continue").performScrollTo().performClick()
         compose.onNode(hasSetTextAction()).performTextInput(phrase.text)
         compose.onNodeWithText("Pasting is off. Type it instead").assertExists()
-        compose.onNodeWithText("0 of 7 words").assertExists()
+        compose.onNodeWithText("0/7 words typed").assertExists()
     }
 
     @Test
@@ -99,7 +99,7 @@ class InterventionScreenTest {
         compose.onNodeWithText("Continue").performScrollTo().performClick()
         compose.onNodeWithText("Could it wait twenty minutes?").assertExists()
         compose.onNodeWithText("Continue").performScrollTo().performClick()
-        compose.onNodeWithText("Type this, word by word").assertExists()
+        compose.onNodeWithText("Type this passage, word by word").assertExists()
     }
 
     @Test
@@ -112,4 +112,12 @@ class InterventionScreenTest {
 
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTextExists(text: String) =
         onAllNodes(androidx.compose.ui.test.hasText(text)).fetchSemanticsNodes().isNotEmpty()
+
+    @Test
+    fun aDailyLimitSaysWhatIsLocked() {
+        show(target = BlockTarget.Limit(instagram))
+        compose.onNodeWithText("Limit reached").assertExists()
+        compose.onNodeWithText("(Instagram locked for today)").assertExists()
+        compose.onNodeWithText("Open it anyway").assertExists()
+    }
 }

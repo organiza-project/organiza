@@ -62,7 +62,10 @@ export JAVA_HOME=/path/to/jdk-17
 
 ### Release signing
 
-Release builds use the debug key unless these properties are set, for example in
+Debug and release builds are signed with the checked-in dogfood key, `app/android/debug.keystore`.
+It is a test key: never publish to a store with it. `./gradlew :app:android:dogfoodApks` writes
+both APKs to `dist/` with v1, v2 and v3 signatures. A real release key is used instead when these
+properties are set, for example in
 `~/.gradle/gradle.properties` (never in the repository):
 
 ```properties

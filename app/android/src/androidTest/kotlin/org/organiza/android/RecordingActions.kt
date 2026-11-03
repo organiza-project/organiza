@@ -1,6 +1,8 @@
 package org.organiza.android
 
 import org.organiza.android.ui.Actions
+import org.organiza.enforcement.ShortFormFeed
+import org.organiza.storage.HabitFrequency
 import org.organiza.presentation.Permission
 import org.organiza.presentation.ProtectionItem
 import org.organiza.sync.BackendKind
@@ -39,4 +41,22 @@ class RecordingActions : Actions {
     override fun signIn(email: String, password: String) { calls += "signIn $email" }
     override fun signUp(email: String, password: String) { calls += "signUp $email" }
     override fun signOut() { calls += "signOut" }
+    override fun startFocus(minutes: Int, strict: Boolean, shortForm: Boolean) { calls += "startFocus $minutes" }
+    override fun setFocusApp(pkg: String, on: Boolean) { calls += "setFocusApp $pkg $on" }
+    override fun addFocusSite(raw: String) { calls += "addFocusSite $raw" }
+    override fun removeFocusSite(domain: String) { calls += "removeFocusSite $domain" }
+    override fun setLimit(pkg: String, minutes: Long?) { calls += "setLimit $pkg $minutes" }
+    override fun setFeed(feed: ShortFormFeed, on: Boolean) { calls += "setFeed $feed $on" }
+    override fun addHabitPlan(name: String, frequency: HabitFrequency, target: Int, reminderMinute: Int?) {
+        calls += "addHabitPlan $name $frequency $target $reminderMinute"
+    }
+    override fun nudge(challengeId: String, memberId: String) { calls += "nudge $memberId" }
+    override fun pickTimetablePhoto() { calls += "pickTimetablePhoto" }
+    override fun setImportText(text: String) { calls += "setImportText" }
+    override fun extractSchedule() { calls += "extractSchedule" }
+    override fun addScheduleBlocks() { calls += "addScheduleBlocks" }
+    override fun clearImport() { calls += "clearImport" }
+    override fun startDictation() { calls += "startDictation" }
+    override fun stopDictation() { calls += "stopDictation" }
+    override fun dictationLevel(): Float = 0f
 }

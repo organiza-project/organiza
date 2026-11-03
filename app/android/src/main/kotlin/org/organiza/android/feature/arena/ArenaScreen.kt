@@ -1,6 +1,8 @@
 package org.organiza.android.feature.arena
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -41,27 +43,38 @@ fun ArenaScreen(ui: UiSnapshot, actions: Actions) {
             }
         }
     }
-    if (challenge != null) {
+    ui.nudges.forEach { line ->
         Panel {
-            PanelHeader("Standings") { Txt(challenge.model.freshness, Type.small, colors.muted) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Glyph.BELL)
+                Txt(line, Type.body, modifier = Modifier.padding(start = 10.dp))
+            }
+        }
+    }
+    if (challenge != null) {
+        if (challenge.model.podium.isNotEmpty()) Podium(challenge.model.podium)
+        Panel {
+            PanelHeader("Friend list") { Txt(challenge.model.freshness, Type.small, colors.muted) }
             challenge.model.rows.forEachIndexed { index, row ->
                 if (index > 0) Rule()
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Txt(row.rank, Type.body, colors.muted, Modifier.width(24.dp))
-                    Column(Modifier.weight(1f)) {
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Avatar(row.name, 40.dp, highlighted = row.isSelf)
+                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                         Txt(if (row.isSelf) "${row.name} (you)" else row.name, Type.bodyStrong, maxLines = 1)
-                        val detail = "streak ${row.streak} · ${row.status.lowercase()} · ${row.verification.lowercase()}"
-                        Txt(detail, Type.small, if (row.invalid) colors.negative else colors.muted)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Txt("${row.xp} XP", Type.small, colors.muted)
+                            Icon(Glyph.FLAME, if (row.streak > 0) colors.text else colors.muted, 14.dp, Modifier.padding(start = 10.dp, end = 2.dp))
+                            Txt("${row.streak}", Type.small, colors.muted)
+                        }
+                        if (row.invalid) Txt("Results could not be verified", Type.small, colors.negative)
                     }
-                    Txt(row.progress, Type.body)
-                }
-                PlanTrack(row.fraction, if (row.isSelf) colors.data else colors.text, row.invalid)
-                if (row.isSelf && row.penalties.isNotEmpty()) {
-                    Txt("Penalties: " + row.penalties.joinToString(", "), Type.small, colors.muted, Modifier.padding(top = 4.dp))
+                    if (!row.isSelf && !row.invalid) {
+                        Action("Nudge", ButtonKind.SECONDARY) { actions.nudge(challenge.id, row.memberId) }
+                    }
                 }
             }
             Rule()
-            Txt("Results are self-reported. Confirmed means they were not rewritten, not that they are proven true.", Type.small, colors.muted)
+            Txt("XP here is 10 per met day and 2 per streak day, from shared results. Results are self-reported.", Type.small, colors.muted)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Action("Sync now", ButtonKind.PRIMARY) { actions.syncArena() }
@@ -115,10 +128,40 @@ private fun NewChallengePanel(actions: Actions, account: AccountView, open: Bool
         if (account.kind == null) {
             Field(relay, { relay = it }, "Relay address (https)")
         } else {
-            Txt("Results sync through ${account.url}" + if (account.signedInAs == null) ". Sign in on the Vault screen first." else ".", Type.small, Theme.colors.muted)
+            Txt("Results sync through ${account.url}" + if (account.signedInAs == null) ". Sign in on the Profile screen first." else ".", Type.small, Theme.colors.muted)
             Spacer(Modifier.height(8.dp))
         }
         Action("Create and get invite", ButtonKind.SECONDARY) { actions.createChallenge(habit, title, days, freezes, relay, name) }
     }
 }
 
+/** The top three on a stepped podium: first in the middle, raised, with a crown (wireframe screen 8). */
+@Composable
+private fun Podium(rows: List<org.organiza.presentation.ArenaRow>) {
+    val colors = Theme.colors
+    val order = listOfNotNull(rows.getOrNull(1), rows.getOrNull(0), rows.getOrNull(2))
+    Panel {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+            order.forEach { row ->
+                val first = row == rows.first()
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Glyph.CROWN, if (first) colors.data else colors.muted, if (first) 28.dp else 20.dp)
+                    Avatar(row.name, if (first) 56.dp else 44.dp, highlighted = row.isSelf)
+                    Txt(row.name, Type.small, maxLines = 1, modifier = Modifier.padding(top = 4.dp))
+                    androidx.compose.foundation.layout.Box(
+                        Modifier
+                            .padding(top = 6.dp)
+                            .fillMaxWidth()
+                            .height(if (first) 72.dp else if (row == rows.getOrNull(1)) 52.dp else 40.dp)
+                            .podiumStep(colors),
+                        contentAlignment = Alignment.Center,
+                    ) { Txt(if (first) "1st" else if (row == rows.getOrNull(1)) "2nd" else "3rd", Type.section) }
+                }
+            }
+        }
+    }
+}
+
+private fun Modifier.podiumStep(colors: Palette): Modifier =
+    this.background(colors.raised, androidx.compose.foundation.shape.RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))
+        .border(Space.stroke, colors.border, androidx.compose.foundation.shape.RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))

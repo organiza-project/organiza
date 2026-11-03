@@ -1,10 +1,5 @@
 package org.organiza.android.feature.focus
 
-import org.organiza.android.feature.ai.CopilotPanel
-import org.organiza.presentation.BarKind
-import org.organiza.presentation.ChoicesModel
-import org.organiza.presentation.FocusState
-import org.organiza.presentation.ProtectionItem
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,31 +12,37 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.organiza.android.ui.*
+import org.organiza.presentation.BarKind
+import org.organiza.presentation.ChoicesModel
+import org.organiza.presentation.Format
+import org.organiza.presentation.FocusState
+import org.organiza.presentation.ProtectionItem
 
+/** The session card on Home: what is blocked and until when, with start or stop (ADR-0018). */
 @Composable
-fun FocusScreen(ui: UiSnapshot, actions: Actions) {
+fun FocusCard(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit) {
     val focus = ui.focus ?: return
     val colors = Theme.colors
     var starting by rememberSaveable { mutableStateOf(false) }
-    TitleBlock("Focus", focus.subline)
     Panel {
+        PanelHeader("Focus") {
+            if (focus.state == FocusState.STRICT) Pill("Strict", colors.raised, colors.text)
+        }
         Row(verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
                 Txt(if (focus.state == FocusState.OFF) "Blocking" else "Time left", Type.small, colors.muted)
                 Txt(focus.headline, Type.figure, if (focus.state == FocusState.OFF) colors.muted else colors.text)
             }
-            if (focus.state == FocusState.STRICT) Pill("Strict", colors.raised, colors.text)
         }
+        Txt(focus.subline, Type.small, colors.muted)
         Spacer(Modifier.height(12.dp))
         DayStripView(focus.strip, "Today's sessions. " + focus.subline)
-        // A legend lists only the kinds on screen (app-screens §6.4).
         val kinds = focus.strip.bars.map { it.kind }.toSet()
         val legend = listOfNotNull(
             (colors.data to "Now").takeIf { BarKind.NOW in kinds },
@@ -56,13 +57,62 @@ fun FocusScreen(ui: UiSnapshot, actions: Actions) {
             } else if (ui.canStop) {
                 Action("Stop session", ButtonKind.SECONDARY) { actions.stopSession() }
             }
+            Action("Agenda", ButtonKind.TEXT) { open(Route.AGENDA) }
+            Action("Blocker hub", ButtonKind.TEXT) { open(Route.BLOCKER) }
+        }
+        if (starting && focus.state == FocusState.OFF) {
+            Rule()
+            StartForm(ui, actions, open) { starting = false }
+        }
+        if (focus.state != FocusState.OFF) {
+            Rule()
+            BlockedNow(ui)
         }
     }
-    if (starting && focus.state == FocusState.OFF) StartPanel(actions) { starting = false }
-    if (focus.state != FocusState.OFF) BlockedPanel(ui)
-    MessagePanel(ui.message)
-    ui.choices?.let { ChoicesPanel(it) }
-    CopilotPanel(ui, actions)
+}
+
+@Composable
+private fun StartForm(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit, close: () -> Unit) {
+    val colors = Theme.colors
+    var minutes by rememberSaveable { mutableStateOf(45) }
+    var strict by rememberSaveable { mutableStateOf(false) }
+    var shortForm by rememberSaveable { mutableStateOf(false) }
+    val listed = ui.hub.apps.count { it.onList } + ui.hub.sites.size
+    Txt("Blocks your focus list: ${Format.count(listed, "app or site", "apps and sites")}.", Type.body)
+    Action("Edit the focus list", ButtonKind.TEXT) { open(Route.BLOCKER) }
+    Spacer(Modifier.height(4.dp))
+    Stepper(minutes / 15, "× 15 min = $minutes min", 1..96) { minutes = it * 15 }
+    SwitchRow("Strict", "Cannot be stopped early, and opening a blocked app takes a longer pause. Up to 24 hours", strict) { strict = it }
+    SwitchRow("Shorts and Reels", "Block every short video feed for this session", shortForm) { shortForm = it }
+    Spacer(Modifier.height(8.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Action("Start", ButtonKind.PRIMARY) {
+            actions.startFocus(minutes, strict, shortForm)
+            close()
+        }
+        Action("Cancel", ButtonKind.TEXT, onClick = close)
+    }
+    if (listed == 0) Txt("Your focus list is empty, so only short videos can be blocked.", Type.small, colors.muted)
+}
+
+@Composable
+private fun BlockedNow(ui: UiSnapshot) {
+    val colors = Theme.colors
+    Txt("Blocked now", Type.bodyStrong)
+    val rows = ui.blockedApps.map { it to "App" } + ui.blockedSites.map { it to "Website and its subdomains" }
+    if (rows.isEmpty()) Txt("This session's list is empty, so nothing is blocked.", Type.body, colors.muted)
+    rows.forEach { (name, kind) ->
+        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            Txt(name, Type.body, modifier = Modifier.weight(1f), maxLines = 1)
+            Txt(kind, Type.small, colors.muted)
+        }
+    }
+}
+
+@Composable
+fun ProtectionPanel(ui: UiSnapshot, actions: Actions) {
+    val focus = ui.focus ?: return
+    val colors = Theme.colors
     Panel {
         PanelHeader("Protection") { Txt(focus.protectionSummary, Type.small, colors.muted) }
         focus.protection.forEachIndexed { index, item ->
@@ -71,25 +121,6 @@ fun FocusScreen(ui: UiSnapshot, actions: Actions) {
         }
         Rule()
         Txt(focus.tamperLine, Type.small, colors.muted)
-    }
-}
-
-@Composable
-private fun BlockedPanel(ui: UiSnapshot) {
-    val colors = Theme.colors
-    Panel {
-        PanelHeader("Blocked now") {
-            Txt("${ui.blockedApps.size + ui.blockedSites.size}", Type.small, colors.muted)
-        }
-        val rows = ui.blockedApps.map { it to "App" } + ui.blockedSites.map { it to "Website, and its subdomains" }
-        if (rows.isEmpty()) Txt("This session's list is empty, so nothing is blocked.", Type.body, colors.muted)
-        rows.forEachIndexed { index, (name, kind) ->
-            if (index > 0) Rule()
-            Row(Modifier.fillMaxWidth()) {
-                Txt(name, Type.body, modifier = Modifier.weight(1f), maxLines = 1)
-                Txt(kind, Type.small, colors.muted)
-            }
-        }
     }
 }
 
@@ -105,34 +136,9 @@ private fun ProtectionRow(item: ProtectionItem, actions: Actions) {
     }
 }
 
-@Composable
-private fun StartPanel(actions: Actions, close: () -> Unit) {
-    var apps by rememberSaveable { mutableStateOf("") }
-    var sites by rememberSaveable { mutableStateOf("") }
-    var minutes by rememberSaveable { mutableStateOf("45") }
-    var strict by rememberSaveable { mutableStateOf(false) }
-    var shortForm by rememberSaveable { mutableStateOf(false) }
-    Panel {
-        PanelHeader("New session")
-        Field(apps, { apps = it }, "Apps to block, by package name")
-        Field(sites, { sites = it }, "Websites to block")
-        Field(minutes, { minutes = it }, "Minutes", number = true)
-        SwitchRow("Strict", "Cannot be stopped early, and opening a blocked app takes a longer pause. Up to 24 hours", strict) { strict = it }
-        SwitchRow("Shorts and Reels", "Block short video feeds inside apps", shortForm) { shortForm = it }
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Action("Start", ButtonKind.PRIMARY) {
-                actions.startSession(apps, sites, minutes, strict, shortForm)
-                close()
-            }
-            Action("Cancel", ButtonKind.TEXT, onClick = close)
-        }
-    }
-}
-
 /** Today's interventions as choices, newest first (ADR-0016). */
 @Composable
-private fun ChoicesPanel(choices: ChoicesModel) {
+fun ChoicesPanel(choices: ChoicesModel) {
     val colors = Theme.colors
     Panel {
         PanelHeader("Today's choices") {

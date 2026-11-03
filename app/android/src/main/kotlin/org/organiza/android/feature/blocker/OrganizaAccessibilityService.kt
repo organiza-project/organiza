@@ -22,6 +22,11 @@ import org.organiza.enforcement.InterventionOutcome
 import org.organiza.enforcement.LockoutExemptions
 import org.organiza.enforcement.ScreenSnapshot
 import org.organiza.enforcement.SessionPolicy
+import org.organiza.enforcement.ShortFormFeed
+import org.organiza.enforcement.UsageLimits
+import org.organiza.android.data.AndroidUsageHistory
+import java.time.ZoneId
+import java.util.concurrent.Executors
 
 class OrganizaAccessibilityService : AccessibilityService() {
     private val main = Handler(Looper.getMainLooper())
@@ -41,18 +46,29 @@ class OrganizaAccessibilityService : AccessibilityService() {
         }
     }
 
-    private val passEnded = Runnable { engine?.recheck() }
+    private val passEnded = Runnable {
+        engine?.recheck()
+        current?.let(::checkLimit)
+    }
+
+    // Daily limits (ADR-0018): usage is read off the main thread, then acted on here.
+    private val usage by lazy { AndroidUsageHistory(this) }
+    private val limitWorker = Executors.newSingleThreadExecutor()
+    private var ignored: Set<PackageName> = emptySet()
+    private var current: PackageName? = null
+    private val limitTick = Runnable { current?.let(::checkLimit) }
 
     override fun onServiceConnected() {
         release()
         val blockSurface = InterventionOverlay(this, app, ::chosen)
         surface = blockSurface
         val launchers = launcherPackages()
+        ignored = transientPackages()
         val blockEngine = BlockEngine(
             blockSurface,
             app.clock,
             DEBOUNCE,
-            transientPackages(),
+            ignored,
             exemptPackages(launchers),
             homes = parsePackages(launchers),
             passes = app.passes,
@@ -76,6 +92,7 @@ class OrganizaAccessibilityService : AccessibilityService() {
 
     private fun schedulePassEnd() {
         main.removeCallbacks(passEnded)
+        main.removeCallbacks(limitTick)
         val until = app.passes.nextExpiry() ?: return
         main.postDelayed(passEnded, Duration.between(app.clock.now(), until).toMillis() + PASS_GRACE_MS)
     }
@@ -93,6 +110,10 @@ class OrganizaAccessibilityService : AccessibilityService() {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 // Tracked while idle too, so a new session can act on the app already open.
                 blockEngine.onForeground(source)
+                if (source !in ignored) {
+                    current = source
+                    checkLimit(source)
+                }
                 inspect(source, policy, blockEngine)
                 app.requestReconcile()
             }
@@ -113,26 +134,53 @@ class OrganizaAccessibilityService : AccessibilityService() {
         }
     }
 
+    /** Short video feeds to block now: every feed in a session that asks for it, plus the hub's switches. */
+    private fun feeds(policy: SessionPolicy): Set<ShortFormFeed> =
+        (if (policy.blockShortForm) ShortFormFeed.entries.toSet() else emptySet()) + app.hub.feeds
+
     private fun inspect(source: PackageName, policy: SessionPolicy, blockEngine: BlockEngine) {
-        if (policy == SessionPolicy.IDLE) return
-        val snapshot = snapshot(source, policy) ?: return
+        val feeds = feeds(policy)
+        if (policy == SessionPolicy.IDLE && feeds.isEmpty()) return
+        val snapshot = snapshot(source, policy, feeds) ?: return
         // Passes are checked by the engine, so the policy sees the full list.
-        contentPolicy.target(snapshot, policy.blockList, policy.blockShortForm, policy.strict)?.let(blockEngine::block)
+        contentPolicy.target(snapshot, policy.blockList, feeds, policy.strict)?.let(blockEngine::block)
+    }
+
+    /** Blocks [source] once today's use reaches its limit, or checks again when it would. */
+    private fun checkLimit(source: PackageName) {
+        main.removeCallbacks(limitTick)
+        val limit = app.hub.limits[source] ?: return
+        val target = BlockTarget.Limit(source)
+        if (app.passes.allows(target) || !usage.permitted()) return
+        limitWorker.execute {
+            val now = app.clock.now()
+            val zone = ZoneId.systemDefault()
+            val used = usage.foregroundTime(source, now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant(), now)
+            main.post {
+                if (current != source) return@post
+                if (UsageLimits.over(limit, used)) {
+                    engine?.block(target)
+                } else {
+                    main.postDelayed(limitTick, UsageLimits.left(limit, used).toMillis() + LIMIT_GRACE_MS)
+                }
+            }
+        }
     }
 
     /** Reads only what the session needs for this app, and returns null when that is nothing. */
-    private fun snapshot(source: PackageName, policy: SessionPolicy): ScreenSnapshot? {
+    private fun snapshot(source: PackageName, policy: SessionPolicy, feeds: Set<ShortFormFeed>): ScreenSnapshot? {
         val urlBarId = ContentPolicy.urlBarId(source)
         val readUrl = urlBarId != null
         val readText = policy.strict && ContentPolicy.isGuarded(source)
-        if (!readUrl && !readText && !policy.blockShortForm) return null
+        val readIds = feeds.isNotEmpty()
+        if (!readUrl && !readText && !readIds) return null
         val root = rootInActiveWindow ?: return null
         if (root.packageName?.toString() != source.value) return null
         val url = urlBarId?.let { root.findAccessibilityNodeInfosByViewId(it).firstOrNull()?.text?.toString() }
         val viewIds = mutableSetOf<String>()
         val text = mutableSetOf<String>()
-        if (readText || policy.blockShortForm) {
-            walk(root, viewIds.takeIf { policy.blockShortForm }, text.takeIf { readText })
+        if (readText || readIds) {
+            walk(root, viewIds.takeIf { readIds }, text.takeIf { readText })
         }
         return ScreenSnapshot(source, url, viewIds, text)
     }
@@ -194,5 +242,6 @@ class OrganizaAccessibilityService : AccessibilityService() {
         const val INSPECTION_INTERVAL_MS = 500L
         const val MAX_NODES = 2000
         const val PASS_GRACE_MS = 250L
+        const val LIMIT_GRACE_MS = 1_000L
     }
 }

@@ -16,7 +16,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.organiza.android.R
 
-/** The achromatic ledger tokens dealt by taste-skill (ADR-0012). Colour lives on data, not chrome. */
+/**
+ * The achromatic ledger tokens dealt by taste-skill (ADR-0012), with the wireframe's face (ADR-0018):
+ * crisp ink outlines on a white ground. Colour lives on data, not chrome.
+ */
 @Immutable
 data class Palette(
     val ground: Color,
@@ -39,19 +42,19 @@ data class Palette(
     val pillPositiveInk: Color,
 )
 
-// A blue-grey ground, like the ledger paper of a printed planner: the face this product takes.
+// White paper and ink lines, as the wireframe draws them.
 val LightPalette = Palette(
-    ground = Color(0xFFF2F4F7),
+    ground = Color(0xFFFFFFFF),
     surface = Color(0xFFFFFFFF),
-    raised = Color(0xFFEEEEEE),
-    border = Color(0xFFE6E6E6),
-    rule = Color(0xFFF0F0F0),
-    control = Color(0xFFD4D4D4),
+    raised = Color(0xFFF1F1F1),
+    border = Color(0xFF111111),
+    rule = Color(0xFFE4E4E4),
+    control = Color(0xFF111111),
     text = Color(0xFF0A0A0A),
     muted = Color(0xFF5F6368),
     primary = Color(0xFF141414),
     onPrimary = Color(0xFFFFFFFF),
-    secondary = Color(0xFFE5E5E5),
+    secondary = Color(0xFFF1F1F1),
     data = Color(0xFF1D5FBF),
     positive = Color(0xFF2E7D32),
     negative = Color(0xFFC4242A),
@@ -63,11 +66,11 @@ val LightPalette = Palette(
 
 val DarkPalette = Palette(
     ground = Color(0xFF000000),
-    surface = Color(0xFF111111),
-    raised = Color(0xFF222222),
-    border = Color(0xFF2E2E2E),
-    rule = Color(0xFF1A1A1A),
-    control = Color(0xFF444444),
+    surface = Color(0xFF0B0B0B),
+    raised = Color(0xFF1E1E1E),
+    border = Color(0xFFEDEDED),
+    rule = Color(0xFF262626),
+    control = Color(0xFFEDEDED),
     text = Color(0xFFFFFFFF),
     muted = Color(0xFFB4B4B4),
     primary = Color(0xFFFFFFFF),
@@ -126,8 +129,10 @@ object Space {
     val gap = 12.dp
     val pad = 16.dp
     val target = 44.dp
-    val radiusCard = 8.dp
-    val radiusControl = 6.dp
+    val radiusCard = 16.dp
+    val radiusControl = 12.dp
+    /** The ink line on cards and controls. */
+    val stroke = 1.5.dp
 }
 
 val LocalPalette = staticCompositionLocalOf { LightPalette }

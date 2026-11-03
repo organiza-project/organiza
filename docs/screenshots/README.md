@@ -14,9 +14,15 @@ by `scripts/seed-screens.sh`, with real interventions on reddit.com and x.com in
 | `07-pause-reason.png` | Choosing a reason, with a note |
 | `08-pause-typing.png` | Typing the phrase, word by word |
 | `09-pause-length.png` | Choosing how long the pass lasts |
-| `10-focus.png` | The Focus screen with today's choices |
-| `11-choices-copilot.png` | Hardest hours, and copilot proposals |
+| `10-home.png` | Home: the daily goal dial and the focus card |
+| `11-home-habits.png` | Home: today's habits with progress pills and done toggles |
+| `12-habits.png` | Habits: 30-day matrix, voice commands and what is coming up |
+| `13-agenda.png` | Agenda: today on an hour grid with the running session |
+| `14-hub.png` | Distraction blocker hub: Reels and Shorts switches, apps and limits |
+| `15-arena.png` | Arena: podium, friend list with XP, streaks and nudges |
+| `16-metrics.png` | Metrics: focus this week, choices, copilot and protection |
+| `17-profile.png` | Profile: level, XP, badges, cloud sync and API switches |
 
-The copilot's text in `11` came from `scripts/fake-groq.py` in demo mode, not from Groq. Its
-layout and the request it answered are real. The two 10:05 "Stayed focused" rows in `10` were
-logged while a bug closed site interventions early, which is fixed in `BlockEngine`.
+Screens 01 to 09 predate the wireframe restyle (ADR-0018): their layout is current, but cards
+now have ink outlines on white. Screens 10 to 17 show the redesign, seeded by
+`scripts/seed-screens.sh`.
