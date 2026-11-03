@@ -17,10 +17,16 @@ public data class ArenaRow(
     val verification: String,
     val invalid: Boolean,
     val penalties: List<String>,
+    val successes: Int,
+    /** Challenge XP: 10 per met day and 2 per day of streak, from shared results only (ADR-0018). */
+    val xp: Int,
 )
 
 /** One challenge as the Arena screen shows it. Results are self-reported (ADR-0006). */
 public data class ArenaModel(val dayLine: String, val finding: String, val rows: List<ArenaRow>, val freshness: String) {
+    /** The valid top three, for the podium. */
+    val podium: List<ArenaRow> get() = rows.filterNot { it.invalid }.take(3)
+
     public companion object {
         public fun build(
             today: LocalDate,
@@ -48,6 +54,8 @@ public data class ArenaModel(val dayLine: String, val finding: String, val rows:
                     verification = member.verification.name.lowercase().replaceFirstChar { it.uppercase() },
                     invalid = invalid,
                     penalties = member.penalties.map { "${Format.dayMonth(LocalDate.parse(it.date))} ${it.outcome.wire}" },
+                    successes = member.successes,
+                    xp = member.successes * 10 + member.standing.streak * 2,
                 )
             }
             return ArenaModel(dayLine, finding(selfId, board), rows, syncedAt?.let { "Synced $it" } ?: "Not synced yet")

@@ -63,4 +63,11 @@ class ArenaModelTest {
         assertEquals("Synced 10:42", model.freshness)
         assertEquals("Not synced yet", ArenaModel.build(today, "2026-11-02", 30, "me", board, null).freshness)
     }
+
+    @Test
+    fun `rows carry challenge xp and the podium takes the valid top three`() {
+        val model = ArenaModel.build(today, "2026-11-02", 30, "me", board, null)
+        model.rows.forEach { assertEquals(it.successes * 10 + it.streak * 2, it.xp) }
+        assertEquals(model.rows.filterNot { it.invalid }.take(3).map { it.memberId }, model.podium.map { it.memberId })
+    }
 }

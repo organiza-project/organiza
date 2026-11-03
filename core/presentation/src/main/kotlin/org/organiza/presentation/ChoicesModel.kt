@@ -57,6 +57,7 @@ public data class ChoicesModel(
             is BlockTarget.Site -> target.entry.value
             is BlockTarget.ShortForm -> "Short videos in ${appName(target.app)}"
             is BlockTarget.Guard -> "Organiza's settings"
+            is BlockTarget.Limit -> "${appName(target.app)}, daily limit"
         }
     }
 }
