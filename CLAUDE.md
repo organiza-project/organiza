@@ -1,4 +1,6 @@
-# CLAUDE.md — Project Organiza Directives
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## 0. Mission
 Organiza delivers **OS-level focus enforcement that is hard to bypass and mindful by
@@ -40,18 +42,59 @@ wait for an approved next phase.
 - Secrets never committed. See `.gitignore`.
 
 ## 4. Repository Layout
-Recorded in ADR-0002. `./gradlew test` runs everything.
+Recorded in ADR-0002 and ADR-0014. `./gradlew test` runs every JVM test.
 
-- `core/domain` — value types and OS ports. Kotlin stdlib only, no Android.
-- `core/testing` — fakes of every port.
-- `core/storage` — SQL schema (`docs/schema.md`), migrations, repositories (ADR-0008).
-- `core/calendar` — `.ics` parser and recurrence engine (ADR-0008).
-- `core/scheduler` — turns occurrences into sessions and sessions into policy (ADR-0008).
-- `core/enforcement` — block engine, content policy, DNS sinkhole, tamper monitor (ADR-0007).
-- `core/ai` — sanitizer, prompt templates, BYOK Groq client (ADR-0009).
-- `core/voice` — dictation pipeline and local command grammar (ADR-0010).
-- `core/arena` — challenge rules, commitments, encrypted relay sync, leaderboard (ADR-0011).
-- `core/presentation` — tested screen models for the Compose UI (ADR-0012).
-- `platform/linux` — systemd daemon and `organiza` CLI on the shared core (ADR-0013).
-- `app/android` — Phase 1: services, overlay, VPN, UI.
-- `.claude/rules/` — working rules for architecture, testing and privacy.
+- `core/domain` — value types and OS ports (`org.organiza.domain.port`). Kotlin stdlib only.
+- `core/testing` — hand-written fakes of every port; core tests use these, never mocks.
+- `core/storage` — SQL schema in `src/main/resources/.../schema/vN.sql` (`docs/schema.md`), migrations, stores.
+- `core/calendar`, `core/scheduler` — `.ics` parsing; occurrences become sessions, sessions become a `SessionPolicy`.
+- `core/enforcement` — block engine, content policy, DNS sinkhole, override passes and friction (ADR-0016).
+- `core/ai`, `core/voice` — sanitizer, prompts, BYOK Groq client; dictation and the local command grammar.
+- `core/arena` — challenges, Ed25519 commitments, encrypted padded relay messages (ADR-0011).
+- `core/sync` — auth and sync ports with local-only and Supabase implementations (ADR-0015).
+- `core/presentation` — screen models: every sentence and state a screen shows, with tests (ADR-0012).
+- `app/android` — the app, grouped by feature under `feature/`; design system in `ui/`.
+- `supabase/` — backend schema; `setup.sql` must contain each migration verbatim (a test checks).
+- `platform/linux` — frozen (ADR-0014); keep it compiling, add nothing.
+- `.claude/rules/` — working rules for architecture, testing and privacy. Read them.
+
+## 5. Commands
+The Android build needs a full JDK 17: `export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64`.
+
+```bash
+./gradlew test                                              # all JVM tests (CI runs test assembleDebug)
+./gradlew :core:enforcement:test --tests '*BlockEngineTest*' # one class; works per module
+./gradlew :app:android:connectedDebugAndroidTest             # Compose instrumentation tests, emulator needed
+./gradlew :app:android:dogfoodApks                           # dist/organiza-{debug,release}.apk, v1+v2+v3 signed
+scripts/verify-android.sh                                    # end-to-end enforcement checks on an emulator
+scripts/seed-screens.sh                                      # sample data for screenshot reviews
+GROQ_API_KEY=$(cat ~/.config/organiza/groq.key) ./gradlew :core:voice:test --tests '*RealGroqTest*'
+```
+
+Library modules build with `explicitApi()` and warnings as errors (`build.gradle.kts`); `:app` and
+`:platform` do not. The emulator AVD is `Medium_Phone_API_36.1`; adb is `~/Android/Sdk/platform-tools/adb`.
+`verify-android.sh` drives the debug build through `DebugSessionReceiver` (debug source set only).
+
+## 6. Architecture
+- **Hexagonal.** Logic lives in `core` behind ports; Android classes are thin adapters
+  (`OrganizaAccessibilityService`, `DnsVpnService`, `SqlCipherDatabase`, Keystore stores). New OS
+  capability = a port in `core/domain` plus a fake in `core/testing`.
+- **One state holder.** `OrganizaApp` (the `Application`) owns storage, the `ActiveSession` policy and
+  the override passes. All storage work runs on one storage thread (`onStorageThread`/`onStores`);
+  AI and Arena calls have their own threads. `refreshUi()` builds a whole immutable `UiSnapshot` from
+  local data and swaps it in; Compose screens only render it and call `ui/Actions`, which
+  `MainActivity` maps to the app. Feature controllers (`HubController`, `ScheduleController`,
+  `SyncController`, `CopilotController`) keep `OrganizaApp` from growing.
+- **Enforcement path.** Scheduler → `SessionPolicy` → `ActiveSession` → the accessibility service
+  feeds `BlockEngine` and `ContentPolicy`; `DnsVpnService` reads the same policy minus passes. A block
+  shows `InterventionOverlay` (a Compose window of type `TYPE_ACCESSIBILITY_OVERLAY`) driven by the
+  pure `InterventionFlow`; overrides grant `OverridePasses` and are logged to `intervention_event`.
+  Daily limits and the Reels/Shorts switches apply outside sessions too (ADR-0018).
+- **Storage.** SQLCipher on Android, SQLite JDBC in tests, both behind `Database`. Schema changes are
+  a new `vN.sql` plus a migration test; released versions are never edited.
+- **Backends.** `Backend.create(config)` returns the auth/sync pair; screens never branch on it.
+  Supabase only stores accounts and opaque Arena ciphertext, reached through two RPC functions.
+- **Gotchas.** Compose skips a composable whose parameters are unchanged and ignores ones it never
+  reads, so pass displayed values, not counters. `uiautomator` unbinds Organiza's accessibility
+  service; use screenshots and `dumpsys` when testing enforcement. Tesseract comes from JitPack and is
+  pinned in `gradle/verification-metadata.xml`.
