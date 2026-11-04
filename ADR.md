@@ -825,3 +825,54 @@ about 9 MB and is weaker on handwriting than cloud OCR. Nudges arrive at the nex
 Sharing XP with friends: it would reveal focus minutes and habit counts. Google sign-in: deferred, to
 keep Google out of the app. Cloud OCR: the image cannot be sanitized.
 
+
+## ADR-0019: Event-paired usage tracking, a full calendar and Habitica-style tasks
+
+### Status
+Accepted, 2026-11-04.
+
+### Context
+Usage limits read nonsense: the Android reader closed a stretch on every `ACTIVITY_STOPPED`, and a
+stop after a pause added the whole time since midnight, so one 20 s visit counted as 23 hours. We
+studied how StayFree (Sensor Tower's usage SDK) reads `UsageStatsManager` events in its shipped APK:
+it keeps resume and pause events only, pairs them per app, joins stretches split by a pause and
+resume within 3 s, drops stretches under a second, and closes an app still in front at "now". It
+caches raw events in a local database and asks only for events since the last one it stored. Its
+Reels and Shorts view IDs are not in the APK; they arrive by remote config. The agenda showed only
+today and tomorrow, and habits earned XP but nothing could be lost.
+
+### Decision
+- **Foreground time** is computed in `core/enforcement` (`ForegroundTime`) from typed `UsageEvent`s.
+  An app is in front while any of its activities is resumed, keyed by activity class, so moving
+  between its own screens is one stretch with no 3 s heuristic. Stops are ignored. Screen off and
+  shutdown close every stretch. Events are read from 3 hours before the window, so an app already
+  open at midnight is counted from midnight. The hub reads every app in one pass, and its total over
+  launchable apps is the day's screen time (launchers and system UI have no launcher entry).
+- **No event cache.** One `queryEvents` call per foreground change of a limited app, and one per hub
+  refresh, is cheap next to the accessibility events that trigger it. The system keeps about a week
+  of events, which covers every window Organiza reads.
+- **Short video detection** keeps Organiza's own view IDs (ADR-0016); no remote parser list, since
+  fetching one would be a network call for core enforcement. Snapchat Discover is not covered.
+- **App picker.** The hub lists every launchable app with its icon, searchable and grouped by the
+  category the app declares (`ApplicationInfo.category`). A limit bar turns red at 80%.
+- **Calendar.** Month, week and day views, built in `core/presentation` (`CalendarMonth`, `AgendaModel`)
+  with no calendar library. Any day can take a focus block; a block not yet started can be moved or
+  removed. Moving adds the new block before removing the old one, so a refused time loses nothing.
+  Blocks are scheduled sessions on the focus list, so the scheduler arms them at their start.
+  Imported calendar events show but stay read-only.
+- **Tasks with health.** Habits (+5 XP or -5 HP per tap), dailies (+10 XP; -8 HP each when undone at
+  midnight) and to-dos (+15 XP once). A session override costs 10 HP for that day. Health is 50. At 0
+  the hero faints: full health, and XP falls to the start of the previous level. Task XP adds to the
+  XP from ADR-0018, so Profile and Habits show one level. Missed days are charged when the app next
+  refreshes, at most 7 days back, and each day once (`setting.rpg_settled`).
+- Schema v7 adds `rpg_task` and `rpg_event`. Task titles stay on the phone and are never synced.
+
+### Consequences
+Limits and the hub now match what the system's own screen time shows to within a second. Damage is
+applied when the app next runs, not exactly at midnight. A daily created in the evening is judged
+that night.
+
+### Alternatives Considered
+kizitonwose/Calendar: a dependency for a grid that is 40 lines here. A remote parser list for
+Reels/Shorts (as StayFree does): needs a server. Storing HP and XP as running totals: an event log
+lets a daily be unchecked cleanly and keeps a history.

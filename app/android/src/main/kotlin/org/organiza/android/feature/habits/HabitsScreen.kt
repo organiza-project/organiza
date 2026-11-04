@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.organiza.android.feature.rpg.QuestsPanel
 import org.organiza.android.ui.*
 
 @Composable
@@ -40,9 +41,10 @@ fun HabitsScreen(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit) {
     TitleBlock("Habits", matrix.finding)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Action("New habit", ButtonKind.PRIMARY) { open(Route.NEW_HABIT) }
-        Action("Agenda", ButtonKind.SECONDARY) { open(Route.AGENDA) }
-        Action("Import schedule", ButtonKind.SECONDARY) { open(Route.IMPORT) }
+        Action("Calendar", ButtonKind.SECONDARY) { open(Route.AGENDA) }
+        Action("Import", ButtonKind.SECONDARY) { open(Route.IMPORT) }
     }
+    QuestsPanel(ui.rpg, actions)
     Panel {
         PanelHeader("Last 30 days") { Txt("Today", Type.small, colors.data) }
         if (matrix.rows.isEmpty()) {

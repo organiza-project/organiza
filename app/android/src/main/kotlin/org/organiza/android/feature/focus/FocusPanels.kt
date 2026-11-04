@@ -57,7 +57,7 @@ fun FocusCard(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit) {
             } else if (ui.canStop) {
                 Action("Stop session", ButtonKind.SECONDARY) { actions.stopSession() }
             }
-            Action("Agenda", ButtonKind.TEXT) { open(Route.AGENDA) }
+            Action("Calendar", ButtonKind.TEXT) { open(Route.AGENDA) }
             Action("Blocker hub", ButtonKind.TEXT) { open(Route.BLOCKER) }
         }
         if (starting && focus.state == FocusState.OFF) {

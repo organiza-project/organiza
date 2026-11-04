@@ -127,7 +127,7 @@ public object Progression {
     /** Level n starts at 50 n (n - 1) XP, so each level takes 100 XP more than the last. */
     public fun level(xp: Int): Int = ((1 + sqrt(1 + 4 * xp / 50.0)) / 2).toInt().coerceAtLeast(1)
 
-    private fun startOf(level: Int): Int = 50 * level * (level - 1)
+    public fun startOf(level: Int): Int = 50 * level * (level - 1)
 
     public fun titleFor(level: Int): String = when {
         level < 4 -> "Focus Novice"
@@ -137,18 +137,24 @@ public object Progression {
         else -> "Focus Master"
     }
 
-    public fun build(facts: ProgressFacts): ProgressionModel {
-        val xp = facts.habitDaysMet * 10 + (facts.focusMinutes / 5).toInt() + facts.stayedFocused * 5 + facts.challengesCompleted * 100
+    public fun xp(facts: ProgressFacts): Int =
+        facts.habitDaysMet * 10 + (facts.focusMinutes / 5).toInt() + facts.stayedFocused * 5 + facts.challengesCompleted * 100
+
+    public fun badges(facts: ProgressFacts): List<Badge> = listOf(
+        Badge("first-session", "First session", "Finish a focus session", facts.focusMinutes > 0),
+        Badge("week-streak", "Seven days", "A 7-day habit streak", facts.longestStreak >= 7),
+        Badge("month-streak", "Thirty days", "A 30-day habit streak", facts.longestStreak >= 30),
+        Badge("held-the-line", "Held the line", "Stay focused 10 times", facts.stayedFocused >= 10),
+        Badge("team-player", "Team player", "Join a challenge", facts.challengesJoined > 0),
+        Badge("finisher", "Finisher", "Complete a challenge", facts.challengesCompleted > 0),
+    )
+
+    public fun build(facts: ProgressFacts): ProgressionModel = of(xp(facts), badges(facts))
+
+    public fun of(totalXp: Int, badges: List<Badge> = emptyList()): ProgressionModel {
+        val xp = totalXp.coerceAtLeast(0)
         val level = level(xp)
         val span = startOf(level + 1) - startOf(level)
-        val badges = listOf(
-            Badge("first-session", "First session", "Finish a focus session", facts.focusMinutes > 0),
-            Badge("week-streak", "Seven days", "A 7-day habit streak", facts.longestStreak >= 7),
-            Badge("month-streak", "Thirty days", "A 30-day habit streak", facts.longestStreak >= 30),
-            Badge("held-the-line", "Held the line", "Stay focused 10 times", facts.stayedFocused >= 10),
-            Badge("team-player", "Team player", "Join a challenge", facts.challengesJoined > 0),
-            Badge("finisher", "Finisher", "Complete a challenge", facts.challengesCompleted > 0),
-        )
         return ProgressionModel(
             xp,
             level,

@@ -80,7 +80,7 @@ class SchemaV6Test {
             "INSERT INTO intervention_event (kind, app, outcome, strict, at_ms) VALUES ('app', 'com.instagram.android', 'stayed', 0, 5)",
         )
         old.execute("INSERT INTO habit (id, name, criterion_kind, created_at_ms) VALUES ('h', 'Old', 'manual', 0)")
-        Migrations.migrate(old)
+        Migrations.migrate(old, target = 6)
         assertEquals(listOf(1L), old.query("SELECT count(*) FROM intervention_event") { it.long(0) })
         assertEquals(HabitPlan.DAILY, HabitStore(old).plan("h"))
         assertEquals(6L, old.query("PRAGMA user_version") { it.long(0) }.single())

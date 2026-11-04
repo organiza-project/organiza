@@ -51,7 +51,7 @@ import org.organiza.android.feature.metrics.MetricsScreen
 import org.organiza.android.feature.onboarding.OnboardingScreen
 import org.organiza.android.feature.onboarding.Permissions
 import org.organiza.android.feature.profile.ProfileScreen
-import org.organiza.android.feature.schedule.AgendaScreen
+import org.organiza.android.feature.schedule.CalendarScreen
 import org.organiza.android.feature.schedule.DictationScreen
 import org.organiza.android.feature.schedule.ImportScreen
 import org.organiza.android.ui.Route
@@ -71,6 +71,9 @@ import org.organiza.presentation.Permission
 import org.organiza.presentation.ProtectionItem
 import org.organiza.scheduler.ManualRequest
 import org.organiza.sync.BackendKind
+import org.organiza.storage.RpgKind
+import org.organiza.android.ui.CalendarMode
+import java.time.LocalDate
 
 class MainActivity : ComponentActivity(), Actions {
     private val app get() = OrganizaApp.from(this)
@@ -183,6 +186,25 @@ class MainActivity : ComponentActivity(), Actions {
     override fun setFeed(feed: ShortFormFeed, on: Boolean) = app.hub.setFeed(feed, on)
 
     override fun nudge(challengeId: String, memberId: String) = app.nudge(challengeId, memberId)
+
+    override fun selectDay(day: LocalDate, then: CalendarMode?) = app.calendar.select(day, then)
+
+    override fun showCalendar(mode: CalendarMode) = app.calendar.show(mode)
+
+    override fun saveFocusBlock(replacing: String?, day: LocalDate, startMinute: Int, minutes: Int) =
+        app.calendar.save(replacing, day, startMinute, minutes)
+
+    override fun deleteFocusBlock(id: String) = app.calendar.delete(id)
+
+    override fun addQuest(kind: RpgKind, title: String) = app.game.add(kind, title)
+
+    override fun tapHabit(id: String, up: Boolean) = app.game.habit(id, up)
+
+    override fun checkDaily(id: String, done: Boolean) = app.game.daily(id, done)
+
+    override fun completeTodo(id: String) = app.game.complete(id)
+
+    override fun deleteQuest(id: String) = app.game.delete(id)
 
     override fun pickTimetablePhoto() = timetablePhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
 
@@ -309,7 +331,7 @@ private fun Root(ui: UiSnapshot, actions: Actions) {
             when {
                 ui.onboarding -> OnboardingScreen(ui, actions)
                 route == Route.NEW_HABIT -> NewHabitScreen(actions, back)
-                route == Route.AGENDA -> AgendaScreen(ui, back, open)
+                route == Route.AGENDA -> CalendarScreen(ui, actions, back, open)
                 route == Route.IMPORT -> ImportScreen(ui, actions, back, open)
                 route == Route.DICTATION -> DictationScreen(ui, actions, back)
                 route == Route.BLOCKER -> BlockerHubScreen(ui, actions, back)

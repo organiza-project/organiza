@@ -12,6 +12,10 @@ import org.organiza.presentation.ChoicesModel
 import org.organiza.presentation.FocusModel
 import org.organiza.presentation.HabitMatrix
 import org.organiza.presentation.Permission
+import org.organiza.presentation.CalendarMonth
+import org.organiza.presentation.Rpg
+import org.organiza.storage.RpgKind
+import java.time.LocalDate
 import org.organiza.sync.BackendKind
 
 @Immutable
@@ -39,6 +43,7 @@ data class HubApp(
     val usedMinutes: Long,
     val limitMinutes: Long?,
     val locked: Boolean,
+    val category: String = "Other",
 )
 
 @Immutable
@@ -48,6 +53,38 @@ data class HubView(
     val blockReels: Boolean = false,
     val blockShorts: Boolean = false,
     val usageAllowed: Boolean = false,
+    val screenTime: String? = null,
+)
+
+enum class CalendarMode { MONTH, WEEK, DAY }
+
+/** A session on the chosen day. Only focus blocks not yet started can be edited. */
+@Immutable
+data class CalendarBlock(val id: String, val label: String, val time: String, val startMinute: Int, val minutes: Int, val editable: Boolean)
+
+/** The calendar (ADR-0019): a month, the chosen day's week and the chosen day itself. */
+@Immutable
+data class CalendarView(
+    val mode: CalendarMode = CalendarMode.MONTH,
+    val selected: LocalDate = LocalDate.EPOCH,
+    val month: CalendarMonth? = null,
+    val week: List<AgendaModel> = emptyList(),
+    val day: AgendaModel? = null,
+    val blocks: List<CalendarBlock> = emptyList(),
+)
+
+@Immutable
+data class RpgTaskView(val id: String, val kind: RpgKind, val title: String, val done: Boolean)
+
+/** The hero and the Habitica-style task lists (ADR-0019). */
+@Immutable
+data class RpgView(
+    val hp: Int = Rpg.MAX_HP,
+    val maxHp: Int = Rpg.MAX_HP,
+    val badge: String = "Lvl 1 · Focus Novice",
+    val xpFraction: Double = 0.0,
+    val xpCaption: String = "",
+    val tasks: List<RpgTaskView> = emptyList(),
 )
 
 /** The schedule import in progress: text read from a photo, a dictation or the keyboard, then blocks. */
@@ -74,6 +111,8 @@ data class UiSnapshot(
     val progression: ProgressionModel? = null,
     val week: FocusWeek? = null,
     val hub: HubView = HubView(),
+    val calendar: CalendarView = CalendarView(),
+    val rpg: RpgView = RpgView(),
     val schedule: ImportView = ImportView(),
     val nudges: List<String> = emptyList(),
     val selfName: String = "You",

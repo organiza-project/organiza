@@ -38,6 +38,8 @@ import org.organiza.android.feature.blocker.DnsVpnService
 import org.organiza.android.feature.blocker.HubController
 import org.organiza.android.feature.habits.Reminders
 import org.organiza.android.feature.schedule.ScheduleController
+import org.organiza.android.feature.schedule.CalendarController
+import org.organiza.android.feature.rpg.RpgController
 import org.organiza.android.feature.blocker.InterventionHost
 import org.organiza.android.feature.blocker.OrganizaAccessibilityService
 import org.organiza.android.feature.blocker.OrganizaDeviceAdminReceiver
@@ -75,6 +77,7 @@ import org.organiza.storage.HabitCriterion
 import org.organiza.storage.HabitKind
 import org.organiza.storage.HabitPlan
 import org.organiza.storage.HabitStore
+import org.organiza.storage.RpgStore
 import org.organiza.storage.SettingsStore
 import org.organiza.storage.UsageLimitStore
 import org.organiza.storage.InterventionChoice
@@ -164,6 +167,8 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
 
     val hub by lazy { HubController(this) }
     val schedule by lazy { ScheduleController(this) }
+    val calendar by lazy { CalendarController(this) }
+    val game by lazy { RpgController(this) }
     private var reminderIds: Set<String> = emptySet()
     internal var aiEndpoint: GroqEndpoint = GroqEndpoint.PRODUCTION
     private val main by lazy { Handler(Looper.getMainLooper()) }
@@ -183,6 +188,7 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
         val tamper = TamperStore(db)
         val aiFacts = AiFacts(db)
         val habits = HabitStore(db)
+        val rpg = RpgStore(db)
         val voice = VoiceExecutor(db, clock, scheduler)
         val rules = RuleStore(db)
         val arena = ArenaEngine(
@@ -509,6 +515,9 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
 
     fun requestUiRefresh() = onStorageThread { refreshUi() }
 
+    /** Re-reads the schedule now, so a block added or moved is armed for its start. */
+    fun requestReconcileNow() = onStorageThread { reconcile() }
+
     fun showMessage(text: String) {
         statusMessage = text
     }
@@ -600,17 +609,19 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
             val metDays = plans.sumOf { input -> active.habits.results(input.id, LocalDate.EPOCH, today.plusDays(1)).count { it.value } }
             val streak = plans.maxOfOrNull { input -> longestStreak(active.habits.results(input.id, LocalDate.EPOCH, today.plusDays(1))) } ?: 0
             val arenaList = active.arena.challenges()
-            val progression = Progression.build(
-                ProgressFacts(
-                    habitDaysMet = metDays,
-                    focusMinutes = allSessions.filter { it.state == SessionState.COMPLETED }
-                        .sumOf { Duration.between(it.start, it.finishedAt ?: it.end).toMinutes().coerceAtLeast(0) },
-                    stayedFocused = stayed,
-                    longestStreak = streak,
-                    challengesJoined = arenaList.size,
-                    challengesCompleted = arenaList.count { it.state == "completed" },
-                ),
+            val facts = ProgressFacts(
+                habitDaysMet = metDays,
+                focusMinutes = allSessions.filter { it.state == SessionState.COMPLETED }
+                    .sumOf { Duration.between(it.start, it.finishedAt ?: it.end).toMinutes().coerceAtLeast(0) },
+                stayedFocused = stayed,
+                longestStreak = streak,
+                challengesJoined = arenaList.size,
+                challengesCompleted = arenaList.count { it.state == "completed" },
             )
+            val baseXp = Progression.xp(facts)
+            game.settle(active, today, zone, baseXp)
+            val hero = game.hero(active, baseXp, Progression.badges(facts))
+            val progression = hero.progression
             val nudges = arenaList.flatMap { challenge -> active.arena.nudgesForMe(challenge.id).map { "$it nudged you in ${challenge.title}" } }
             UiSnapshot(
                 home = HomeModel.build(today, plans),
@@ -619,6 +630,8 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
                 progression = progression,
                 week = FocusWeek.build(today, zone, allSessions),
                 hub = hub.view(active, zone),
+                calendar = calendar.view(now, zone, views),
+                rpg = game.view(active, today, hero),
                 schedule = schedule.view,
                 nudges = nudges,
                 selfName = arenaList.firstOrNull()?.displayName?.takeIf(String::isNotBlank) ?: "You",

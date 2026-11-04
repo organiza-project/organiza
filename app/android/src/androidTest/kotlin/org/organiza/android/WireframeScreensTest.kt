@@ -29,6 +29,15 @@ import org.organiza.presentation.HomeHabitInput
 import org.organiza.presentation.HomeModel
 import org.organiza.storage.HabitFrequency
 import org.organiza.storage.HabitPlan
+import org.organiza.storage.RpgKind
+import org.organiza.android.feature.rpg.QuestsPanel
+import org.organiza.android.feature.schedule.CalendarScreen
+import org.organiza.android.ui.CalendarView
+import org.organiza.android.ui.RpgTaskView
+import org.organiza.android.ui.RpgView
+import org.organiza.presentation.CalendarMonth
+import org.organiza.presentation.Format
+import java.time.YearMonth
 
 @RunWith(AndroidJUnit4::class)
 class WireframeScreensTest {
@@ -76,5 +85,57 @@ class WireframeScreensTest {
         compose.onNodeWithText("Block Reels tab only").performClick()
         compose.onNodeWithText("Daily limit").performScrollTo().performClick()
         assertEquals(listOf("setFeed INSTAGRAM_REELS true", "setLimit com.instagram.android 60"), actions.calls)
+    }
+
+    @Test
+    fun theHubWarnsNearALimitAndPicksAppsBySearch() {
+        val hub = HubView(
+            apps = listOf(
+                HubApp("com.instagram.android", "Instagram", onList = false, usedMinutes = 50, limitMinutes = 60, locked = false, category = "Social"),
+                HubApp("org.example.chess", "Chess", onList = false, usedMinutes = 3, limitMinutes = null, locked = false, category = "Games"),
+                HubApp("org.example.maps", "Maps", onList = false, usedMinutes = 0, limitMinutes = null, locked = false, category = "Maps"),
+            ),
+            usageAllowed = true,
+            screenTime = "53 m",
+        )
+        show { BlockerHubScreen(UiSnapshot(hub = hub), actions) {} }
+        compose.onNodeWithText("53 m").assertExists()
+        compose.onNodeWithText("50/60 min today").performScrollTo().assertExists()
+        compose.onNodeWithText("Add apps").performScrollTo().performClick()
+        compose.onNodeWithText("Search apps").performScrollTo()
+        // The search field comes before the website field.
+        compose.onAllNodes(hasSetTextAction())[0].performTextInput("che")
+        compose.onNodeWithText("Maps").assertDoesNotExist()
+        compose.onNodeWithText("Games").performScrollTo().assertExists()
+        compose.onNodeWithText("Block").performScrollTo().performClick()
+        assertEquals(listOf("setFocusApp org.example.chess true"), actions.calls)
+    }
+
+    @Test
+    fun aDayIsChosenFromTheMonthAndTakesAFocusBlock() {
+        val today = LocalDate.now()
+        val other = today.withDayOfMonth(if (today.dayOfMonth == 15) 16 else 15)
+        val calendar = CalendarView(selected = today, month = CalendarMonth.build(YearMonth.from(today), today, today, emptyMap()))
+        show { CalendarScreen(UiSnapshot(calendar = calendar), actions, {}, {}) }
+        compose.onNodeWithContentDescription("${Format.dayMonth(other)}, 0 blocks").performClick()
+        compose.onNodeWithText("Add block").performScrollTo().performClick()
+        compose.onNodeWithText("Week").performClick()
+        assertEquals(listOf("selectDay $other null", "saveFocusBlock null $today 540 60", "showCalendar WEEK"), actions.calls)
+    }
+
+    @Test
+    fun dailiesCheckOffAndHabitsCountBothWays() {
+        val rpg = RpgView(
+            hp = 42,
+            badge = "Lvl 3 · Focus Novice",
+            tasks = listOf(RpgTaskView("d", RpgKind.DAILY, "Drink water", done = false), RpgTaskView("h", RpgKind.HABIT, "Stretch", done = false)),
+        )
+        show { QuestsPanel(rpg, actions) }
+        compose.onNodeWithContentDescription("HP 42 / 50").assertExists()
+        compose.onNodeWithContentDescription("Done Drink water").performClick()
+        compose.onNodeWithText("Habits 1").performClick()
+        compose.onNodeWithContentDescription("Did Stretch").performClick()
+        compose.onNodeWithContentDescription("Slip on Stretch").performClick()
+        assertEquals(listOf("checkDaily d true", "tapHabit h true", "tapHabit h false"), actions.calls)
     }
 }

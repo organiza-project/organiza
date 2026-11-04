@@ -6,6 +6,9 @@ import org.organiza.storage.HabitFrequency
 import org.organiza.presentation.Permission
 import org.organiza.presentation.ProtectionItem
 import org.organiza.sync.BackendKind
+import org.organiza.storage.RpgKind
+import org.organiza.android.ui.CalendarMode
+import java.time.LocalDate
 
 /** Records what the screens ask for, by name, for UI tests. */
 class RecordingActions : Actions {
@@ -15,6 +18,17 @@ class RecordingActions : Actions {
         calls += "startSession"
     }
     override fun stopSession() { calls += "stopSession" }
+    override fun selectDay(day: LocalDate, then: CalendarMode?) { calls += "selectDay $day $then" }
+    override fun showCalendar(mode: CalendarMode) { calls += "showCalendar $mode" }
+    override fun saveFocusBlock(replacing: String?, day: LocalDate, startMinute: Int, minutes: Int) {
+        calls += "saveFocusBlock $replacing $day $startMinute $minutes"
+    }
+    override fun deleteFocusBlock(id: String) { calls += "deleteFocusBlock $id" }
+    override fun addQuest(kind: RpgKind, title: String) { calls += "addQuest $kind $title" }
+    override fun tapHabit(id: String, up: Boolean) { calls += "tapHabit $id $up" }
+    override fun checkDaily(id: String, done: Boolean) { calls += "checkDaily $id $done" }
+    override fun completeTodo(id: String) { calls += "completeTodo $id" }
+    override fun deleteQuest(id: String) { calls += "deleteQuest $id" }
     override fun fix(item: ProtectionItem) { calls += "fix ${item.kind}" }
     override fun addHabit(name: String) { calls += "addHabit $name" }
     override fun markToday(habitId: String, name: String, done: Boolean) { calls += "markToday $name" }

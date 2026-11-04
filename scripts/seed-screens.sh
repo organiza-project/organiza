@@ -49,6 +49,17 @@ ics+="END:VCALENDAR\r\n"
 bc ics --es base64 "$(printf "$ics" | base64 -w0)"
 sleep 2
 
+# Habitica-style tasks: two dailies (one done), two habits tapped both ways, two to-dos.
+for daily in "Drink water" "Plan tomorrow"; do bc quest --es kind DAILY --es name "$daily"; done
+for habit in "Took a walk" "Doomscrolled"; do bc quest --es kind HABIT --es name "$habit"; done
+for todo in "Book dentist" "Clear inbox"; do bc quest --es kind TODO --es name "$todo"; done
+bc questtap --es name "Drink water"
+bc questtap --es name "Took a walk"; bc questtap --es name "Took a walk"
+bc questtap --es name "Doomscrolled" --ez up false
+# A daily limit nearly used up, for the hub's bars.
+bc limit --es package com.android.chrome --el minutes 15
+bc limit --es package com.google.android.youtube --el minutes 60
+
 # One challenge with a second member, through the reference relay and the peer process.
 python3 scripts/arena-relay.py 18081 >/dev/null 2>&1 &
 relay_pid=$!

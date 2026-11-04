@@ -5,6 +5,8 @@ import org.organiza.presentation.Permission
 import org.organiza.storage.HabitFrequency
 import org.organiza.presentation.ProtectionItem
 import org.organiza.sync.BackendKind
+import org.organiza.storage.RpgKind
+import java.time.LocalDate
 
 /** Every user action the screens can ask for. The activity maps these to the app (ADR-0012). */
 interface Actions {
@@ -31,6 +33,19 @@ interface Actions {
     fun discardCommand()
     fun importCalendar()
     fun weeklyReview()
+
+    // Calendar (ADR-0019). [then] switches the view once the day is chosen.
+    fun selectDay(day: LocalDate, then: CalendarMode?)
+    fun showCalendar(mode: CalendarMode)
+    fun saveFocusBlock(replacing: String?, day: LocalDate, startMinute: Int, minutes: Int)
+    fun deleteFocusBlock(id: String)
+
+    // Habits, dailies and to-dos with health and XP (ADR-0019)
+    fun addQuest(kind: RpgKind, title: String)
+    fun tapHabit(id: String, up: Boolean)
+    fun checkDaily(id: String, done: Boolean)
+    fun completeTodo(id: String)
+    fun deleteQuest(id: String)
 
     // Arena
     fun syncArena()

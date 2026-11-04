@@ -3,7 +3,7 @@
 The source of truth is the scripts in
 [`schema/`](../core/storage/src/main/resources/org/organiza/storage/schema/), applied in
 order by `Migrations` and tested by `SchemaV1Test` and `MigrationsTest`. The current
-version is 6. Decisions are in ADR-0004, ADR-0006, ADR-0008, ADR-0011, ADR-0013, ADR-0016 and ADR-0018.
+version is 7. Decisions are in ADR-0004, ADR-0006, ADR-0008, ADR-0011, ADR-0013, ADR-0016, ADR-0018 and ADR-0019.
 
 | Table | Purpose | Notes |
 |-------|---------|-------|
@@ -19,7 +19,9 @@ version is 6. Decisions are in ADR-0004, ADR-0006, ADR-0008, ADR-0011, ADR-0013,
 | `arena_reveal` | A member's revealed salts | Stored as the signed message they sent |
 | `tamper_event` | A capability lost during a session | Capability and time only; columns are pinned by a test |
 | `usage_limit` | A daily foreground limit per app | 5 to 720 minutes; applies all day |
-| `setting` | Switches outside sessions | Reels and Shorts blocking |
+| `setting` | Switches and small values outside sessions | Reels and Shorts blocking, the last day RPG damage was settled |
+| `rpg_task` | A habit, daily or to-do | The title stays on this phone; only a to-do has a done time |
+| `rpg_event` | Each XP or HP change, applied in id order | One `daily` row per task and day; rows outlive a deleted task |
 | `arena_nudge` | Nudges sent and received | Once per sender, receiver and day; member IDs only |
 | `intervention_event` | A blocked app or site, and whether the person stayed focused or overrode | The block-list entry, never the URL; reason, note and pass length for overrides; columns are pinned by a test |
 

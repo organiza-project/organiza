@@ -37,6 +37,14 @@ check_above_zero() { # name actual
   fi
 }
 
+check_between() { # name low high actual, for numbers in a range
+  if [[ "${4// /}" =~ ^[0-9]+$ ]] && (( ${4// /} >= $2 && ${4// /} <= $3 )); then
+    echo "PASS  $1"; passed=$((passed + 1))
+  else
+    echo "FAIL  $1: expected $2 to $3, got '$4'"; failed=$((failed + 1))
+  fi
+}
+
 check_not() { # name unexpected actual
   if [[ "$3" != *"$2"* ]]; then
     echo "PASS  $1"; passed=$((passed + 1))
@@ -383,6 +391,22 @@ get_invite() {
 peer() { ./gradlew -q :core:arena:arenaPeer "-Ppeer=$1,http://127.0.0.1:18081,$2" --console=plain 2>&1 | grep -E '^peer'; }
 shell appops set "$APP" GET_USAGE_STATS allow >/dev/null
 check "usage access is detected" "USAGE_STATS" "$(debug_state)"
+usage_seconds() {
+  "$ADB" logcat -c
+  broadcast usage --es package "$1"
+  sleep 1
+  "$ADB" logcat -d -s OrganizaDebug:I | tr -d '\r' | grep -o 'usage=[0-9]*' | tail -1 | cut -d= -f2
+}
+echo "--- usage tracking"
+shell input keyevent KEYCODE_HOME >/dev/null; sleep 2
+before=$(usage_seconds com.android.settings)
+open_settings; sleep 18
+shell input keyevent KEYCODE_HOME >/dev/null; sleep 2
+after=$(usage_seconds com.android.settings)
+# Open for about 20 s with the launch. The old reader added the whole day on each stop.
+check_between "time in front is counted to the second" 17 26 "$((after - before))"
+sleep 10
+check_eq "time in the background is not counted" "$after" "$(usage_seconds com.android.settings)"
 # The relay is not running yet, so this also tests an outage.
 broadcast arenacreate --es habit Reading --es title 'SecretTitleText' --es relay "$relay_url" --es name AppUser --ei days 1
 sleep 4

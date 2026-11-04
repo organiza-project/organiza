@@ -34,7 +34,7 @@ enum class Tab(val label: String, val glyph: Glyph) {
 /** Screens that open on top of a tab and close with back. */
 enum class Route(val title: String) {
     NEW_HABIT("New habit"),
-    AGENDA("Agenda"),
+    AGENDA("Calendar"),
     IMPORT("Import schedule"),
     DICTATION("Dictate schedule"),
     BLOCKER("Distraction blocker hub"),

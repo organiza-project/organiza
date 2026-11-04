@@ -45,22 +45,9 @@ import org.organiza.android.ui.*
 import org.organiza.presentation.AgendaModel
 import org.organiza.presentation.BarKind
 
-/** The agenda (wireframe screen 4): today or tomorrow on an hour grid, with a line at now. */
+/** One day on an hour grid from 06:00, with a line at now (wireframe screen 4). */
 @Composable
-fun AgendaScreen(ui: UiSnapshot, back: () -> Unit, open: (Route) -> Unit) {
-    var tomorrow by rememberSaveable { mutableStateOf(false) }
-    TopBar("Agenda", back)
-    Segmented(listOf(false, true), tomorrow, { if (it) "Tomorrow" else "Today" }) { tomorrow = it }
-    val agenda = (if (tomorrow) ui.agendaTomorrow else ui.agendaToday) ?: return
-    Panel { AgendaGrid(agenda) }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Action("Import schedule", ButtonKind.PRIMARY) { open(Route.IMPORT) }
-        Action("Blocker hub", ButtonKind.SECONDARY) { open(Route.BLOCKER) }
-    }
-}
-
-@Composable
-private fun AgendaGrid(agenda: AgendaModel) {
+internal fun AgendaGrid(agenda: AgendaModel) {
     val colors = Theme.colors
     val hourHeight = 44.dp
     val hours = agenda.toHour - agenda.fromHour

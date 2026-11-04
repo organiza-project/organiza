@@ -10,6 +10,9 @@ import android.util.Base64
 import android.util.Log
 import java.io.File
 import java.time.Duration
+import java.time.Instant
+import java.time.ZoneId
+import org.organiza.android.data.AndroidUsageHistory
 import org.organiza.ai.GroqEndpoint
 import org.organiza.android.feature.focus.SessionInput
 import org.organiza.android.feature.voice.VoiceRecorder
@@ -18,6 +21,7 @@ import org.organiza.domain.Parsed
 import org.organiza.domain.port.BlockTarget
 import org.organiza.arena.ChallengeRules
 import org.organiza.scheduler.ManualRequest
+import org.organiza.storage.RpgKind
 import org.organiza.storage.StoredRule
 
 /** Lets scripts/verify-android.sh drive sessions and read state over adb. */
@@ -116,6 +120,28 @@ class DebugSessionReceiver : BroadcastReceiver() {
             "arenasync" -> app.arenaNow()
             "arenainvite" -> Log.i("OrganizaDebug", "invite=${app.latestInvite}")
             "clockdays" -> app.clockOffsetForTesting = Duration.ofDays(intent.getLongExtra("days", 0))
+            // Today's foreground seconds for one package, as the limits and the hub read them.
+            "usage" -> {
+                val app0 = (PackageName.parse(intent.getStringExtra("package").orEmpty()) as? Parsed.Valid)?.value
+                if (app0 != null) {
+                    val zone = ZoneId.systemDefault()
+                    val now = Instant.now()
+                    val used = AndroidUsageHistory(context).foregroundTime(app0, now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant(), now)
+                    Log.i("OrganizaDebug", "usage=${used.seconds}")
+                }
+                return
+            }
+            "quest" -> app.game.add(RpgKind.valueOf(intent.getStringExtra("kind").orEmpty()), intent.getStringExtra("name").orEmpty())
+            // Ticks a daily, taps a habit (up unless --ez up false) or completes a to-do, found by its title.
+            "questtap" -> app.onStores { stores ->
+                val task = stores.rpg.tasks().firstOrNull { it.title == intent.getStringExtra("name") } ?: return@onStores
+                when (task.kind) {
+                    RpgKind.DAILY -> app.game.daily(task.id, true)
+                    RpgKind.HABIT -> app.game.habit(task.id, intent.getBooleanExtra("up", true))
+                    RpgKind.TODO -> app.game.complete(task.id)
+                }
+            }
+            "limit" -> app.hub.setLimit(intent.getStringExtra("package").orEmpty(), intent.getLongExtra("minutes", 60))
             "ics" -> app.importCalendar(
                 Base64.decode(intent.getStringExtra("base64").orEmpty(), Base64.DEFAULT).decodeToString(),
             )

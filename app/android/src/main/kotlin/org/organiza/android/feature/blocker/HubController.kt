@@ -1,6 +1,7 @@
 package org.organiza.android.feature.blocker
 
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import java.time.Duration
 import java.time.ZoneId
 import org.organiza.android.OrganizaApp
@@ -12,6 +13,7 @@ import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
 import org.organiza.enforcement.ShortFormFeed
 import org.organiza.enforcement.UsageLimits
+import org.organiza.presentation.Format
 import org.organiza.storage.Setting
 import org.organiza.storage.StoredRule
 
@@ -77,7 +79,7 @@ class HubController(private val app: OrganizaApp) {
         }
     }
 
-    /** Today's use for the apps on the list or with a limit, and every launchable app to add. Storage thread. */
+    /** Today's use of every launchable app, its category and limit, and the day's screen time. Storage thread. */
     fun view(stores: OrganizaApp.Storage, zone: ZoneId): HubView {
         val rule = stores.rules.all().firstOrNull { it.calendarTag == FOCUS_TAG }
         val listed = rule?.packages.orEmpty()
@@ -85,13 +87,17 @@ class HubController(private val app: OrganizaApp) {
         val now = app.clock.now()
         val start = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
         val installed = launchable()
-        val rows = installed.map { (pkg, label) ->
+        // One pass over today's events covers every app, rather than one query per row.
+        val today = if (allowed) usage.perApp(start, now).mapKeys { it.key.value } else emptyMap()
+        val rows = installed.map { (pkg, label, category) ->
             val parsed = parsePackage(pkg)
-            val used = if (allowed && parsed != null && (parsed in listed || parsed in limits)) usage.foregroundTime(parsed, start, now) else Duration.ZERO
+            val used = today[pkg] ?: Duration.ZERO
             val limit = parsed?.let(limits::get)
-            HubApp(pkg, label, parsed in listed, used.toMinutes(), limit?.toMinutes(), limit != null && UsageLimits.over(limit, used))
+            HubApp(pkg, label, parsed in listed, used.toMinutes(), limit?.toMinutes(), limit != null && UsageLimits.over(limit, used), category)
         }.sortedWith(compareByDescending<HubApp> { it.onList || it.limitMinutes != null }.thenBy { it.label.lowercase() })
-        return HubView(rows, rule?.domains.orEmpty().map { it.value }.sorted(), ShortFormFeed.INSTAGRAM_REELS in feeds, ShortFormFeed.YOUTUBE_SHORTS in feeds, allowed)
+        // Launchers and system UI have no launcher entry, so they never count as screen time.
+        val screenTime = if (allowed) Format.duration(rows.fold(Duration.ZERO) { sum, row -> sum + (today[row.pkg] ?: Duration.ZERO) }) else null
+        return HubView(rows, rule?.domains.orEmpty().map { it.value }.sorted(), ShortFormFeed.INSTAGRAM_REELS in feeds, ShortFormFeed.YOUTUBE_SHORTS in feeds, allowed, screenTime)
     }
 
     private fun edit(work: (OrganizaApp.Storage) -> Unit) = app.onStores { stores ->
@@ -100,15 +106,19 @@ class HubController(private val app: OrganizaApp) {
         app.requestUiRefresh()
     }
 
-    private var launchableCache: List<Pair<String, String>>? = null
+    private var launchableCache: List<Triple<String, String, String>>? = null
 
-    private fun launchable(): List<Pair<String, String>> = launchableCache ?: run {
+    /** Package, label and the store category each app declares, or Other. */
+    private fun launchable(): List<Triple<String, String, String>> = launchableCache ?: run {
         val pm = app.packageManager
         val main = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         pm.queryIntentActivities(main, 0)
-            .map { it.activityInfo.packageName to it.loadLabel(pm).toString() }
-            .filter { it.first != app.packageName }
-            .distinctBy { it.first }
+            .filter { it.activityInfo.packageName != app.packageName }
+            .distinctBy { it.activityInfo.packageName }
+            .map { info ->
+                val category = ApplicationInfo.getCategoryTitle(app, info.activityInfo.applicationInfo.category)?.toString() ?: "Other"
+                Triple(info.activityInfo.packageName, info.loadLabel(pm).toString(), category)
+            }
             .also { launchableCache = it }
     }
 

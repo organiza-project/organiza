@@ -26,16 +26,22 @@ public class UsageLimitStore(private val db: Database) {
 public enum class Setting(internal val key: String) {
     BLOCK_REELS("block_reels"),
     BLOCK_SHORTS("block_shorts"),
+    RPG_SETTLED("rpg_settled"),
 }
 
 public class SettingsStore(private val db: Database) {
     public fun flag(setting: Setting): Boolean =
         db.query("SELECT value FROM setting WHERE key = ?", listOf(setting.key)) { it.string(0) }.firstOrNull() == "true"
 
-    public fun setFlag(setting: Setting, on: Boolean) {
+    public fun setFlag(setting: Setting, on: Boolean): Unit = setText(setting, on.toString())
+
+    public fun text(setting: Setting): String? =
+        db.query("SELECT value FROM setting WHERE key = ?", listOf(setting.key)) { it.string(0) }.firstOrNull()
+
+    public fun setText(setting: Setting, value: String) {
         db.execute(
             "INSERT INTO setting (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-            listOf(setting.key, on.toString()),
+            listOf(setting.key, value),
         )
     }
 }
