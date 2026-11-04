@@ -43,6 +43,7 @@ gradle-app.setting
 
 # ---------- Android ----------
 *.apk
+*.xapk
 *.aab
 *.ap_
 *.dex
