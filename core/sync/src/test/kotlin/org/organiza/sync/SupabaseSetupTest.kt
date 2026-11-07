@@ -25,7 +25,7 @@ class SupabaseSetupTest {
                 assertEquals(listOf("arena_message"), db.names("select tablename from pg_tables where schemaname = 'public'"))
                 assertEquals(emptyList(), db.names("select viewname from pg_views where schemaname = 'public'"))
                 assertEquals(
-                    listOf("arena_append", "arena_fetch", "rls_auto_enable"),
+                    listOf("arena_append", "arena_fetch", "delete_account", "rls_auto_enable"),
                     db.names("select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' order by 1"),
                 )
                 assertEquals(emptyList(), db.names("select tgname from pg_trigger where tgrelid = 'auth.users'::regclass and not tgisinternal"))

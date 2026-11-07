@@ -7,8 +7,8 @@
 -- types. Objects that belong to extensions are left alone, and so are event-trigger functions
 -- such as rls_auto_enable, which turns row-level security on for new tables. Accounts in auth.users are kept;
 -- see the commented line at the end of part 1 to delete them too.
--- PART 2 is supabase/migrations/20261102120000_arena_relay.sql, unchanged. A test checks
--- that the two stay identical.
+-- PART 2 is every file in supabase/migrations, in order and unchanged. A test checks
+-- that they stay identical.
 
 -- ===== PART 1: purge the public schema =====
 do $$
@@ -136,6 +136,29 @@ revoke all on function public.arena_append(text, text) from public, anon;
 revoke all on function public.arena_fetch(text, bigint) from public, anon;
 grant execute on function public.arena_append(text, text) to authenticated;
 grant execute on function public.arena_fetch(text, bigint) to authenticated;
+
+-- Organiza backend: deleting an account from the app (ADR-0020).
+-- Removes the caller's auth identity, and with it, by the foreign key's cascade, every relay
+-- message they sent. Nobody can delete another account: the function only ever uses auth.uid().
+
+create function public.delete_account()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+    v_user uuid := auth.uid();
+begin
+    if v_user is null then
+        raise exception 'sign in to delete the account' using errcode = '28000';
+    end if;
+    delete from auth.users where id = v_user;
+end;
+$$;
+
+revoke all on function public.delete_account() from public, anon;
+grant execute on function public.delete_account() to authenticated;
 
 -- Tell the Data API about the new functions now rather than on its next refresh.
 notify pgrst, 'reload schema';

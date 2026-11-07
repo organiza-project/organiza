@@ -1,6 +1,7 @@
 package org.organiza.android.ui
 
 import androidx.compose.runtime.Immutable
+import org.organiza.ai.ChatTurn
 import org.organiza.ai.CopilotAdvice
 import org.organiza.ai.SuggestedBlock
 import org.organiza.presentation.AgendaModel
@@ -96,6 +97,18 @@ data class ImportView(
     val status: String? = null,
 )
 
+/** Today's minutes towards a habit's goal, with the linked app's name when one counts (ADR-0020). */
+@Immutable
+data class HabitProgressView(val goalMinutes: Int?, val minutes: Int, val linkedLabel: String?)
+
+/** The copilot chat, kept in memory only and gone when the app closes. */
+@Immutable
+data class ChatView(val turns: List<ChatTurn> = emptyList(), val busy: Boolean = false)
+
+/** The last monitor-only session: where the time went, and the AI's guilt-free take when asked. */
+@Immutable
+data class MonitorView(val minutes: Long, val apps: List<Pair<String, Long>>, val summary: String?, val busy: Boolean)
+
 @Immutable
 data class CopilotView(val advice: CopilotAdvice? = null, val ranOn: String? = null, val busy: Boolean = false)
 
@@ -120,6 +133,11 @@ data class UiSnapshot(
     val choices: ChoicesModel? = null,
     val copilot: CopilotView = CopilotView(),
     val habits: HabitMatrix? = null,
+    val habitProgress: Map<String, HabitProgressView> = emptyMap(),
+    val chat: ChatView = ChatView(),
+    val monitor: MonitorView? = null,
+    val monitoring: Boolean = false,
+    val lockdown: Boolean = false,
     val upcoming: List<Upcoming> = emptyList(),
     val challenges: List<ChallengeView> = emptyList(),
     val account: AccountView = AccountView(),

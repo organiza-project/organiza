@@ -13,16 +13,16 @@ work for the Organiza hosted project and for a self-hosted one.
 `setup.sql` first **purges the `public` schema**: every table, view, function, sequence and type in
 it, and any trigger those functions back, such as a `handle_new_user` trigger on `auth.users`. It
 keeps extension objects, Supabase's `ensure_rls` safeguard, and every account in `auth.users`. It
-then creates the schema. It is safe to run again. If you only want the schema, run
-`supabase/migrations/20261102120000_arena_relay.sql` instead, or `supabase db push` with the CLI.
+then creates the schema. It is safe to run again. If you only want the schema, run the files in
+`supabase/migrations/` in order instead, or `supabase db push` with the CLI.
 
 To check it worked, run:
 
 ```sql
-select proname from pg_proc where proname in ('arena_append', 'arena_fetch');
+select proname from pg_proc where proname in ('arena_append', 'arena_fetch', 'delete_account');
 ```
 
-Both names should come back.
+All three names should come back.
 
 ### What the schema contains
 
@@ -31,10 +31,11 @@ Both names should come back.
 | `arena_message` | Opaque ciphertext, one row per message, under a mailbox ID derived from the challenge secret |
 | `arena_append(mailbox, data)` | Adds a message. Needs a signed-in user. At most 500 messages per user per day |
 | `arena_fetch(mailbox, after)` | Returns up to 200 messages after a cursor. Needs a signed-in user |
+| `delete_account()` | Deletes the caller's account and, by cascade, every message they sent (ADR-0020) |
 
 Row-level security is on for `arena_message`, with **no policies**, and every direct grant to `anon`
 and `authenticated` is revoked. Clients cannot list, read, change or delete rows. They can only
-call the two functions, and reading a mailbox needs its 64-character ID, which only invite holders
+call the three functions, and reading a mailbox needs its 64-character ID, which only invite holders
 can derive.
 
 There are deliberately no `profiles`, `challenges` or membership tables. Display names, members and

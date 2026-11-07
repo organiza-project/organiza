@@ -38,6 +38,7 @@ enum class Route(val title: String) {
     IMPORT("Import schedule"),
     DICTATION("Dictate schedule"),
     BLOCKER("Distraction blocker hub"),
+    COPILOT("Copilot"),
 }
 
 @Composable
@@ -88,4 +89,18 @@ fun TopBar(title: String, onBack: () -> Unit) {
         ) { Icon(Glyph.BACK) }
         Txt(title, Type.title, modifier = Modifier.semantics { heading() })
     }
+}
+
+/** Opens the copilot chat from any tab (ADR-0020). */
+@Composable
+fun CopilotFab(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val colors = Theme.colors
+    Box(
+        modifier
+            .size(56.dp)
+            .background(colors.primary, CircleShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = "Open the copilot" },
+        contentAlignment = Alignment.Center,
+    ) { Icon(Glyph.CHAT, colors.onPrimary, 24.dp) }
 }

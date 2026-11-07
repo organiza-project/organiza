@@ -119,7 +119,7 @@ private fun PickRow(app: HubApp, actions: Actions) {
 
 /** The app's launcher icon, loaded off the main thread. */
 @Composable
-private fun AppIcon(pkg: String) {
+internal fun AppIcon(pkg: String, size: androidx.compose.ui.unit.Dp = 36.dp) {
     val context = LocalContext.current
     val icon by produceState<ImageBitmap?>(null, pkg) {
         value = withContext(Dispatchers.Default) {
@@ -135,8 +135,8 @@ private fun AppIcon(pkg: String) {
         }
     }
     val shape = RoundedCornerShape(10.dp)
-    Box(Modifier.size(36.dp).clip(shape).background(Theme.colors.raised, shape)) {
-        icon?.let { Image(it, contentDescription = null, modifier = Modifier.size(36.dp)) }
+    Box(Modifier.size(size).clip(shape).background(Theme.colors.raised, shape)) {
+        icon?.let { Image(it, contentDescription = null, modifier = Modifier.size(size)) }
     }
 }
 

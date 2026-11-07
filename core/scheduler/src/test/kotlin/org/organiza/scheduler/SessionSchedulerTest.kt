@@ -10,6 +10,7 @@ import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
 import org.organiza.enforcement.BlockList
 import org.organiza.enforcement.SessionPolicy
+import org.organiza.storage.FocusTier
 import org.organiza.storage.Migrations
 import org.organiza.storage.RuleStore
 import org.organiza.storage.SessionState
@@ -300,5 +301,34 @@ class SessionSchedulerTest {
         val steam = (org.organiza.domain.ProcessName.parse("steam") as Parsed.Valid).value
         scheduler.startManual(ManualRequest(emptySet(), emptySet(), processes = setOf(steam)), Duration.ofMinutes(30))
         assertEquals(setOf(steam), scheduler.reconcile().policy.blockList.processes)
+    }
+
+    @Test
+    fun `a lockdown session allows only its listed apps`() {
+        val messages = pkg("com.google.android.apps.messaging")
+        val request = ManualRequest(setOf(messages), setOf(reddit), tier = FocusTier.LOCKDOWN)
+        assertEquals(StartResult.Started, scheduler.startManual(request, Duration.ofMinutes(30)))
+        val policy = scheduler.reconcile().policy
+        assertEquals(BlockList(setOf(messages), emptySet(), allowOnly = true), policy.blockList)
+        assertEquals(FocusTier.LOCKDOWN, sessions.inState(SessionState.ACTIVE).single().tier)
+    }
+
+    @Test
+    fun `lockdown wins over a standard session running at the same time`() {
+        sync(occurrence(fromNow = Duration.ZERO.plusSeconds(1)))
+        clock.advance(Duration.ofSeconds(2))
+        scheduler.startManual(ManualRequest(emptySet(), emptySet(), tier = FocusTier.LOCKDOWN), Duration.ofMinutes(30))
+        assertEquals(BlockList(emptySet(), emptySet(), allowOnly = true), scheduler.reconcile().policy.blockList)
+    }
+
+    @Test
+    fun `a monitor session blocks nothing but still runs`() {
+        val state = scheduler.run {
+            startManual(ManualRequest(setOf(instagram), emptySet(), tier = FocusTier.MONITOR), Duration.ofMinutes(30))
+            reconcile()
+        }
+        assertEquals(SessionPolicy.IDLE, state.policy)
+        assertEquals(1, state.activeSessionIds.size)
+        assertEquals(FocusTier.MONITOR, sessions.inState(SessionState.ACTIVE).single().tier)
     }
 }

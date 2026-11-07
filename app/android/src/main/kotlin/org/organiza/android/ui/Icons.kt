@@ -40,6 +40,8 @@ enum class Glyph(internal val path: String) {
     CLOCK("M12 21 A9 9 0 1 0 12 3 A9 9 0 1 0 12 21 M12 7.5 V12 L15 14"),
     CROWN("M4 9 L8 12.5 L12 6 L16 12.5 L20 9 L18.5 17 H5.5 Z"),
     CHECK("M5 12.5 L10 17 L19 7"),
+    CHAT("M4 5 H20 V16 H10 L6 19.5 V16 H4 Z M8 9.5 H16 M8 12.5 H13"),
+    SEND("M4.5 12 L19.5 4.5 L15 19.5 L11.5 13 Z M11.5 13 L19.5 4.5"),
 }
 
 private val vectors = mutableMapOf<Glyph, ImageVector>()

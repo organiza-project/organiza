@@ -15,9 +15,16 @@ public enum class HabitFrequency { DAILY, WEEKLY, MONTHLY }
 
 /**
  * How often a habit is due (ADR-0018). [target] is the number of met days a period needs: always 1
- * for a daily habit. [reminderMinute] is a local time of day, or null for no reminder.
+ * for a daily habit. [reminderMinute] is a local time of day, or null for no reminder. A day with
+ * [goalMinutes] is met once that many minutes are logged or spent in [linkedPackage] (ADR-0020).
  */
-public data class HabitPlan(val frequency: HabitFrequency, val target: Int, val reminderMinute: Int?) {
+public data class HabitPlan(
+    val frequency: HabitFrequency,
+    val target: Int,
+    val reminderMinute: Int?,
+    val goalMinutes: Int? = null,
+    val linkedPackage: String? = null,
+) {
     public companion object {
         public val DAILY: HabitPlan = HabitPlan(HabitFrequency.DAILY, 1, null)
     }
@@ -46,21 +53,33 @@ public class HabitStore(private val db: Database) {
 
     public fun add(id: String, name: String, plan: HabitPlan, at: Instant) {
         db.execute(
-            "INSERT INTO habit (id, name, criterion_kind, created_at_ms, frequency, target, reminder_minute) " +
-                "VALUES (?, ?, 'manual', ?, ?, ?, ?)",
-            listOf(id, name, at.toEpochMilli(), plan.frequency.name.lowercase(), plan.target.toLong(), plan.reminderMinute?.toLong()),
+            "INSERT INTO habit (id, name, criterion_kind, created_at_ms, frequency, target, reminder_minute, goal_minutes, linked_package) " +
+                "VALUES (?, ?, 'manual', ?, ?, ?, ?, ?, ?)",
+            listOf(
+                id, name, at.toEpochMilli(), plan.frequency.name.lowercase(), plan.target.toLong(), plan.reminderMinute?.toLong(),
+                plan.goalMinutes?.toLong(), plan.linkedPackage,
+            ),
         )
     }
 
     public fun plan(id: String): HabitPlan? =
-        db.query("SELECT frequency, target, reminder_minute FROM habit WHERE id = ?", listOf(id)) { row ->
-            HabitPlan(HabitFrequency.valueOf(row.string(0).orEmpty().uppercase()), row.long(1)?.toInt() ?: 1, row.long(2)?.toInt())
+        db.query("SELECT frequency, target, reminder_minute, goal_minutes, linked_package FROM habit WHERE id = ?", listOf(id)) { row ->
+            HabitPlan(
+                HabitFrequency.valueOf(row.string(0).orEmpty().uppercase()),
+                row.long(1)?.toInt() ?: 1,
+                row.long(2)?.toInt(),
+                row.long(3)?.toInt(),
+                row.string(4),
+            )
         }.firstOrNull()
 
     public fun setPlan(id: String, plan: HabitPlan) {
         db.execute(
-            "UPDATE habit SET frequency = ?, target = ?, reminder_minute = ? WHERE id = ?",
-            listOf(plan.frequency.name.lowercase(), plan.target.toLong(), plan.reminderMinute?.toLong(), id),
+            "UPDATE habit SET frequency = ?, target = ?, reminder_minute = ?, goal_minutes = ?, linked_package = ? WHERE id = ?",
+            listOf(
+                plan.frequency.name.lowercase(), plan.target.toLong(), plan.reminderMinute?.toLong(),
+                plan.goalMinutes?.toLong(), plan.linkedPackage, id,
+            ),
         )
     }
 
@@ -102,4 +121,27 @@ public class HabitStore(private val db: Database) {
             "SELECT local_date, success FROM habit_log WHERE habit_id = ? AND local_date >= ? AND local_date < ?",
             listOf(id, from.toString(), to.toString()),
         ) { row -> LocalDate.parse(row.string(0).orEmpty()) to (row.long(1) == 1L) }.toMap()
+
+    /** Adds minutes logged by hand and returns the day's total. Meeting the goal, or having none, marks the day. */
+    public fun logMinutes(id: String, date: LocalDate, minutes: Int): Int = db.transaction {
+        db.execute(
+            "INSERT INTO habit_minutes (habit_id, local_date, minutes) VALUES (?, ?, ?) " +
+                "ON CONFLICT (habit_id, local_date) DO UPDATE SET minutes = minutes + excluded.minutes",
+            listOf(id, date.toString(), minutes.toLong()),
+        )
+        settle(id, date, appMinutes = 0)
+    }
+
+    public fun loggedMinutes(id: String, date: LocalDate): Int =
+        db.query("SELECT minutes FROM habit_minutes WHERE habit_id = ? AND local_date = ?", listOf(id, date.toString())) {
+            it.long(0)?.toInt() ?: 0
+        }.firstOrNull() ?: 0
+
+    /** The day's minutes with [appMinutes] from the linked app, marking the day met once the goal is reached. */
+    public fun settle(id: String, date: LocalDate, appMinutes: Int): Int {
+        val total = loggedMinutes(id, date) + appMinutes
+        val goal = plan(id)?.goalMinutes
+        if (total > 0 && (goal == null || total >= goal)) mark(id, date, true)
+        return total
+    }
 }

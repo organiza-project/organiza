@@ -51,12 +51,12 @@ class WireframeScreensTest {
     @Test
     fun aWeeklyHabitIsSavedWithItsTarget() {
         var closed = false
-        show { NewHabitScreen(actions) { closed = true } }
+        show { NewHabitScreen(UiSnapshot(), actions) { closed = true } }
         compose.onNode(hasSetTextAction()).performTextInput("Run")
         compose.onNodeWithText("Weekly").performClick()
         compose.onNodeWithContentDescription("More").performClick()
         compose.onNodeWithText("Save").performScrollTo().performClick()
-        assertEquals(listOf("addHabitPlan Run WEEKLY 4 null"), actions.calls)
+        assertEquals(listOf("addHabitPlan Run WEEKLY 4 null null null"), actions.calls)
         assertTrue(closed)
     }
 

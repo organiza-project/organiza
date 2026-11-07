@@ -76,8 +76,9 @@ fun AiKeyPanel(ui: UiSnapshot, actions: Actions, title: String = "AI coach") {
         PanelHeader(title) { Pill(if (ui.hasApiKey) "Key saved" else "No key", colors.raised, colors.text) }
         Txt(
             "Optional, with your own Groq key, kept in Android Keystore. What is sent: counts of blocked attempts by hour, " +
-                "habit names and results, calendar times, and in strict sessions the reason you type, with names, links " +
-                "and numbers removed where detected. App and website names are never sent.",
+                "screen time by app category, habit names and results, calendar times, what you type to the copilot, and in " +
+                "strict sessions the reason you type, with names, links and numbers removed where detected. App and website " +
+                "names are never sent.",
             Type.small,
             colors.muted,
         )

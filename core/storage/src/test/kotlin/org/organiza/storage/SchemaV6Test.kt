@@ -82,8 +82,10 @@ class SchemaV6Test {
         old.execute("INSERT INTO habit (id, name, criterion_kind, created_at_ms) VALUES ('h', 'Old', 'manual', 0)")
         Migrations.migrate(old, target = 6)
         assertEquals(listOf(1L), old.query("SELECT count(*) FROM intervention_event") { it.long(0) })
-        assertEquals(HabitPlan.DAILY, HabitStore(old).plan("h"))
         assertEquals(6L, old.query("PRAGMA user_version") { it.long(0) }.single())
+        // Plans read the columns of every later version too.
+        Migrations.migrate(old)
+        assertEquals(HabitPlan.DAILY, HabitStore(old).plan("h"))
     }
 
     @Test

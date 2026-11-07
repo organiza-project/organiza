@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.organiza.android.feature.ai.AiKeyPanel
+import org.organiza.android.feature.sync.AccountPanel
 import org.organiza.android.feature.sync.BackendPanel
 import org.organiza.android.ui.*
 import org.organiza.sync.BackendKind
@@ -69,13 +70,19 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
     }
     MessagePanel(ui.message)
     Panel {
+        val account = ui.account
         SwitchRow(
             "Supabase cloud sync",
-            ui.account.url.ifEmpty { "Off: challenges use a relay you enter" },
-            ui.account.kind != null,
+            when {
+                account.signedInAs != null -> "Signed in as ${account.signedInAs}"
+                account.kind != null -> "On. Sign in below to sync challenges"
+                else -> "Off: challenges use a relay you enter"
+            },
+            account.kind != null,
         ) { on ->
-            if (on && ui.account.hostedAvailable) actions.chooseBackend(BackendKind.HOSTED, "", "") else if (!on) actions.chooseBackend(null, "", "")
-            showBackend = on && !ui.account.hostedAvailable
+            if (on && account.hostedAvailable) actions.chooseBackend(BackendKind.HOSTED, "", "") else if (!on) actions.chooseBackend(null, "", "")
+            // Without a hosted project in this build, turning sync on means choosing a backend first.
+            showBackend = on && !account.hostedAvailable
         }
         Action(if (showBackend) "Hide backend settings" else "Backend settings", ButtonKind.TEXT) { showBackend = !showBackend }
         Rule()
@@ -84,7 +91,8 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
         }
         Action(if (showKey) "Hide key settings" else "Key settings", ButtonKind.TEXT) { showKey = !showKey }
     }
-    if (showBackend) BackendPanel(ui.account, actions)
+    if (showBackend) BackendPanel(ui.account, actions, withAccount = false)
+    if (ui.account.kind != null) AccountPanel(ui.account, actions)
     if (showKey) AiKeyPanel(ui, actions)
     VaultPanels(ui, actions)
 }
@@ -96,7 +104,7 @@ private fun VaultPanels(ui: UiSnapshot, actions: Actions) {
         PanelHeader("On this phone")
         ui.stored.forEach { (label, value) -> KeyValue(label, value) }
         Rule()
-        Txt("Encrypted with a key held by Android Keystore. App use, websites and calendar titles never leave the phone.", Type.small, colors.muted)
+        Txt("Encrypted with a key held by Android Keystore. App names, websites and calendar titles never leave the phone.", Type.small, colors.muted)
     }
     Panel {
         PanelHeader("Voice")

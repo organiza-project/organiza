@@ -100,6 +100,9 @@ class HubController(private val app: OrganizaApp) {
         return HubView(rows, rule?.domains.orEmpty().map { it.value }.sorted(), ShortFormFeed.INSTAGRAM_REELS in feeds, ShortFormFeed.YOUTUBE_SHORTS in feeds, allowed, screenTime)
     }
 
+    /** The category each launchable app declares, by package. Usage is only ever sent to the AI this way. */
+    fun categories(): Map<String, String> = launchable().associate { (pkg, _, category) -> pkg to category }
+
     private fun edit(work: (OrganizaApp.Storage) -> Unit) = app.onStores { stores ->
         work(stores)
         load(stores)

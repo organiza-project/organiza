@@ -876,3 +876,55 @@ that night.
 kizitonwose/Calendar: a dependency for a grid that is 40 lines here. A remote parser list for
 Reels/Shorts (as StayFree does): needs a server. Storing HP and XP as running totals: an event log
 lets a daily be unchecked cleanly and keeps a history.
+
+## ADR-0020: Strictness tiers, minute habits, a copilot chat and account deletion
+
+### Status
+Accepted, 2026-11-07.
+
+### Context
+Sessions blocked one list or nothing, so a person who wanted the whole phone off, or only wanted to
+see where time went, had no option. Habits were done or not done, with no way to count reading time
+or credit time spent in a reading app. The copilot only produced weekly suggestions, the Profile sync
+switch turned on a backend without showing where to sign in, and an account could not be deleted
+from the app. The reminder time used the platform's old dialog.
+
+### Decision
+- **Tiers** live on the session row (`session.tier`, schema v8), because manual rules are deleted
+  when their session ends and a finished monitor session must still be found. Lockdown makes the
+  policy an allow list (`BlockList.allowOnly`): its rule's packages are the apps left open, which by
+  default is the SMS app; the launcher, dialer, emergency apps and Organiza stay exempt (ADR-0007).
+  A lockdown in force wins over standard sessions, and blocks no sites, since browsers are paused.
+  Monitor sessions add nothing to the policy and cannot be strict. Calendar and voice blocks stay
+  standard.
+- **Monitor summary.** The last monitor session of the past day shows its top apps from
+  `UsageStatsManager`, on the phone. The optional AI summary receives minutes by app category only.
+- **Minute habits.** `habit.goal_minutes` and `habit.linked_package` (v8), with hand-logged minutes in
+  `habit_minutes`. A linked app's foreground time is read live on each refresh and added, never
+  stored. A day is marked met once the total reaches the goal, or on any minutes without a goal.
+- **Copilot chat.** A dedicated screen, opened by a button on every tab. A message the local grammar
+  parses becomes a pending command with no AI call. Otherwise it goes to Groq with today's screen time
+  by category, focus minutes and sanitized habits, and the reply may carry one grammar line, which
+  is parsed locally and waits for Confirm (ADR-0010). The grammar gains `log N minutes of NAME`,
+  habits with a frequency word, and meetings: a schedule line naming a meeting, call or appointment
+  becomes an event handed to the phone's calendar app with `ACTION_INSERT`, which asks before
+  saving, so Organiza needs no calendar permission and stores no title. Turns are kept in memory only.
+  The chat uses `openai/gpt-oss-120b`: `llama-3.3-70b-versatile` was asked for but Groq no longer
+  serves it.
+- **Account deletion.** A `delete_account()` function deletes the caller's `auth.users` row; relay
+  messages go with it by cascade. It is `security definer`, uses only `auth.uid()`, and is granted
+  to `authenticated` only. The app asks once more, then signs out on success. Data on the phone stays.
+- **Dashboard.** Metrics ranks today's apps by time with their icons, loaded off the main thread, and
+  a bar against the limit. A tap opens a sheet with one-tap limits and the Reels or Shorts switch.
+- **Clock dial.** Material 3 is added for its `TimePicker` only, coloured from the house palette.
+
+### Consequences
+Lockdown is as strong as the accessibility service, like every other block. Calendar events are
+created by the calendar app, so a phone without one cannot take them. Linked-app minutes need usage
+access. The hosted backend needs the new migration before deletion works there.
+
+### Alternatives Considered
+A Supabase Edge Function for deletion: a second runtime and a service key for what one SQL function
+does. Coil for icons: a dependency for a bitmap that `PackageManager` already gives. Android's
+`SpeechRecognizer`: may send audio to a vendor without the consent Organiza already asks for, so the
+chat reuses the Groq Whisper path. A rule-level tier: lost with the manual rule when a session ends.

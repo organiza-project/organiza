@@ -12,6 +12,7 @@ import org.organiza.domain.port.Clock
 import org.organiza.enforcement.BlockList
 import org.organiza.enforcement.SessionPolicy
 import org.organiza.storage.Database
+import org.organiza.storage.FocusTier
 import org.organiza.storage.RuleStore
 import org.organiza.storage.SessionSource
 import org.organiza.storage.SessionState
@@ -38,6 +39,7 @@ public data class ManualRequest(
     val strict: Boolean = false,
     val blockShortForm: Boolean = false,
     val processes: Set<ProcessName> = emptySet(),
+    val tier: FocusTier = FocusTier.STANDARD,
 )
 
 public enum class StartResult { Started, InvalidDuration }
@@ -135,7 +137,7 @@ public class SessionScheduler(
         db.transaction {
             rules.save(rule, now)
             sessions.insert(
-                StoredSession(id, rule.id, SessionSource.MANUAL, SessionState.ACTIVE, null, now, now.plus(duration), null),
+                StoredSession(id, rule.id, SessionSource.MANUAL, SessionState.ACTIVE, null, now, now.plus(duration), null, request.tier),
             )
         }
         return StartResult.Started
@@ -189,15 +191,23 @@ public class SessionScheduler(
         rules.all().filter { it.id.startsWith(MANUAL_RULE_PREFIX) && it.id !in inUse }.forEach { rules.delete(it.id) }
     }
 
+    /** Monitor sessions add nothing. Any lockdown turns the list into its allowed apps (ADR-0020). */
     private fun policyFor(active: List<StoredSession>): SessionPolicy {
-        val inForce = active.mapNotNull { session -> session.ruleId?.let(rules::find) }
+        val blocking = active.filter { it.tier != FocusTier.MONITOR }
+        val lockdown = blocking.filter { it.tier == FocusTier.LOCKDOWN }.mapNotNull { session -> session.ruleId?.let(rules::find) }
+        val inForce = blocking.mapNotNull { session -> session.ruleId?.let(rules::find) }
         if (inForce.isEmpty()) return SessionPolicy.IDLE
-        return SessionPolicy(
+        val list = if (lockdown.isNotEmpty()) {
+            BlockList(lockdown.flatMap { it.packages }.toSet(), emptySet(), allowOnly = true)
+        } else {
             BlockList(
                 inForce.flatMap { it.packages }.toSet(),
                 inForce.flatMap { it.domains }.toSet(),
                 inForce.flatMap { it.processes }.toSet(),
-            ),
+            )
+        }
+        return SessionPolicy(
+            list,
             strict = inForce.any { it.strict },
             blockShortForm = inForce.any { it.blockShortForm },
         )

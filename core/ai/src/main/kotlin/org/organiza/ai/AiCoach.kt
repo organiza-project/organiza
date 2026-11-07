@@ -15,6 +15,9 @@ public data class SuggestedBlock(val day: DayOfWeek, val startMinute: Int, val m
 
 public data class ScheduleSuggestion(val blocks: List<SuggestedBlock>, val note: String)
 
+/** A chat answer, with a grammar line for the local parser when the person asked for a change. */
+public data class ChatReply(val reply: String, val command: String?)
+
 public data class CopilotAdvice(val focusBlocks: List<SuggestedBlock>, val warnings: List<String>, val habitTips: List<String>)
 
 /** Runs each AI feature. Replies are untrusted and must parse into a strict shape. */
@@ -36,6 +39,14 @@ public class AiCoach(
         }
 
     public fun copilot(facts: CopilotFacts): AiResult<CopilotAdvice> = ask(Prompts.copilot(facts, sanitizer), ::parseAdvice)
+
+    public fun chat(question: String, history: List<ChatTurn>, facts: UsageFacts): AiResult<ChatReply> =
+        ask(Prompts.copilotChat(sanitizer.clean(question), history, facts, sanitizer)) { reply ->
+            reply["reply"].text()?.let { ChatReply(it, reply["command"].text()) }
+        }
+
+    public fun monitorSummary(sessionMinutes: Long, facts: UsageFacts): AiResult<String> =
+        ask(Prompts.monitorSummary(sessionMinutes, facts)) { it["summary"].text() }
 
     /** Weekly blocks from a timetable's text. Nothing is scheduled until the person adds them. */
     public fun extractSchedule(text: String): AiResult<List<SuggestedBlock>> =

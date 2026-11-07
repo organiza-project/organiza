@@ -133,4 +133,20 @@ class VoiceExecutorTest {
         assertEquals(1, scheduled().size)
         assertEquals(VoiceOutcome.Done, executor.apply(VoiceCommand.AddHabit("stretch")))
     }
+
+    @Test
+    fun `logged minutes go to the named habit`() {
+        executor.apply(VoiceCommand.AddHabit("Reading"))
+        assertEquals(VoiceOutcome.Done, executor.apply(VoiceCommand.LogMinutes("reading", today, 30)))
+        val id = habits.active().single().id
+        assertEquals(30, habits.loggedMinutes(id, today))
+        assertEquals(VoiceOutcome.NoSuchHabit, executor.apply(VoiceCommand.LogMinutes("chess", today, 30)))
+        assertEquals(VoiceOutcome.InvalidTime, executor.apply(VoiceCommand.LogMinutes("reading", today.plusDays(1), 30)))
+    }
+
+    @Test
+    fun `an event is handed to the phone's calendar and stores nothing here`() {
+        assertEquals(VoiceOutcome.OpenCalendar, executor.apply(VoiceCommand.AddEvent("Meeting with John", later, 60)))
+        assertEquals(emptyList(), scheduled())
+    }
 }

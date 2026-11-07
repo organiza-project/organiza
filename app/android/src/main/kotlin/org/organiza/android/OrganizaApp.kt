@@ -3,6 +3,7 @@ package org.organiza.android
 import android.app.Application
 import android.app.admin.DevicePolicyManager
 import android.content.pm.ApplicationInfo
+import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -11,7 +12,9 @@ import android.net.VpnService
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.provider.CalendarContract
 import android.provider.Settings
+import android.provider.Telephony
 import android.util.Log
 import java.time.Duration
 import java.time.Instant
@@ -26,6 +29,7 @@ import org.organiza.ai.GroqClient
 import org.organiza.ai.GroqEndpoint
 import org.organiza.ai.Sanitizer
 import org.organiza.ai.UrlConnectionTransport
+import org.organiza.ai.UsageFacts
 import org.organiza.android.data.AndroidUsageHistory
 import org.organiza.android.data.DatabaseKey
 import org.organiza.android.data.KeystoreApiKeyStore
@@ -33,6 +37,7 @@ import org.organiza.android.data.KeystoreSecretStore
 import org.organiza.android.data.SqlCipherDatabase
 import org.organiza.android.data.StorageException
 import org.organiza.android.data.StorageFailure
+import org.organiza.android.feature.ai.ChatController
 import org.organiza.android.feature.ai.CopilotController
 import org.organiza.android.feature.blocker.DnsVpnService
 import org.organiza.android.feature.blocker.HubController
@@ -73,6 +78,7 @@ import org.organiza.scheduler.StopResult
 import org.organiza.scheduler.VoiceExecutor
 import org.organiza.scheduler.VoiceOutcome
 import org.organiza.storage.Database
+import org.organiza.storage.FocusTier
 import org.organiza.storage.HabitCriterion
 import org.organiza.storage.HabitKind
 import org.organiza.storage.HabitPlan
@@ -92,6 +98,8 @@ import org.organiza.storage.RuleStore
 import org.organiza.storage.TamperStore
 import androidx.compose.runtime.mutableStateOf
 import org.organiza.android.ui.ChallengeView
+import org.organiza.android.ui.HabitProgressView
+import org.organiza.android.ui.MonitorView
 import org.organiza.android.ui.UiSnapshot
 import org.organiza.android.ui.Upcoming
 import org.organiza.presentation.AgendaModel
@@ -128,6 +136,11 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
 
     val sync by lazy { SyncController(this) }
     val copilot by lazy { CopilotController(this) }
+    val chat by lazy { ChatController(this) }
+
+    // Guilt-free summaries of monitor sessions, by session ID, kept in memory only.
+    private val monitorSummaries = java.util.concurrent.ConcurrentHashMap<String, String>()
+    @Volatile private var monitorBusy = false
 
     /** Lets debug checks reach tomorrow. Only the debug receiver changes it. */
     @Volatile internal var clockOffsetForTesting: Duration = Duration.ZERO
@@ -292,19 +305,131 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
         refreshUi()
     }
 
-    /** Starts a session on the focus list the distraction hub edits. */
-    fun startFocus(minutes: Int, strict: Boolean, shortForm: Boolean) = onStorageThread {
+    /**
+     * Starts a session at the chosen tier (ADR-0020): the focus list the hub edits, everything but calls
+     * and messages, or nothing at all while the apps used are watched.
+     */
+    fun startFocus(minutes: Int, strict: Boolean, shortForm: Boolean, tier: FocusTier) = onStorageThread {
         val active = storage ?: return@onStorageThread
-        val rule = hub.focusRule(active)
-        if (rule.packages.isEmpty() && rule.domains.isEmpty() && !shortForm) {
-            statusMessage = "Add apps or sites in the distraction blocker hub first"
-            return@onStorageThread
+        val request = when (tier) {
+            FocusTier.LOCKDOWN -> ManualRequest(lockdownApps(), emptySet(), strict, shortForm, tier = tier)
+            FocusTier.MONITOR -> ManualRequest(emptySet(), emptySet(), tier = tier)
+            FocusTier.STANDARD -> {
+                val rule = hub.focusRule(active)
+                if (rule.packages.isEmpty() && rule.domains.isEmpty() && !shortForm) {
+                    statusMessage = "Add apps or sites in the distraction blocker hub first"
+                    return@onStorageThread
+                }
+                ManualRequest(rule.packages, rule.domains, strict, shortForm)
+            }
         }
-        statusMessage = when (active.scheduler.startManual(ManualRequest(rule.packages, rule.domains, strict, shortForm), Duration.ofMinutes(minutes.toLong()))) {
-            StartResult.Started -> "Session started"
+        statusMessage = when (active.scheduler.startManual(request, Duration.ofMinutes(minutes.toLong()))) {
+            StartResult.Started -> if (tier == FocusTier.MONITOR) "Monitoring started. Nothing is blocked" else "Session started"
             StartResult.InvalidDuration -> "Length not allowed. Strict sessions can run up to 24 hours."
         }
         reconcile()
+    }
+
+    /** What lockdown leaves open besides the launcher, dialer and Organiza, which are always exempt (ADR-0007). */
+    private fun lockdownApps(): Set<PackageName> =
+        listOfNotNull(Telephony.Sms.getDefaultSmsPackage(this)).mapNotNull { (PackageName.parse(it) as? Parsed.Valid)?.value }.toSet()
+
+    /** Today's screen time by category, focus time and habits, for the AI. Never app names. Storage thread. */
+    fun usageFacts(stores: Storage): UsageFacts {
+        val zone = ZoneId.systemDefault()
+        val now = clock.now()
+        val today = now.atZone(zone).toLocalDate()
+        val byCategory = minutesByCategory(today.atStartOfDay(zone).toInstant(), now)
+        val habits = stores.aiFacts.habits(today.minusDays(7), today.plusDays(1), Sanitizer())
+        return UsageFacts(byCategory.values.sum(), byCategory, stores.aiFacts.weekly(now.minus(WEEK), now, habits).focusMinutes, habits)
+    }
+
+    private fun minutesByCategory(from: Instant, to: Instant): Map<String, Long> {
+        if (!usageHistory.permitted()) return emptyMap()
+        val categories = hub.categories()
+        return usageHistory.perApp(from, to).entries
+            .filter { it.key.value in categories }
+            .groupBy({ categories.getValue(it.key.value) }, { it.value.toMinutes() })
+            .mapValues { it.value.sum() }
+            .filterValues { it > 0 }
+    }
+
+    fun logMinutes(habitId: String, minutes: Int) = onStorageThread {
+        val active = storage ?: return@onStorageThread
+        if (minutes !in 1..MAX_LOG_MINUTES) return@onStorageThread
+        val today = clock.now().atZone(ZoneId.systemDefault()).toLocalDate()
+        if (active.habits.loggedMinutes(habitId, today) + minutes > MAX_LOG_MINUTES) {
+            statusMessage = "A day has only 1440 minutes"
+            return@onStorageThread
+        }
+        val total = active.habits.logMinutes(habitId, today, minutes)
+        statusMessage = "Logged $minutes min. $total min today"
+        refreshUi()
+    }
+
+    /** Asks for a guilt-free look at the last monitor session, by app category only. */
+    fun summarizeMonitor() = onStorageThread {
+        val last = lastMonitor() ?: return@onStorageThread
+        val end = last.finishedAt ?: return@onStorageThread
+        val minutes = Duration.between(last.start, end).toMinutes()
+        val byCategory = minutesByCategory(last.start, end)
+        monitorBusy = true
+        refreshUi()
+        onAiThread {
+            try {
+                when (val result = coach().monitorSummary(minutes, UsageFacts(byCategory.values.sum(), byCategory, minutes, emptyList()))) {
+                    is AiResult.Ok -> monitorSummaries[last.id] = result.value
+                    is AiResult.Failed -> statusMessage = "Summary failed: ${result.failure}"
+                }
+            } finally {
+                monitorBusy = false
+                requestUiRefresh()
+            }
+        }
+    }
+
+    /** The most recent finished monitor session from the last day. Storage thread. */
+    private fun lastMonitor(): org.organiza.storage.StoredSession? {
+        val active = storage ?: return null
+        val now = clock.now()
+        return (active.sessions.inState(SessionState.COMPLETED) + active.sessions.inState(SessionState.ABORTED))
+            .filter { it.tier == FocusTier.MONITOR && it.finishedAt != null }
+            .maxByOrNull { it.finishedAt!! }
+            ?.takeIf { Duration.between(it.finishedAt, now) < Duration.ofDays(1) }
+    }
+
+    /** A dictated chat message: transcribed with the user's consent, then sent like a typed one. */
+    fun chatDictated(samples: ShortArray, sampleRate: Int) = onAiThread {
+        val pipeline = VoicePipeline(apiKeys, GroqClient(UrlConnectionTransport(), aiEndpoint), Sanitizer())
+        when (val result = pipeline.transcript(samples, sampleRate)) {
+            is VoiceResult.Transcript -> if (result.text.isBlank()) statusMessage = "Voice: nothing heard" else chat.send(result.text)
+            VoiceResult.Silent -> statusMessage = "Voice: nothing heard, nothing was sent"
+            VoiceResult.TooLong -> statusMessage = "Voice: too long, nothing was sent"
+            is VoiceResult.Failed -> statusMessage = "Voice failed: ${result.failure}"
+            else -> Unit
+        }
+    }
+
+    /** A command from the chat, waiting for Confirm like a spoken one (ADR-0010). */
+    fun propose(command: VoiceCommand) {
+        pendingCommand = command
+        requestUiRefresh()
+    }
+
+    /** Hands a meeting to the phone's calendar app, which shows it for saving. Nothing is stored here. */
+    private fun openCalendar(event: VoiceCommand.AddEvent): String {
+        val end = event.start.plus(Duration.ofMinutes(event.minutes.toLong()))
+        val intent = Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI)
+            .putExtra(CalendarContract.Events.TITLE, event.title)
+            .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.start.toEpochMilli())
+            .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, end.toEpochMilli())
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return try {
+            startActivity(intent)
+            "Opened your calendar. Save the event there"
+        } catch (_: ActivityNotFoundException) {
+            "No calendar app on this phone can take the event"
+        }
     }
 
     fun nudge(challengeId: String, memberId: String) = onArenaThread {
@@ -403,6 +528,7 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
             VoiceOutcome.NothingToCancel -> "No upcoming session to cancel. Running sessions cannot be cancelled by voice."
             VoiceOutcome.RefusedStrict -> "The schedule cannot change during a strict session"
             VoiceOutcome.InvalidTime -> "That time is not allowed"
+            VoiceOutcome.OpenCalendar -> openCalendar(command as VoiceCommand.AddEvent)
         }
         reconcile()
     }
@@ -562,6 +688,25 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
             val todays = active.interventions.between(startOfDay, now.plusSeconds(1))
             overridesToday = todays.count { it.choice == InterventionChoice.OVERRODE }
             val choices = ChoicesModel.build(todays, zone, ::appLabel, copilot.windows(active.interventions, zone))
+            // Minute goals and linked apps settle first, so a goal met in the app shows as done (ADR-0020).
+            val habitProgress = active.habits.active().mapNotNull { habit ->
+                val plan = active.habits.plan(habit.id) ?: return@mapNotNull null
+                val linked = plan.linkedPackage?.let { (PackageName.parse(it) as? Parsed.Valid)?.value }
+                if (plan.goalMinutes == null && linked == null) return@mapNotNull null
+                val appMinutes = if (linked != null && usageHistory.permitted()) usageHistory.foregroundTime(linked, startOfDay, now).toMinutes().toInt() else 0
+                habit.id to HabitProgressView(plan.goalMinutes, active.habits.settle(habit.id, today, appMinutes), linked?.let(::appLabel))
+            }.toMap()
+            val monitor = lastMonitor()?.let { last ->
+                val end = last.finishedAt ?: last.end
+                val apps = if (usageHistory.permitted()) {
+                    usageHistory.perApp(last.start, end).filterKeys { it.value != packageName }.entries
+                        .sortedByDescending { it.value }.take(MONITOR_APPS)
+                        .map { appLabel(it.key) to it.value.toMinutes() }.filter { it.second > 0 }
+                } else {
+                    emptyList()
+                }
+                MonitorView(Duration.between(last.start, end).toMinutes(), apps, monitorSummaries[last.id], monitorBusy)
+            }
             val habits = active.habits.active().map { habit ->
                 HabitInput(
                     habit.id,
@@ -643,6 +788,11 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
                 copilot = copilot.view(),
                 account = sync.view(),
                 habits = HabitMatrix.build(today, habits),
+                habitProgress = habitProgress,
+                chat = chat.view(),
+                monitor = monitor,
+                monitoring = sessions.any { it.state == SessionState.ACTIVE && it.tier == FocusTier.MONITOR },
+                lockdown = session.current.blockList.allowOnly,
                 upcoming = upcoming,
                 challenges = challenges,
                 hasApiKey = keySaved,
@@ -808,7 +958,7 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
         }
     }
 
-    fun coach() = AiCoach(apiKeys, GroqClient(UrlConnectionTransport(), aiEndpoint), Sanitizer())
+    fun coach(model: String = GroqClient.DEFAULT_MODEL) = AiCoach(apiKeys, GroqClient(UrlConnectionTransport(), aiEndpoint, model), Sanitizer())
 
     fun hasApiKey(): Boolean = keySaved
 
@@ -927,6 +1077,8 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
         private val WEEK: Duration = Duration.ofDays(7)
         private const val MAX_UPCOMING = 5
         private const val HOME_DAYS = 40L
+        private const val MAX_LOG_MINUTES = 1440
+        private const val MONITOR_APPS = 5
 
         /** The longest run of consecutive met days in [results]. */
         internal fun longestStreak(results: Map<LocalDate, Boolean>): Int {

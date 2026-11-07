@@ -33,6 +33,7 @@ public enum class AuthResult {
     UNAVAILABLE,
     REFUSED,
     NOT_SUPPORTED,
+    DELETED,
 }
 
 /** Accounts for the chosen backend (ADR-0015). Calls block on the network, so keep them off the main thread. */
@@ -47,6 +48,9 @@ public interface AuthRepository {
 
     /** A current access token, refreshed when it is about to expire, or null when signed out or offline. */
     public fun accessToken(): String?
+
+    /** Deletes the account and everything the backend holds for it, then signs out (ADR-0020). */
+    public fun deleteAccount(): AuthResult
 }
 
 public object LocalOnlyAuth : AuthRepository {
@@ -59,6 +63,8 @@ public object LocalOnlyAuth : AuthRepository {
     override fun signOut(): Unit = Unit
 
     override fun accessToken(): String? = null
+
+    override fun deleteAccount(): AuthResult = AuthResult.NOT_SUPPORTED
 }
 
 /**
@@ -109,6 +115,19 @@ public class SupabaseAuth(
         if (reply.status in SUCCESS) return keep(reply)?.access
         if (reply.status in 400..499) forget()
         return null
+    }
+
+    @Synchronized
+    override fun deleteAccount(): AuthResult {
+        val token = accessToken() ?: return if (session == null) AuthResult.NOT_SUPPORTED else AuthResult.UNAVAILABLE
+        val reply = try {
+            transport.post("${config.url}/rest/v1/rpc/delete_account", headers() + ("Authorization" to "Bearer $token"), "{}")
+        } catch (_: IOException) {
+            return AuthResult.UNAVAILABLE
+        }
+        if (reply.status !in SUCCESS) return if (reply.status in 400..499) AuthResult.REFUSED else AuthResult.UNAVAILABLE
+        forget()
+        return AuthResult.DELETED
     }
 
     private fun credentials(path: String, email: String, password: String): AuthResult {

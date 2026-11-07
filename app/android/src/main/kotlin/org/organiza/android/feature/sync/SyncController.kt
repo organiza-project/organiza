@@ -71,6 +71,9 @@ class SyncController(private val app: OrganizaApp) {
 
     fun signUp(email: String, password: String) = onNetwork { app.showMessage(result(backend.auth.signUp(email, password))) }
 
+    /** Deletes the account and its cloud data. The phone's own data stays (ADR-0020). */
+    fun deleteAccount() = onNetwork { app.showMessage(result(backend.auth.deleteAccount())) }
+
     fun signOut() = onNetwork {
         backend.auth.signOut()
         app.showMessage("Signed out")
@@ -132,6 +135,7 @@ class SyncController(private val app: OrganizaApp) {
         AuthResult.UNAVAILABLE -> "The backend could not be reached"
         AuthResult.REFUSED -> "The backend refused the request"
         AuthResult.NOT_SUPPORTED -> "Choose a backend first"
+        AuthResult.DELETED -> "Account and cloud data deleted. Nothing of yours is left on the backend"
     }
 
     private companion object {

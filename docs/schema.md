@@ -9,9 +9,10 @@ version is 7. Decisions are in ADR-0004, ADR-0006, ADR-0008, ADR-0011, ADR-0013,
 |-------|---------|-------|
 | `rule` | A named set of blocks, optionally bound to a calendar tag | `calendar_tag` is `#focus`, `#deepwork` and so on |
 | `rule_target` | What a rule blocks | `package`, `domain` or, on Linux, `process`; full URLs are not stored |
-| `session` | A planned or running block period | History survives rule deletion; calendar occurrences are unique per UID and start |
-| `habit` | A criterion and its plan | `manual`, `screen_time_under` or `zero_launches`; daily, weekly or monthly with a target of met days and an optional reminder time |
+| `session` | A planned or running block period | History survives rule deletion; calendar occurrences are unique per UID and start; from v8 a tier: lockdown, standard or monitor |
+| `habit` | A criterion and its plan | `manual`, `screen_time_under` or `zero_launches`; daily, weekly or monthly with a target of met days and an optional reminder time; from v8 an optional minute goal and linked app |
 | `habit_log` | One result per habit per local day | Holds the result only, never the underlying usage |
+| `habit_minutes` | Minutes logged by hand per habit and day (v8) | App minutes from a linked app are read live and never stored |
 | `challenge` | A peer challenge over a habit | A habit in a challenge cannot be deleted |
 | `challenge_log` | One daily commitment, and the only table that feeds sync | Columns are pinned by an allow-list test |
 | `arena_member` | Other people in a challenge | A public key and a chosen display name |

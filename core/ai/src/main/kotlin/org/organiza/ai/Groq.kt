@@ -219,11 +219,14 @@ public class GroqClient(
     public companion object {
         /** Hosted model IDs retire often. Check Groq's deprecations page before changing this. */
         public const val DEFAULT_MODEL: String = "openai/gpt-oss-20b"
+
+        /** The copilot chat's larger model (ADR-0020). llama-3.3-70b-versatile was retired from Groq by 2026-11. */
+        public const val CHAT_MODEL: String = "openai/gpt-oss-120b"
         private const val TRANSCRIPTION_MODEL = "whisper-large-v3-turbo"
 
         // A fixed hint with no user data, which steers Whisper towards command vocabulary.
         private const val TRANSCRIPTION_HINT = "Add a habit. Mark habit as done. Remove the habit. " +
-            "Schedule focus tomorrow at 9 for 1 hour. Cancel the session."
+            "Schedule focus tomorrow at 9 for 1 hour. Cancel the session. Log 30 minutes of reading."
         private const val OK = 200
         private const val CAPACITY = 498
         private const val TEMPERATURE = 0.3

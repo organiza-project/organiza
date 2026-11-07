@@ -2,6 +2,7 @@ package org.organiza.android
 
 import org.organiza.android.ui.Actions
 import org.organiza.enforcement.ShortFormFeed
+import org.organiza.storage.FocusTier
 import org.organiza.storage.HabitFrequency
 import org.organiza.presentation.Permission
 import org.organiza.presentation.ProtectionItem
@@ -55,14 +56,21 @@ class RecordingActions : Actions {
     override fun signIn(email: String, password: String) { calls += "signIn $email" }
     override fun signUp(email: String, password: String) { calls += "signUp $email" }
     override fun signOut() { calls += "signOut" }
-    override fun startFocus(minutes: Int, strict: Boolean, shortForm: Boolean) { calls += "startFocus $minutes" }
+    override fun startFocus(minutes: Int, strict: Boolean, shortForm: Boolean, tier: FocusTier) { calls += "startFocus $minutes $tier" }
+    override fun summarizeMonitor() { calls += "summarizeMonitor" }
+    override fun logMinutes(habitId: String, minutes: Int) { calls += "logMinutes $habitId $minutes" }
+    override fun sendChat(text: String) { calls += "sendChat $text" }
+    override fun startChatVoice() { calls += "startChatVoice" }
+    override fun stopChatVoice() { calls += "stopChatVoice" }
+    override fun clearChat() { calls += "clearChat" }
+    override fun deleteAccount() { calls += "deleteAccount" }
     override fun setFocusApp(pkg: String, on: Boolean) { calls += "setFocusApp $pkg $on" }
     override fun addFocusSite(raw: String) { calls += "addFocusSite $raw" }
     override fun removeFocusSite(domain: String) { calls += "removeFocusSite $domain" }
     override fun setLimit(pkg: String, minutes: Long?) { calls += "setLimit $pkg $minutes" }
     override fun setFeed(feed: ShortFormFeed, on: Boolean) { calls += "setFeed $feed $on" }
-    override fun addHabitPlan(name: String, frequency: HabitFrequency, target: Int, reminderMinute: Int?) {
-        calls += "addHabitPlan $name $frequency $target $reminderMinute"
+    override fun addHabitPlan(name: String, frequency: HabitFrequency, target: Int, reminderMinute: Int?, goalMinutes: Int?, linkedPackage: String?) {
+        calls += "addHabitPlan $name $frequency $target $reminderMinute $goalMinutes $linkedPackage"
     }
     override fun nudge(challengeId: String, memberId: String) { calls += "nudge $memberId" }
     override fun pickTimetablePhoto() { calls += "pickTimetablePhoto" }

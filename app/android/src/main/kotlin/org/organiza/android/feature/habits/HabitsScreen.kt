@@ -66,13 +66,14 @@ fun HabitsScreen(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit) {
                     Action("Mark done", ButtonKind.SECONDARY) { actions.markToday(row.id, row.name, true) }
                 }
             }
+            ui.habitProgress[row.id]?.let { progress -> MinutesRow(row.id, progress, actions) }
             HabitCells(row.cells, "${row.name}: ${row.met} of ${row.days} days met")
         }
         if (matrix.rows.isNotEmpty()) MatrixLegend()
     }
     Panel {
         PanelHeader("Speak a command")
-        Txt("Say \"mark read as done\" or \"schedule focus tomorrow at 9\". Nothing changes until you confirm.", Type.small, colors.muted)
+        Txt("Say \"log 30 minutes of reading\" or \"schedule focus tomorrow at 9\". Nothing changes until you confirm.", Type.small, colors.muted)
         Spacer(Modifier.height(8.dp))
         TalkButton(actions)
         if (ui.pendingCommand != null) {
@@ -103,6 +104,37 @@ fun HabitsScreen(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit) {
         Action("Ask for a review", ButtonKind.SECONDARY) { actions.weeklyReview() }
     }
 }
+
+/** Today's minutes against the goal, from the linked app and from logging by hand (ADR-0020). */
+@Composable
+private fun MinutesRow(habitId: String, progress: HabitProgressView, actions: Actions) {
+    val colors = Theme.colors
+    var adding by rememberSaveable(habitId) { mutableStateOf(LOG_STEP) }
+    var open by rememberSaveable(habitId) { mutableStateOf(false) }
+    val goal = progress.goalMinutes
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val figure = if (goal != null) "${progress.minutes} of $goal min today" else "${progress.minutes} min today"
+            Txt(figure, Type.small, colors.muted, Modifier.weight(1f))
+            Action(if (open) "Close" else "Log time", ButtonKind.TEXT) { open = !open }
+        }
+        if (goal != null) ProgressPill(progress.minutes.toDouble() / goal, ink = if (progress.minutes >= goal) colors.data else colors.text)
+        progress.linkedLabel?.let { Txt("Counting time in $it automatically", Type.small, colors.muted, Modifier.padding(top = 4.dp)) }
+        if (open) {
+            Column(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Stepper(adding, "min", LOG_STEP..MAX_LOG) { wanted -> adding = (adding + if (wanted > adding) LOG_STEP else -LOG_STEP).coerceIn(LOG_STEP, MAX_LOG) }
+                Spacer(Modifier.height(8.dp))
+                Action("Add $adding min", ButtonKind.PRIMARY, modifier = Modifier.fillMaxWidth()) {
+                    actions.logMinutes(habitId, adding)
+                    open = false
+                }
+            }
+        }
+    }
+}
+
+private const val LOG_STEP = 5
+private const val MAX_LOG = 240
 
 @Composable
 private fun HabitCells(cells: List<Cell>, description: String) {

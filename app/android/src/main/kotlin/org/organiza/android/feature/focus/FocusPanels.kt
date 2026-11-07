@@ -23,6 +23,7 @@ import org.organiza.presentation.ChoicesModel
 import org.organiza.presentation.Format
 import org.organiza.presentation.FocusState
 import org.organiza.presentation.ProtectionItem
+import org.organiza.storage.FocusTier
 
 /** The session card on Home: what is blocked and until when, with start or stop (ADR-0018). */
 @Composable
@@ -67,6 +68,28 @@ fun FocusCard(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit) {
         if (focus.state != FocusState.OFF) {
             Rule()
             BlockedNow(ui)
+        } else {
+            ui.monitor?.let { Rule(); MonitorSummary(it, ui.hasApiKey, actions) }
+        }
+    }
+}
+
+/** Where the time went in the last monitor-only session, with an optional AI take on it. */
+@Composable
+private fun MonitorSummary(monitor: MonitorView, hasKey: Boolean, actions: Actions) {
+    val colors = Theme.colors
+    Txt("Last monitor session · ${monitor.minutes} min", Type.bodyStrong)
+    if (monitor.apps.isEmpty()) Txt("No app time recorded. Allow usage access to see it.", Type.small, colors.muted)
+    monitor.apps.forEach { (label, minutes) ->
+        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+            Txt(label, Type.body, modifier = Modifier.weight(1f), maxLines = 1)
+            Txt("$minutes min", Type.small, colors.muted)
+        }
+    }
+    when {
+        monitor.summary != null -> Txt(monitor.summary, Type.body, modifier = Modifier.padding(top = 6.dp))
+        hasKey -> Action(if (monitor.busy) "Thinking" else "Guilt-free summary", ButtonKind.TEXT, enabled = !monitor.busy) {
+            actions.summarizeMonitor()
         }
     }
 }
@@ -77,27 +100,55 @@ private fun StartForm(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit, c
     var minutes by rememberSaveable { mutableStateOf(45) }
     var strict by rememberSaveable { mutableStateOf(false) }
     var shortForm by rememberSaveable { mutableStateOf(false) }
+    var tier by rememberSaveable { mutableStateOf(FocusTier.STANDARD) }
     val listed = ui.hub.apps.count { it.onList } + ui.hub.sites.size
-    Txt("Blocks your focus list: ${Format.count(listed, "app or site", "apps and sites")}.", Type.body)
-    Action("Edit the focus list", ButtonKind.TEXT) { open(Route.BLOCKER) }
-    Spacer(Modifier.height(4.dp))
+    Txt("How hard should it block?", Type.bodyStrong, modifier = Modifier.padding(bottom = 6.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChoiceRow("Total lockdown", "Every app is paused except calls, messages and the home screen", tier == FocusTier.LOCKDOWN) {
+            tier = FocusTier.LOCKDOWN
+        }
+        ChoiceRow(
+            "Standard focus",
+            "Blocks your focus list: ${Format.count(listed, "app or site", "apps and sites")}",
+            tier == FocusTier.STANDARD,
+        ) { tier = FocusTier.STANDARD }
+        ChoiceRow("Monitor only", "Blocks nothing. See where your time went afterwards, without judgement", tier == FocusTier.MONITOR) {
+            tier = FocusTier.MONITOR
+        }
+    }
+    if (tier == FocusTier.STANDARD) Action("Edit the focus list", ButtonKind.TEXT) { open(Route.BLOCKER) }
+    Spacer(Modifier.height(8.dp))
     Stepper(minutes / 15, "× 15 min = $minutes min", 1..96) { minutes = it * 15 }
-    SwitchRow("Strict", "Cannot be stopped early, and opening a blocked app takes a longer pause. Up to 24 hours", strict) { strict = it }
-    SwitchRow("Shorts and Reels", "Block every short video feed for this session", shortForm) { shortForm = it }
+    if (tier != FocusTier.MONITOR) {
+        SwitchRow("Strict", "Cannot be stopped early, and opening a blocked app takes a longer pause. Up to 24 hours", strict) { strict = it }
+        SwitchRow("Shorts and Reels", "Block every short video feed for this session", shortForm) { shortForm = it }
+    }
     Spacer(Modifier.height(8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Action("Start", ButtonKind.PRIMARY) {
-            actions.startFocus(minutes, strict, shortForm)
+            val blocking = tier != FocusTier.MONITOR
+            actions.startFocus(minutes, strict && blocking, shortForm && blocking, tier)
             close()
         }
         Action("Cancel", ButtonKind.TEXT, onClick = close)
     }
-    if (listed == 0) Txt("Your focus list is empty, so only short videos can be blocked.", Type.small, colors.muted)
+    if (tier == FocusTier.STANDARD && listed == 0) Txt("Your focus list is empty, so only short videos can be blocked.", Type.small, colors.muted)
 }
 
 @Composable
 private fun BlockedNow(ui: UiSnapshot) {
     val colors = Theme.colors
+    if (ui.lockdown) {
+        Txt("Total lockdown", Type.bodyStrong)
+        val open = (listOf("Phone", "Home screen") + ui.blockedApps).joinToString()
+        Txt("Every app is paused. Still open: $open.", Type.body, colors.muted)
+        return
+    }
+    if (ui.monitoring && ui.blockedApps.isEmpty() && ui.blockedSites.isEmpty()) {
+        Txt("Monitor only", Type.bodyStrong)
+        Txt("Nothing is blocked. The apps you use are counted on this phone and shown when the session ends.", Type.body, colors.muted)
+        return
+    }
     Txt("Blocked now", Type.bodyStrong)
     val rows = ui.blockedApps.map { it to "App" } + ui.blockedSites.map { it to "Website and its subdomains" }
     if (rows.isEmpty()) Txt("This session's list is empty, so nothing is blocked.", Type.body, colors.muted)

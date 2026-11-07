@@ -33,6 +33,9 @@ public sealed interface VoiceOutcome {
     public data object RefusedStrict : VoiceOutcome
 
     public data object InvalidTime : VoiceOutcome
+
+    /** Nothing was stored: the app hands the event to the phone's calendar, which asks before saving. */
+    public data object OpenCalendar : VoiceOutcome
 }
 
 /** Applies a confirmed command. Voice gets no power the app lacks otherwise (ADR-0010). */
@@ -66,6 +69,17 @@ public class VoiceExecutor(
             }
             is VoiceCommand.AddSession -> addSession(command)
             is VoiceCommand.CancelSession -> cancelSession(command)
+            is VoiceCommand.LogMinutes -> {
+                if (command.date.isAfter(clock.now().atZone(zone).toLocalDate())) {
+                    VoiceOutcome.InvalidTime
+                } else {
+                    withHabit(command.name) { habit ->
+                        habits.logMinutes(habit.id, command.date, command.minutes)
+                        VoiceOutcome.Done
+                    }
+                }
+            }
+            is VoiceCommand.AddEvent -> VoiceOutcome.OpenCalendar
         }
     }
 

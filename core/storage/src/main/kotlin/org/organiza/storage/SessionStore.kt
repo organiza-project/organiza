@@ -15,6 +15,13 @@ public enum class SessionState(internal val column: String) {
     ABORTED("aborted"),
 }
 
+/** How hard a session blocks (ADR-0020): only listed apps, the listed apps, or nothing at all. */
+public enum class FocusTier(internal val column: String) {
+    LOCKDOWN("lockdown"),
+    STANDARD("standard"),
+    MONITOR("monitor"),
+}
+
 public data class StoredSession(
     val id: String,
     val ruleId: String?,
@@ -24,13 +31,14 @@ public data class StoredSession(
     val start: Instant,
     val end: Instant,
     val finishedAt: Instant?,
+    val tier: FocusTier = FocusTier.STANDARD,
 )
 
 public class SessionStore(private val db: Database) {
     public fun insert(session: StoredSession) {
         db.execute(
-            "INSERT INTO session (id, rule_id, source, state, calendar_event_uid, starts_at_ms, ends_at_ms, finished_at_ms) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO session (id, rule_id, source, state, calendar_event_uid, starts_at_ms, ends_at_ms, finished_at_ms, tier) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             listOf(
                 session.id,
                 session.ruleId,
@@ -40,6 +48,7 @@ public class SessionStore(private val db: Database) {
                 session.start.toEpochMilli(),
                 session.end.toEpochMilli(),
                 session.finishedAt?.toEpochMilli(),
+                session.tier.column,
             ),
         )
     }
@@ -87,7 +96,7 @@ public class SessionStore(private val db: Database) {
 
     private fun select(where: String, args: List<Any?>): List<StoredSession> =
         db.query(
-            "SELECT id, rule_id, source, state, calendar_event_uid, starts_at_ms, ends_at_ms, finished_at_ms " +
+            "SELECT id, rule_id, source, state, calendar_event_uid, starts_at_ms, ends_at_ms, finished_at_ms, tier " +
                 "FROM session $where ORDER BY starts_at_ms, id",
             args,
         ) { row ->
@@ -100,6 +109,7 @@ public class SessionStore(private val db: Database) {
                 start = Instant.ofEpochMilli(row.long(5) ?: 0),
                 end = Instant.ofEpochMilli(row.long(6) ?: 0),
                 finishedAt = row.long(7)?.let(Instant::ofEpochMilli),
+                tier = FocusTier.entries.first { it.column == row.string(8) },
             )
         }
 }

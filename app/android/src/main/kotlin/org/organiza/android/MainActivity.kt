@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -43,6 +44,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import org.organiza.android.feature.arena.ArenaScreen
 import org.organiza.android.feature.blocker.BlockerHubScreen
+import org.organiza.android.feature.ai.CopilotScreen
 import org.organiza.android.feature.focus.SessionInput
 import org.organiza.android.feature.habits.HabitsScreen
 import org.organiza.android.feature.habits.NewHabitScreen
@@ -54,9 +56,11 @@ import org.organiza.android.feature.profile.ProfileScreen
 import org.organiza.android.feature.schedule.CalendarScreen
 import org.organiza.android.feature.schedule.DictationScreen
 import org.organiza.android.feature.schedule.ImportScreen
+import org.organiza.android.ui.CopilotFab
 import org.organiza.android.ui.Route
 import org.organiza.android.ui.Tab
 import org.organiza.enforcement.ShortFormFeed
+import org.organiza.storage.FocusTier
 import org.organiza.storage.HabitFrequency
 import org.organiza.storage.HabitPlan
 import org.organiza.android.feature.voice.VoiceRecorder
@@ -99,6 +103,7 @@ class MainActivity : ComponentActivity(), Actions {
         uri?.let(app.schedule::readPhoto)
     }
     private var dictation: VoiceRecorder? = null
+    private var chatVoice: VoiceRecorder? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -118,6 +123,8 @@ class MainActivity : ComponentActivity(), Actions {
         recorder = null
         dictation?.stop()
         dictation = null
+        chatVoice?.stop()
+        chatVoice = null
         super.onPause()
     }
 
@@ -162,18 +169,59 @@ class MainActivity : ComponentActivity(), Actions {
 
     override fun signOut() = app.sync.signOut()
 
+    override fun deleteAccount() {
+        AlertDialog.Builder(this)
+            .setTitle("Delete account and cloud data?")
+            .setMessage(DELETE_NOTICE)
+            .setPositiveButton("Delete") { _, _ -> app.sync.deleteAccount() }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     override fun runCopilot() = app.copilot.run()
+
+    override fun sendChat(text: String) = app.chat.send(text)
+
+    override fun clearChat() = app.chat.clear()
+
+    override fun startChatVoice() {
+        if (!app.voiceConsent) return startTalking()
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            microphone.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+        chatVoice = VoiceRecorder().takeIf(VoiceRecorder::start)
+        if (chatVoice == null) app.showMessage("Could not start the microphone")
+    }
+
+    override fun stopChatVoice() {
+        val active = chatVoice ?: return
+        chatVoice = null
+        app.chatDictated(active.stop(), VoiceRecorder.SAMPLE_RATE)
+    }
 
     override fun addHabit(name: String) = app.addHabit(name)
 
-    override fun addHabitPlan(name: String, frequency: HabitFrequency, target: Int, reminderMinute: Int?) {
-        app.addHabitPlan(name, HabitPlan(frequency, target, reminderMinute))
+    override fun logMinutes(habitId: String, minutes: Int) = app.logMinutes(habitId, minutes)
+
+    override fun addHabitPlan(
+        name: String,
+        frequency: HabitFrequency,
+        target: Int,
+        reminderMinute: Int?,
+        goalMinutes: Int?,
+        linkedPackage: String?,
+    ) {
+        app.addHabitPlan(name, HabitPlan(frequency, target, reminderMinute, goalMinutes, linkedPackage))
         val needs = reminderMinute != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         if (needs) notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    override fun startFocus(minutes: Int, strict: Boolean, shortForm: Boolean) = app.startFocus(minutes, strict, shortForm)
+    override fun startFocus(minutes: Int, strict: Boolean, shortForm: Boolean, tier: FocusTier) =
+        app.startFocus(minutes, strict, shortForm, tier)
+
+    override fun summarizeMonitor() = app.summarizeMonitor()
 
     override fun setFocusApp(pkg: String, on: Boolean) = app.hub.setApp(pkg, on)
 
@@ -299,6 +347,8 @@ class MainActivity : ComponentActivity(), Actions {
         const val VOICE_NOTICE = "While you hold the button, your voice is recorded and sent to Groq using your own " +
             "key, so they can turn it into text. Unlike typed text, a recording cannot have names removed first. " +
             "Organiza keeps no recordings or transcripts, and silence is never sent."
+        const val DELETE_NOTICE = "This deletes your account on the backend and every challenge result it holds for you, " +
+            "right away. It cannot be undone. Habits, sessions and usage on this phone are not touched."
     }
 }
 
@@ -317,11 +367,12 @@ private fun Root(ui: UiSnapshot, actions: Actions) {
         val scroll = rememberSaveable(tab, route, saver = androidx.compose.foundation.ScrollState.Saver) {
             androidx.compose.foundation.ScrollState(0)
         }
+        val onTab = !ui.onboarding && route == null
         // Content stops at 720dp and centres on a tablet, so short panels never stretch across it.
+        Box(Modifier.weight(1f).fillMaxWidth()) {
         Column(
             Modifier
-                .weight(1f)
-                .fillMaxWidth()
+                .fillMaxSize()
                 .verticalScroll(scroll)
                 .wrapContentWidth(Alignment.CenterHorizontally)
                 .widthIn(max = 720.dp)
@@ -330,19 +381,23 @@ private fun Root(ui: UiSnapshot, actions: Actions) {
         ) {
             when {
                 ui.onboarding -> OnboardingScreen(ui, actions)
-                route == Route.NEW_HABIT -> NewHabitScreen(actions, back)
+                route == Route.NEW_HABIT -> NewHabitScreen(ui, actions, back)
                 route == Route.AGENDA -> CalendarScreen(ui, actions, back, open)
                 route == Route.IMPORT -> ImportScreen(ui, actions, back, open)
                 route == Route.DICTATION -> DictationScreen(ui, actions, back)
                 route == Route.BLOCKER -> BlockerHubScreen(ui, actions, back)
+                route == Route.COPILOT -> CopilotScreen(ui, actions, back)
                 tab == Tab.HOME -> HomeScreen(ui, actions, open) { tab = it }
                 tab == Tab.HABITS -> HabitsScreen(ui, actions, open)
                 tab == Tab.ARENA -> ArenaScreen(ui, actions)
                 tab == Tab.METRICS -> MetricsScreen(ui, actions)
                 else -> ProfileScreen(ui, actions)
             }
-            Spacer(Modifier.height(8.dp))
+            // Room under the last panel so the copilot button never covers it.
+            Spacer(Modifier.height(if (onTab) 80.dp else 8.dp))
         }
-        if (!ui.onboarding && route == null) BottomBar(tab) { tab = it }
+        if (onTab) CopilotFab(Modifier.align(Alignment.BottomEnd).padding(16.dp)) { open(Route.COPILOT) }
+        }
+        if (onTab) BottomBar(tab) { tab = it }
     }
 }

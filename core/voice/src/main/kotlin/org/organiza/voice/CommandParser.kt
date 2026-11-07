@@ -21,6 +21,12 @@ public sealed interface VoiceCommand {
 
     public data class CancelSession(val tag: String, val start: Instant?) : VoiceCommand
 
+    /** Minutes spent on a habit, added to the day's progress (ADR-0020). */
+    public data class LogMinutes(val name: String, val date: LocalDate, val minutes: Int) : VoiceCommand
+
+    /** A meeting or appointment for the phone's own calendar, which asks again before saving it. */
+    public data class AddEvent(val title: String, val start: Instant, val minutes: Int) : VoiceCommand
+
     /** The text shown for confirmation before anything is applied (ADR-0010). */
     public fun describe(zone: ZoneId = ZoneId.systemDefault()): String = when (this) {
         is AddHabit -> "Add habit: $name"
@@ -28,8 +34,13 @@ public sealed interface VoiceCommand {
         is MarkHabit -> "Mark $name ${if (done) "done" else "missed"} on $date"
         is AddSession -> "Schedule $tag at ${start.atZone(zone).toLocalDateTime()} for $minutes minutes"
         is CancelSession -> "Cancel " + (start?.let { "$tag at ${it.atZone(zone).toLocalDateTime()}" } ?: "the next $tag session")
+        is LogMinutes -> "Log $minutes minutes of $name on ${date.format(SPOKEN_DAY)}"
+        is AddEvent -> "Add to calendar: $title, ${start.atZone(zone).format(SPOKEN_TIME)} for $minutes minutes"
     }
 }
+
+private val SPOKEN_DAY = java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", Locale.UK)
+private val SPOKEN_TIME = java.time.format.DateTimeFormatter.ofPattern("EEE d MMM HH:mm", Locale.UK)
 
 public object SpokenNumbers {
     private val WORDS = mapOf(
@@ -46,7 +57,13 @@ public object SpokenNumbers {
 /** The whole command grammar. Nothing else can become an action (ADR-0010). */
 public object CommandParser {
     private const val NAME_PREFIX = """(?: the| my)?"""
-    private val ADD_HABIT = Regex("""(?:add|create|start|new)(?: a new| a| new)? habit(?: called| named| to)? (.+)""")
+    private val ADD_HABIT =
+        Regex("""(?:add|create|start|new)(?: a new| a| new)?(?: daily| weekly| monthly)? habit(?: called| named| to| for)? (.+)""")
+    private val LOG = Regex(
+        """(?:log|track|record) (half an hour|an hour|(\d{1,4}) (hours?|minutes?|mins?)(?: (?:and )?(\d{1,2}) (?:minutes?|mins?))?) """ +
+            """(?:of|for|on)$NAME_PREFIX (.+?)(?: (today|yesterday))?""",
+    )
+    private val EVENT = Regex("""^(?:meeting|call|appointment|event|lunch|dinner|coffee)\b.*""")
     private val REMOVE_HABIT = Regex("""(?:remove|delete|drop|stop)$NAME_PREFIX habit(?: called| named)? (.+)""")
     private val MARK = Regex(
         """(?:mark|check off|tick off)$NAME_PREFIX(?: habit)? (.+?)(?: as)? """ +
@@ -75,7 +92,8 @@ public object CommandParser {
             val (name, day) = match.destructured
             return VoiceCommand.MarkHabit(name, dateFor(day, now), true)
         }
-        SCHEDULE.matchEntire(line)?.let { return parseSchedule(it.groupValues[1], now) }
+        LOG.matchEntire(SpokenNumbers.toDigits(line))?.let { return parseLog(it, now) }
+        SCHEDULE.matchEntire(line)?.let { return parseSchedule(it.groupValues[1], now, text) }
         CANCEL.matchEntire(line)?.let { return parseCancel(it.groupValues[1], now) }
         return null
     }
@@ -91,7 +109,20 @@ public object CommandParser {
     private fun dateFor(day: String, now: ZonedDateTime): LocalDate =
         if (day == "yesterday") now.toLocalDate().minusDays(1) else now.toLocalDate()
 
-    private fun parseSchedule(raw: String, now: ZonedDateTime): VoiceCommand? {
+    private fun parseLog(match: MatchResult, now: ZonedDateTime): VoiceCommand? {
+        val amount = match.groupValues[2].toIntOrNull()
+        val minutes = when {
+            match.groupValues[1] == "half an hour" -> 30
+            match.groupValues[1] == "an hour" -> 60
+            amount == null -> return null
+            match.groupValues[3].startsWith("hour") -> amount * 60 + (match.groupValues[4].toIntOrNull() ?: 0)
+            else -> amount
+        }
+        if (minutes !in 1..MAX_MINUTES) return null
+        return VoiceCommand.LogMinutes(match.groupValues[5], dateFor(match.groupValues[6], now), minutes)
+    }
+
+    private fun parseSchedule(raw: String, now: ZonedDateTime, spoken: String): VoiceCommand? {
         var rest = SpokenNumbers.toDigits(raw)
         val duration = DURATION.find(rest)
         val minutes = if (duration == null) DEFAULT_MINUTES else minutesFrom(duration) ?: return null
@@ -99,6 +130,7 @@ public object CommandParser {
         val parts = extractWhen(rest)
         val start = startFrom(parts.day, parts.time ?: return null, now, requireFuture = true) ?: return null
         val tag = tagFrom(parts.rest) ?: return null
+        if (EVENT.matches(tag)) return VoiceCommand.AddEvent(spokenCase(tag, spoken), start, minutes)
         return VoiceCommand.AddSession(tag, start, minutes)
     }
 
@@ -117,6 +149,13 @@ public object CommandParser {
         val withoutDay = day?.let { text.replace(it.value, " ") } ?: text
         val time = TIME.find(withoutDay)
         return WhenParts(day?.value, time, time?.let { withoutDay.replace(it.value, " ") } ?: withoutDay)
+    }
+
+    /** The title as it was said, so "John" keeps its capital, with the first letter raised. */
+    private fun spokenCase(title: String, spoken: String): String {
+        val flat = spoken.replace(Regex("""[,.!?;"]"""), " ").replace(Regex("""\s+"""), " ")
+        val found = Regex(Regex.escape(title), RegexOption.IGNORE_CASE).find(flat)?.value ?: title
+        return found.replaceFirstChar { it.uppercase(Locale.ROOT) }
     }
 
     private fun tagFrom(rest: String): String? = rest

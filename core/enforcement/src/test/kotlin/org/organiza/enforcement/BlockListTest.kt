@@ -37,4 +37,11 @@ class BlockListTest {
         assertEquals(domain("reddit.com"), list.entryFor(domain("old.reddit.com")))
         assertEquals(null, list.entryFor(domain("example.com")))
     }
+
+    @Test
+    fun `an allow list blocks every app but the listed ones`() {
+        val lockdown = BlockList(setOf(pkg("com.google.android.apps.messaging")), emptySet(), allowOnly = true)
+        assertEquals(false, lockdown.blocks(pkg("com.google.android.apps.messaging")))
+        assertEquals(true, lockdown.blocks(pkg("com.example.notes")))
+    }
 }

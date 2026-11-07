@@ -150,4 +150,29 @@ class SupabaseAuthTest {
         assertEquals(AuthState.SignedOut, LocalOnlyAuth.state())
         assertNull(LocalOnlyAuth.accessToken())
     }
+
+    @Test
+    fun `deleting the account calls the backend function and forgets the session`() {
+        http.respond(200, session())
+        auth.signIn("sam@example.org", "correct horse")
+        http.respond(204, "")
+        assertEquals(AuthResult.DELETED, auth.deleteAccount())
+        val request = http.requests.last()
+        assertEquals("https://abc.supabase.co/rest/v1/rpc/delete_account", request.url)
+        assertEquals("Bearer access-1", request.headers["Authorization"])
+        assertEquals(AuthState.SignedOut, auth.state())
+        assertTrue(vault.names.isEmpty())
+    }
+
+    @Test
+    fun `a deletion that does not reach the backend keeps the session`() {
+        http.respond(200, session())
+        auth.signIn("sam@example.org", "correct horse")
+        http.respond(500, "")
+        assertEquals(AuthResult.UNAVAILABLE, auth.deleteAccount())
+        http.fail(IOException("offline"))
+        assertEquals(AuthResult.UNAVAILABLE, auth.deleteAccount())
+        assertEquals(AuthState.SignedIn("sam@example.org"), auth.state())
+        assertEquals(AuthResult.NOT_SUPPORTED, LocalOnlyAuth.deleteAccount())
+    }
 }

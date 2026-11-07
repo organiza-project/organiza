@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,6 +24,7 @@ import org.organiza.android.ui.KeyValue
 import org.organiza.android.ui.Panel
 import org.organiza.android.ui.PanelHeader
 import org.organiza.android.ui.Rule
+import org.organiza.android.ui.Segmented
 import org.organiza.android.ui.Theme
 import org.organiza.android.ui.Txt
 import org.organiza.android.ui.Type
@@ -30,7 +32,7 @@ import org.organiza.sync.BackendKind
 
 /** Chooses where Arena results and the account live (ADR-0015). Blocking never depends on it. */
 @Composable
-fun BackendPanel(account: AccountView, actions: Actions) {
+fun BackendPanel(account: AccountView, actions: Actions, withAccount: Boolean = true) {
     val colors = Theme.colors
     var kind by rememberSaveable(account.kind) { mutableStateOf(account.kind) }
     var url by rememberSaveable(account.kind) { mutableStateOf(if (account.kind == BackendKind.SELF_HOSTED) account.url else "") }
@@ -69,33 +71,44 @@ fun BackendPanel(account: AccountView, actions: Actions) {
             key = ""
         }
     }
-    if (account.kind != null) AccountPanel(account, actions)
+    if (withAccount && account.kind != null) AccountPanel(account, actions)
 }
 
+private enum class AuthMode(val label: String) { SIGN_IN("Sign in"), SIGN_UP("Create account") }
+
+/** Email sign-in and sign-up for the chosen backend, then the account and its deletion (ADR-0015, ADR-0020). */
 @Composable
-private fun AccountPanel(account: AccountView, actions: Actions) {
+fun AccountPanel(account: AccountView, actions: Actions) {
     val colors = Theme.colors
+    var mode by rememberSaveable { mutableStateOf(AuthMode.SIGN_IN) }
     var email by rememberSaveable { mutableStateOf("") }
     // Secrets use remember, not rememberSaveable, so they never reach saved instance state.
     var password by remember { mutableStateOf("") }
     Panel {
-        PanelHeader("Account")
-        KeyValue("Backend", account.url)
-        Rule()
+        PanelHeader("Account") { Txt(account.url.removePrefix("https://"), Type.small, colors.muted, maxLines = 1) }
         if (account.signedInAs != null) {
             KeyValue("Signed in as", account.signedInAs)
+            Txt("Challenge results sync through this account, encrypted so the backend cannot read them.", Type.small, colors.muted)
             Spacer(Modifier.height(8.dp))
-            Action("Sign out", ButtonKind.TEXT, enabled = !account.busy) { actions.signOut() }
+            Action("Sign out", ButtonKind.SECONDARY, enabled = !account.busy) { actions.signOut() }
+            Rule()
+            Txt("Deleting removes your account and every challenge result the backend holds, at once. Nothing on this phone changes.", Type.small, colors.muted)
+            Spacer(Modifier.height(8.dp))
+            Action("Delete account & cloud data", ButtonKind.DANGER, enabled = !account.busy, modifier = Modifier.fillMaxWidth()) {
+                actions.deleteAccount()
+            }
             return@Panel
         }
-        Txt("Sign in to sync challenges. Your password goes to this backend only.", Type.small, colors.muted)
-        Spacer(Modifier.height(8.dp))
-        Field(email, { email = it }, "Email")
+        Segmented(AuthMode.entries, mode, { it.label }) { mode = it }
+        Spacer(Modifier.height(12.dp))
+        Field(email, { email = it.trim() }, "Email")
         Field(password, { password = it }, "Password", secret = true)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            val ready = email.isNotBlank() && password.isNotEmpty() && !account.busy
-            Action("Sign in", ButtonKind.PRIMARY, enabled = ready) { actions.signIn(email, password); password = "" }
-            Action("Create account", ButtonKind.TEXT, enabled = ready) { actions.signUp(email, password); password = "" }
+        if (mode == AuthMode.SIGN_UP) Txt("At least 8 characters. Your password goes to this backend only.", Type.small, colors.muted)
+        Spacer(Modifier.height(8.dp))
+        val ready = "@" in email && password.isNotEmpty() && !account.busy
+        Action(if (account.busy) "Working" else mode.label, ButtonKind.PRIMARY, enabled = ready, modifier = Modifier.fillMaxWidth()) {
+            if (mode == AuthMode.SIGN_IN) actions.signIn(email, password) else actions.signUp(email, password)
+            password = ""
         }
     }
 }

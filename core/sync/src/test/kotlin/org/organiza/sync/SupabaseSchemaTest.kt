@@ -138,4 +138,23 @@ class SupabaseSchemaTest {
         private fun migrations(): List<File> = SupabaseStub.migrations()
 
     }
+
+    @Test
+    fun `a member deletes their own account and everything they sent, and nobody else's`() {
+        val leaver = UUID.randomUUID()
+        val box = "12".repeat(32)
+        connection("authenticated", leaver).use { db ->
+            db.createStatement().use { it.execute("reset role; insert into auth.users (id) values ('$leaver'); set role authenticated") }
+            db.append(box, byteArrayOf(1))
+        }
+        connection("authenticated", alex).use { it.append(box, byteArrayOf(2)) }
+        connection("authenticated", leaver).use { db -> db.createStatement().use { it.execute("select public.delete_account()") } }
+        fun rows(sql: String): List<String> = postgres.postgresDatabase.connection.use { db ->
+            db.createStatement().use { it.executeQuery(sql).use { rows -> buildList { while (rows.next()) add(rows.getString(1)) } } }
+        }
+        assertEquals(listOf("0"), rows("select count(*) from auth.users where id = '$leaver'"))
+        assertEquals(listOf("1"), rows("select count(*) from auth.users where id = '$alex'"))
+        assertEquals(listOf(alex.toString()), rows("select sender from public.arena_message where mailbox = '$box'"))
+        connection("anon", null).use { db -> assertFailsWith<SQLException> { db.createStatement().use { it.execute("select public.delete_account()") } } }
+    }
 }

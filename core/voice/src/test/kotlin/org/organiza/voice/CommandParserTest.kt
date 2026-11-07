@@ -121,4 +121,25 @@ class CommandParserTest {
             parse(List(random.nextInt(0, 9)) { words[random.nextInt(words.size)] }.joinToString(" "))
         }
     }
+
+    @Test
+    fun `adds habits with a frequency or a purpose`() {
+        assertEquals(VoiceCommand.AddHabit("coding"), parse("Create a new daily habit for coding"))
+        assertEquals(VoiceCommand.AddHabit("guitar"), parse("start a weekly habit called guitar"))
+    }
+
+    @Test
+    fun `logs minutes against a habit`() {
+        assertEquals(VoiceCommand.LogMinutes("reading", today, 30), parse("Log 30 minutes of reading."))
+        assertEquals(VoiceCommand.LogMinutes("coding", today.minusDays(1), 60), parse("log an hour of coding yesterday"))
+        assertEquals(VoiceCommand.LogMinutes("guitar", today, 90), parse("track 1 hour 30 minutes of my guitar"))
+        assertEquals(VoiceCommand.LogMinutes("yoga", today, 45), parse("log forty-five minutes for yoga"))
+    }
+
+    @Test
+    fun `meetings become calendar events, keeping the spoken name`() {
+        assertEquals(VoiceCommand.AddEvent("Meeting with John", at(2, 14), 60), parse("Schedule a meeting with John tomorrow at 2 PM"))
+        assertEquals(VoiceCommand.AddEvent("Call with the bank", at(2, 9), 30), parse("book a call with the bank tomorrow at 9 for 30 minutes"))
+        assertEquals(VoiceCommand.AddSession("deep work", at(2, 9), 60), parse("schedule deep work tomorrow at 9"))
+    }
 }

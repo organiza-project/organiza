@@ -2,6 +2,7 @@ package org.organiza.android.ui
 
 import org.organiza.enforcement.ShortFormFeed
 import org.organiza.presentation.Permission
+import org.organiza.storage.FocusTier
 import org.organiza.storage.HabitFrequency
 import org.organiza.presentation.ProtectionItem
 import org.organiza.sync.BackendKind
@@ -16,7 +17,8 @@ interface Actions {
     fun fix(item: ProtectionItem)
 
     // The focus list, daily limits and short video feeds (ADR-0018)
-    fun startFocus(minutes: Int, strict: Boolean, shortForm: Boolean)
+    fun startFocus(minutes: Int, strict: Boolean, shortForm: Boolean, tier: FocusTier)
+    fun summarizeMonitor()
     fun setFocusApp(pkg: String, on: Boolean)
     fun addFocusSite(raw: String)
     fun removeFocusSite(domain: String)
@@ -25,7 +27,8 @@ interface Actions {
 
     // Habits, voice and calendar
     fun addHabit(name: String)
-    fun addHabitPlan(name: String, frequency: HabitFrequency, target: Int, reminderMinute: Int?)
+    fun addHabitPlan(name: String, frequency: HabitFrequency, target: Int, reminderMinute: Int?, goalMinutes: Int?, linkedPackage: String?)
+    fun logMinutes(habitId: String, minutes: Int)
     fun markToday(habitId: String, name: String, done: Boolean)
     fun startTalking()
     fun stopTalking()
@@ -69,6 +72,10 @@ interface Actions {
     fun removeKey()
     fun setVoiceConsent(on: Boolean)
     fun runCopilot()
+    fun sendChat(text: String)
+    fun startChatVoice()
+    fun stopChatVoice()
+    fun clearChat()
 
     // Onboarding
     fun grant(permission: Permission)
@@ -80,4 +87,5 @@ interface Actions {
     fun signIn(email: String, password: String)
     fun signUp(email: String, password: String)
     fun signOut()
+    fun deleteAccount()
 }

@@ -173,4 +173,34 @@ class PromptsTest {
         transport.respond(200, reply("""{"blocks":[{"day":"MONDAY","start":"9am","minutes":60,"label":"x"}]}"""))
         assertEquals(AiResult.Failed(AiFailure.MALFORMED), coach.extractSchedule("x"))
     }
+
+    private val usage = UsageFacts(
+        screenMinutes = 240,
+        minutesByCategory = mapOf("Social" to 90L, "Video" to 60L),
+        focusMinutes = 120,
+        habits = weekly.habits,
+    )
+
+    @Test
+    fun `chat sends the sanitized question and turns, and reads a reply with a command`() {
+        transport.respond(200, reply("""{"reply":"Try a 30 minute block","command":"log 30 minutes of reading"}"""))
+        val history = listOf(ChatTurn(fromUser = true, text = "Lunch with Sarah Connor at Acme"), ChatTurn(fromUser = false, text = "Noted"))
+        val answer = coach.chat(leaky, history, usage)
+        assertEquals(AiResult.Ok(ChatReply("Try a 30 minute block", "log 30 minutes of reading")), answer)
+        assertNothingLeaked()
+        assertTrue("\"Social\":90" in sentBody().replace("\\\"", "\""))
+    }
+
+    @Test
+    fun `a chat reply without a command is a plain answer`() {
+        transport.respond(200, reply("""{"reply":"Keep mornings for deep work","command":null}"""))
+        assertEquals(AiResult.Ok(ChatReply("Keep mornings for deep work", null)), coach.chat("How do I focus?", emptyList(), usage))
+    }
+
+    @Test
+    fun `a monitor summary sends categories and minutes only`() {
+        transport.respond(200, reply("""{"summary":"Mostly video, and that is fine"}"""))
+        assertEquals(AiResult.Ok("Mostly video, and that is fine"), coach.monitorSummary(45, usage))
+        assertTrue("\"sessionMinutes\":45" in sentBody().replace("\\\"", "\""))
+    }
 }
