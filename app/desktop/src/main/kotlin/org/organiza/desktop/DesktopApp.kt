@@ -2,27 +2,119 @@ package org.organiza.desktop
 
 import androidx.compose.runtime.mutableStateOf
 import java.time.LocalDate
+import java.time.ZoneId
+import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.TimeUnit
+import org.organiza.domain.port.Clock
 import org.organiza.enforcement.ShortFormFeed
+import org.organiza.feature.blocker.hubView
 import org.organiza.presentation.Permission
 import org.organiza.presentation.ProtectionItem
+import org.organiza.storage.Database
+import org.organiza.storage.FocusLog
 import org.organiza.storage.FocusTier
 import org.organiza.storage.HabitFrequency
+import org.organiza.storage.MigrationResult
+import org.organiza.storage.Migrations
 import org.organiza.storage.RpgKind
+import org.organiza.storage.RuleStore
+import org.organiza.storage.Setting
+import org.organiza.storage.SettingsStore
+import org.organiza.storage.UsageLimitStore
 import org.organiza.sync.BackendKind
 import org.organiza.ui.Actions
 import org.organiza.ui.CalendarMode
 import org.organiza.ui.UiSnapshot
 
 /**
- * The desktop state holder. Stage 1 of the Linux port draws every screen; storage, sync, AI and
- * enforcement are wired in the next stages (ADR-0023), so until then each action says so on screen.
+ * The desktop state holder (ADR-0023). It keeps the focus log and shows today's use (ADR-0024).
+ * Sync, AI and enforcement come in the next stages, so until then those actions say so on screen.
+ * All storage work runs on one thread, as on Android.
  */
-class DesktopApp : Actions {
+class DesktopApp(
+    private val db: Database,
+    private val clock: Clock,
+    private val focus: FocusSource,
+    private val apps: List<LinuxApp>,
+    private val zone: ZoneId = ZoneId.systemDefault(),
+) : Actions, AutoCloseable {
     val ui = mutableStateOf(UiSnapshot())
 
-    private fun notYet() {
-        ui.value = ui.value.copy(message = NOT_YET)
+    private val storage = Executors.newSingleThreadScheduledExecutor { Thread(it, "storage").apply { isDaemon = true } }
+    private val log = FocusLog(db)
+    private val usage = LoggedUsage(log)
+    private val packages = apps.associate { it.id to it.pkg }
+
+    @Volatile private var tracking: AutoCloseable? = null
+
+    @Volatile private var closed = false
+
+    init {
+        val ready = storage.submit<Boolean> {
+            when (Migrations.migrate(db)) {
+                is MigrationResult.TooNew -> false
+                else -> {
+                    // shortcut: a stretch left open by a crash is dropped, since when it ended is unknown.
+                    log.last()?.takeIf { it.app != null }?.let { log.record(it.at, null) }
+                    true
+                }
+            }
+        }.get()
+        if (ready) {
+            tracking = focus.start { id ->
+                val at = clock.now()
+                val app = id?.let(packages::get)
+                onStorage { log.record(at, app) }
+            }
+            storage.scheduleAtFixedRate(::refresh, 1, 1, TimeUnit.MINUTES)
+            refreshUi()
+        } else {
+            say("This data was written by a newer Organiza, so it was left as it is. Update Organiza to open it.")
+        }
     }
+
+    /** Rebuilds what the screens show from local data. */
+    fun refreshUi() = onStorage(::refresh)
+
+    private fun refresh() {
+        val now = clock.now()
+        val start = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
+        val allowed = tracking != null
+        val today = if (allowed) usage.perApp(start, now).mapKeys { it.key.value } else emptyMap()
+        val settings = SettingsStore(db)
+        val feeds = buildSet {
+            if (settings.flag(Setting.BLOCK_REELS)) add(ShortFormFeed.INSTAGRAM_REELS)
+            if (settings.flag(Setting.BLOCK_SHORTS)) add(ShortFormFeed.YOUTUBE_SHORTS)
+        }
+        val launchable = apps.mapNotNull { app -> app.pkg?.let { Triple(it.value, app.name, app.category) } }
+        val hub = hubView(launchable, today, RuleStore(db).all(), UsageLimitStore(db).all(), feeds, allowed)
+        ui.value = ui.value.copy(hub = hub)
+    }
+
+    /** Ends the stretch in front and stops tracking. The database stays open for its owner. */
+    override fun close() {
+        if (closed) return
+        closed = true
+        tracking?.close()
+        val at = clock.now()
+        storage.submit { log.record(at, null) }.get()
+        storage.shutdown()
+    }
+
+    private fun onStorage(work: () -> Unit) {
+        try {
+            if (!closed) storage.execute(work)
+        } catch (_: RejectedExecutionException) {
+            // Closed meanwhile: the last stretch was already ended.
+        }
+    }
+
+    private fun say(text: String) {
+        ui.value = ui.value.copy(message = text)
+    }
+
+    private fun notYet() = say(NOT_YET)
 
     override fun startSession(apps: String, sites: String, minutes: String, strict: Boolean, shortForm: Boolean) = notYet()
     override fun stopSession() = notYet()
@@ -81,7 +173,7 @@ class DesktopApp : Actions {
     override fun startChatVoice() = notYet()
     override fun stopChatVoice() = Unit
     override fun clearChat() = notYet()
-    override fun grant(permission: Permission) = notYet()
+    override fun grant(permission: Permission) = if (permission == Permission.USAGE) say(focus.enable()) else notYet()
     override fun finishOnboarding() = notYet()
     override fun restartOnboarding() = notYet()
     override fun chooseBackend(kind: BackendKind?, url: String, key: String) = notYet()

@@ -6,14 +6,13 @@ import java.time.Duration
 import java.time.ZoneId
 import org.organiza.android.OrganizaApp
 import org.organiza.android.data.AndroidUsageHistory
-import org.organiza.ui.HubApp
+import org.organiza.feature.blocker.hubView
 import org.organiza.ui.HubView
 import org.organiza.domain.DomainName
 import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
 import org.organiza.enforcement.ShortFormFeed
 import org.organiza.enforcement.UsageLimits
-import org.organiza.presentation.Format
 import org.organiza.storage.Setting
 import org.organiza.storage.StoredRule
 
@@ -31,7 +30,6 @@ class HubController(private val app: OrganizaApp) {
 
     private val usage by lazy { AndroidUsageHistory(app) }
 
-    /** The rule tagged #focus is the focus list: calendar events and imported blocks use it too. */
     fun focusRule(stores: OrganizaApp.Storage): StoredRule =
         stores.rules.all().firstOrNull { it.calendarTag == FOCUS_TAG }
             ?: StoredRule(FOCUS_RULE, "Focus list", FOCUS_TAG, strict = false, blockShortForm = false, enabled = true, emptySet(), emptySet())
@@ -84,23 +82,12 @@ class HubController(private val app: OrganizaApp) {
 
     /** Today's use of every launchable app, its category and limit, and the day's screen time. Storage thread. */
     fun view(stores: OrganizaApp.Storage, zone: ZoneId): HubView {
-        val rule = stores.rules.all().firstOrNull { it.calendarTag == FOCUS_TAG }
-        val listed = rule?.packages.orEmpty()
         val allowed = usage.permitted()
         val now = app.clock.now()
         val start = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
-        val installed = launchable()
         // One pass over today's events covers every app, rather than one query per row.
         val today = if (allowed) usage.perApp(start, now).mapKeys { it.key.value } else emptyMap()
-        val rows = installed.map { (pkg, label, category) ->
-            val parsed = parsePackage(pkg)
-            val used = today[pkg] ?: Duration.ZERO
-            val limit = parsed?.let(limits::get)
-            HubApp(pkg, label, parsed in listed, used.toMinutes(), limit?.toMinutes(), limit != null && UsageLimits.over(limit, used), category)
-        }.sortedWith(compareByDescending<HubApp> { it.onList || it.limitMinutes != null }.thenBy { it.label.lowercase() })
-        // Launchers and system UI have no launcher entry, so they never count as screen time.
-        val screenTime = if (allowed) Format.duration(rows.fold(Duration.ZERO) { sum, row -> sum + (today[row.pkg] ?: Duration.ZERO) }) else null
-        return HubView(rows, rule?.domains.orEmpty().map { it.value }.sorted(), ShortFormFeed.INSTAGRAM_REELS in feeds, ShortFormFeed.YOUTUBE_SHORTS in feeds, allowed, screenTime)
+        return hubView(launchable(), today, stores.rules.all(), limits, feeds, allowed)
     }
 
     /** The category each launchable app declares, by package. Usage is only ever sent to the AI this way. */
@@ -131,7 +118,7 @@ class HubController(private val app: OrganizaApp) {
     private fun parsePackage(raw: String): PackageName? = (PackageName.parse(raw) as? Parsed.Valid)?.value
 
     companion object {
-        const val FOCUS_TAG = "#focus"
+        const val FOCUS_TAG = org.organiza.feature.blocker.FOCUS_TAG
         private const val FOCUS_RULE = "focus-list"
     }
 }

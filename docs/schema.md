@@ -3,7 +3,7 @@
 The source of truth is the scripts in
 [`schema/`](../core/storage/src/main/resources/org/organiza/storage/schema/), applied in
 order by `Migrations` and tested by `SchemaV1Test` and `MigrationsTest`. The current
-version is 7. Decisions are in ADR-0004, ADR-0006, ADR-0008, ADR-0011, ADR-0013, ADR-0016, ADR-0018 and ADR-0019.
+version is 9. Decisions are in ADR-0004, ADR-0006, ADR-0008, ADR-0011, ADR-0013, ADR-0016, ADR-0018, ADR-0019 and ADR-0024.
 
 | Table | Purpose | Notes |
 |-------|---------|-------|
@@ -25,6 +25,7 @@ version is 7. Decisions are in ADR-0004, ADR-0006, ADR-0008, ADR-0011, ADR-0013,
 | `rpg_event` | Each XP or HP change, applied in id order | One `daily` row per task and day; rows outlive a deleted task |
 | `arena_nudge` | Nudges sent and received | Once per sender, receiver and day; member IDs only |
 | `intervention_event` | A blocked app or site, and whether the person stayed focused or overrode | The block-list entry, never the URL; reason, note and pass length for overrides; columns are pinned by a test |
+| `focus_change` | The app that came to the front on the Linux desktop, or none (v9) | Time and desktop app only, never window titles or URLs; Linux has no OS usage log, so the app keeps this one |
 
 ## Conventions
 

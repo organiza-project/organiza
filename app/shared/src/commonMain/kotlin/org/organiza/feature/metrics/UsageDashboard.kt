@@ -60,7 +60,7 @@ fun UsageDashboard(ui: UiSnapshot, actions: Actions) {
     Panel {
         PanelHeader("Usage today") { hub.screenTime?.let { Txt(it, Type.bodyStrong) } }
         if (!hub.usageAllowed) {
-            Txt("Allow usage access to see how long each app was open today. It is read on this phone only.", Type.body, colors.muted)
+            Txt("Allow usage access to see how long each app was open today. It is read on this device only.", Type.body, colors.muted)
             Spacer(Modifier.height(8.dp))
             Action("Allow usage access", ButtonKind.SECONDARY) { actions.grant(Permission.USAGE) }
             return@Panel

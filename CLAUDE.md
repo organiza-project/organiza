@@ -56,7 +56,8 @@ Recorded in ADR-0002 and ADR-0014. `./gradlew test` runs every JVM test.
 - `app/shared` — Compose Multiplatform: design system (`org.organiza.ui`) and every screen
   (`org.organiza.feature.*`) in `commonMain`; small `actual`s in `androidMain`/`desktopMain` (ADR-0023).
 - `app/android` — the Android app: state holder, controllers, services and adapters, by feature under `feature/`.
-- `app/desktop` — the Linux desktop app (Compose Desktop); `DesktopApp` is its state holder.
+- `app/desktop` — the Linux desktop app (Compose Desktop); `DesktopApp` is its state holder. Usage comes from a
+  focus log fed by the bundled GNOME Shell extension or `xprop` on X11 (ADR-0024).
 - `supabase/` — backend schema; `setup.sql` must contain each migration verbatim (a test checks).
 - `platform/linux` — frozen (ADR-0014); keep it compiling, add nothing. The desktop daemon replaces it.
 - `.claude/rules/` — working rules for architecture, testing and privacy. Read them.

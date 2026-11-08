@@ -1056,3 +1056,59 @@ waits for that toolchain update.
 ### Alternatives Considered
 Converting every `:core` module to Kotlin Multiplatform: a rewrite of tested code for targets that
 are not planned. A separate desktop UI: two copies of every screen to keep alike by hand.
+
+## ADR-0024: Usage tracking and app icons on the Linux desktop
+
+### Status
+Accepted, 2026-11-09. Stage 2 of the Linux port (ADR-0023).
+
+### Context
+Linux has no usage log like Android's UsageStatsManager, so the desktop app has to watch which app
+is in front and keep that record itself. No portable way exists to ask: X11 publishes the active
+window, but on Wayland every compositor keeps it private. GNOME, the default on Ubuntu and the
+desktop this is developed on, reveals it only to code running inside GNOME Shell.
+
+### Decision
+- **App identity is the desktop file ID** (`org.gnome.Nautilus`, `firefox_firefox`), which also
+  gives the name, icon and category. Most IDs are not valid `PackageName`s (`google-chrome`,
+  `code_code`), so `LinuxApps.packageName` maps them deterministically: an ID that already fits is
+  kept, and any other ID gets a `linux.` prefix, with each character outside `[A-Za-z0-9_.]` turned
+  into `_`. The core modules (`ForegroundTime`, limits and, in Stage 3, `BlockEngine`) then work
+  unchanged.
+- **Focus sources:**
+  - On GNOME (Wayland or X11), a bundled shell extension, `organiza-focus@organiza.org`, reports
+    `Shell.WindowTracker`'s focus app. It answers `Current` and emits `Changed` on the D-Bus
+    connection that already owns `org.gnome.Shell`, and the app reads that through `gdbus`.
+    GNOME turns extensions off on the lock screen, and the extension then reports that nothing is
+    in front, so time spent locked or suspended is not counted. "Allow usage access" installs and
+    enables the extension. It starts after the next login.
+  - On other X11 desktops, `xprop -spy` reports the active window. Its `_GTK_APPLICATION_ID` or
+    `WM_CLASS` is matched to a desktop entry.
+  - Windows without a desktop entry never count, as with launchers on Android.
+  - wlroots, Hyprland and KDE Wayland have no source yet. A source is one small class when someone
+    needs one.
+- **A local focus log.** Table `focus_change` (schema v9) stores the time and the app now in front,
+  with no app when nothing is. `FocusLog` turns it back into `UsageEvent`s for `ForegroundTime`.
+  Rows are written only on a change, and window titles and URLs are never read. Nothing in the log
+  feeds sync.
+- **Desktop storage** is SQLCipher through the encrypting JDBC driver, at
+  `$XDG_DATA_HOME/organiza/organiza.db`. Its 32-byte key lives in the login keyring through
+  libsecret, which a small `python3` + `gi` helper calls. The key goes over stdin and stdout, never
+  argv. A database whose key is missing is never replaced.
+- **Icons** come from each entry's `Icon=` key. An absolute path is used as it is. A name is looked
+  up in the hicolor theme and `/pixmaps` under each XDG data directory. PNG is decoded by Skia, and
+  SVG is drawn into a bitmap.
+- Tracking runs while the desktop app is open. The Stage 3 daemon takes it over.
+
+### Consequences
+The metrics and blocker screens show real per-app minutes on Linux. The desktop needs `python3-gi`
+and `gir1.2-secret-1`, which Ubuntu installs by default. On GNOME, tracking starts only after one
+re-login. If the app crashes, the stretch that was open is dropped rather than counted until the
+next start.
+
+### Alternatives Considered
+- `org.gnome.Shell.Eval`: disabled since GNOME 41.
+- Polling `xdotool`: blind to Wayland windows.
+- A JVM D-Bus library or JNA for libsecret: a new dependency to replace two short subprocess calls.
+- Widening `PackageName`: desktop IDs can contain spaces, and Android input validation would get
+  weaker.

@@ -1,0 +1,7 @@
+{
+  "uuid": "organiza-focus@organiza.org",
+  "name": "Organiza Focus",
+  "description": "Tells the Organiza app which app is in front, so it can count screen time on this computer. Nothing leaves the computer, and window titles are never read.",
+  "shell-version": ["45", "46", "47", "48", "49"],
+  "url": "https://github.com/organiza-project/organiza"
+}
