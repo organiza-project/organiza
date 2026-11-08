@@ -79,8 +79,11 @@ class RpgController(private val app: OrganizaApp) {
         val tasks = stores.rpg.tasks().filter { it.doneAt == null }.map { task ->
             RpgTaskView(task.id, task.kind, task.title, task.kind == RpgKind.DAILY && today in checks[task.id].orEmpty())
         }
-        val next = hero.progression.level + 1
-        return RpgView(hero.hp, hero.maxHp, hero.badge, hero.progression.fraction, "${hero.progression.toNext} XP to level $next", tasks)
+        val progression = hero.progression
+        return RpgView(
+            hero.hp, hero.maxHp, hero.badge, progression.fraction, "${progression.toNext} XP to level ${progression.level + 1}", tasks,
+            progression.level, progression.rank, progression.rankLine,
+        )
     }
 
     private fun entries(stores: OrganizaApp.Storage) = stores.rpg.entries().map { (xp, hp) -> RpgEntry(xp, hp) }

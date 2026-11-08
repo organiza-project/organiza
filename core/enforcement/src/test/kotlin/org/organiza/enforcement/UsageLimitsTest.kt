@@ -18,11 +18,7 @@ class UsageLimitsTest {
     }
 
     @Test
-    fun `the slider moves in steps and stays in range`() {
-        assertEquals(listOf(5L, 15L, 30L, 45L, 60L), UsageLimits.STEPS.take(5).map { it.toMinutes() })
-        assertEquals(Duration.ofMinutes(180), UsageLimits.STEPS.last())
-        assertEquals(Duration.ofMinutes(30), UsageLimits.nearest(Duration.ofMinutes(33)))
-        assertEquals(Duration.ofMinutes(5), UsageLimits.nearest(Duration.ZERO))
-        assertEquals(Duration.ofMinutes(180), UsageLimits.nearest(Duration.ofHours(9)))
+    fun `a typed limit is kept as typed, within what the schema stores`() {
+        assertEquals(5..720, UsageLimits.MINUTES)
     }
 }

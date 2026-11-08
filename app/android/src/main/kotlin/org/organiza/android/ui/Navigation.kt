@@ -37,7 +37,6 @@ enum class Route(val title: String) {
     AGENDA("Calendar"),
     IMPORT("Import schedule"),
     DICTATION("Dictate schedule"),
-    BLOCKER("Distraction blocker hub"),
     COPILOT("Copilot"),
 }
 

@@ -109,7 +109,7 @@ fun HabitsScreen(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit) {
 @Composable
 private fun MinutesRow(habitId: String, progress: HabitProgressView, actions: Actions) {
     val colors = Theme.colors
-    var adding by rememberSaveable(habitId) { mutableStateOf(LOG_STEP) }
+    var adding by rememberSaveable(habitId) { mutableStateOf(15) }
     var open by rememberSaveable(habitId) { mutableStateOf(false) }
     val goal = progress.goalMinutes
     Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
@@ -121,8 +121,8 @@ private fun MinutesRow(habitId: String, progress: HabitProgressView, actions: Ac
         if (goal != null) ProgressPill(progress.minutes.toDouble() / goal, ink = if (progress.minutes >= goal) colors.data else colors.text)
         progress.linkedLabel?.let { Txt("Counting time in $it automatically", Type.small, colors.muted, Modifier.padding(top = 4.dp)) }
         if (open) {
-            Column(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Stepper(adding, "min", LOG_STEP..MAX_LOG) { wanted -> adding = (adding + if (wanted > adding) LOG_STEP else -LOG_STEP).coerceIn(LOG_STEP, MAX_LOG) }
+            Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                MinutesField("Time to add", adding, 1..MAX_LOG, listOf(5, 15, 30, 60)) { adding = it }
                 Spacer(Modifier.height(8.dp))
                 Action("Add $adding min", ButtonKind.PRIMARY, modifier = Modifier.fillMaxWidth()) {
                     actions.logMinutes(habitId, adding)
@@ -133,7 +133,6 @@ private fun MinutesRow(habitId: String, progress: HabitProgressView, actions: Ac
     }
 }
 
-private const val LOG_STEP = 5
 private const val MAX_LOG = 240
 
 @Composable

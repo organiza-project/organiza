@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.time.Instant
 import java.time.ZoneId
@@ -58,21 +59,24 @@ class RefinementScreensTest {
         compose.onNodeWithText("25 m left of 2 h 00 m").assertExists()
         compose.onNodeWithText("Maps").assertDoesNotExist()
         compose.onNodeWithText("Instagram").performClick()
-        compose.onNodeWithText("1h 30").performClick()
         compose.onNodeWithText("Block Reels").performClick()
-        assertEquals(listOf("setLimit com.instagram.android 90", "setFeed INSTAGRAM_REELS true"), actions.calls)
+        // A typed or tapped limit is saved when the sheet closes, never on each digit.
+        compose.onNodeWithText("1 h 30").performClick()
+        compose.onNodeWithText("Done").performClick()
+        assertEquals(listOf("setFeed INSTAGRAM_REELS true", "setLimit com.instagram.android 90"), actions.calls)
     }
 
     @Test
     fun aMonitorOnlySessionStartsWithoutStrictOrFeeds() {
         val focus = FocusModel.build(Instant.parse("2026-11-07T10:00:00Z"), ZoneId.of("UTC"), SessionPolicy.IDLE, emptyList(), emptySet(), 0)
         show { FocusCard(UiSnapshot(focus = focus), actions) {} }
-        compose.onNodeWithText("Start a session").performClick()
+        compose.onNodeWithText("Start a focus session").performClick()
         compose.onNodeWithText("Total lockdown").assertExists()
         compose.onNodeWithText("Monitor only").performClick()
         compose.onNodeWithText("Strict").assertDoesNotExist()
-        compose.onNodeWithText("Start").performScrollTo().performClick()
-        assertEquals(listOf("startFocus 45 MONITOR"), actions.calls)
+        compose.onNodeWithContentDescription("Session length").performTextReplacement("25")
+        compose.onNodeWithText("Start 25 minutes").performScrollTo().performClick()
+        assertEquals(listOf("startFocus 25 MONITOR"), actions.calls)
     }
 
     @Test

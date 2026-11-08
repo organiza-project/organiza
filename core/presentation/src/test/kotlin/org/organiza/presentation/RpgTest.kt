@@ -17,8 +17,8 @@ class RpgTest {
 
     @Test
     fun `fainting refills health and drops to the start of the previous level`() {
-        // 350 XP is level 3 (starts at 300), so the hero falls to level 2, which starts at 100.
-        assertEquals(RpgEntry(xp = -250, hp = Rpg.MAX_HP), Rpg.faint(totalXp = 350))
+        // 350 XP is level 4 (starts at 300), so the hero falls to level 3, which starts at 150.
+        assertEquals(RpgEntry(xp = -200, hp = Rpg.MAX_HP), Rpg.faint(totalXp = 350))
         assertEquals(RpgEntry(xp = -40, hp = Rpg.MAX_HP), Rpg.faint(totalXp = 40))
         assertEquals(Rpg.MAX_HP, Rpg.hp(List(10) { Rpg.MISSED_DAILY } + Rpg.faint(350)))
     }
@@ -53,6 +53,6 @@ class RpgTest {
         assertEquals(100, hero.progression.xp)
         assertEquals(2, hero.progression.level)
         assertEquals(Rpg.MAX_HP - 5, hero.hp)
-        assertEquals("Lvl 2 · Focus Novice", hero.badge)
+        assertEquals("Lvl 2 · Novice", hero.badge)
     }
 }

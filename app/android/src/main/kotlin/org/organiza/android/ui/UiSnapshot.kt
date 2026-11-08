@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import org.organiza.ai.ChatTurn
 import org.organiza.ai.CopilotAdvice
 import org.organiza.ai.SuggestedBlock
+import org.organiza.presentation.Rank
 import org.organiza.presentation.AgendaModel
 import org.organiza.presentation.ArenaModel
 import org.organiza.presentation.FocusWeek
@@ -82,10 +83,13 @@ data class RpgTaskView(val id: String, val kind: RpgKind, val title: String, val
 data class RpgView(
     val hp: Int = Rpg.MAX_HP,
     val maxHp: Int = Rpg.MAX_HP,
-    val badge: String = "Lvl 1 · Focus Novice",
+    val badge: String = "Lvl 1 · Novice",
     val xpFraction: Double = 0.0,
     val xpCaption: String = "",
     val tasks: List<RpgTaskView> = emptyList(),
+    val level: Int = 1,
+    val rank: Rank = Rank.NOVICE,
+    val rankLine: String = "",
 )
 
 /** The schedule import in progress: text read from a photo, a dictation or the keyboard, then blocks. */

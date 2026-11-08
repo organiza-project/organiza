@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -32,10 +33,11 @@ import java.time.Duration
 import org.organiza.android.feature.blocker.AppIcon
 import org.organiza.android.ui.*
 import org.organiza.enforcement.ShortFormFeed
+import org.organiza.enforcement.UsageLimits
 import org.organiza.presentation.Format
 import org.organiza.presentation.Permission
 
-// A bar turns red once 80% of the day's limit is used, as on the blocker hub.
+// A bar turns red once 80% of the day's limit is used, as in the blocker below.
 private const val WARN_AT = 0.8
 private const val TOP = 8
 
@@ -45,8 +47,8 @@ private val FEEDS = mapOf(
     "com.google.android.youtube" to (ShortFormFeed.YOUTUBE_SHORTS to "Block Shorts"),
 )
 
-/** The limits a tap sets, in two rows of four. Null is no limit. */
-private val PRESETS: List<List<Long?>> = listOf(listOf(null, 15L, 30L, 60L), listOf(90L, 120L, 180L))
+/** One-tap limits under the typed box. */
+private val PRESETS = listOf(15, 30, 60, 90)
 
 /** Today's apps ranked by use, StayFree style: icon, time and how far into its limit (ADR-0020). */
 @Composable
@@ -117,8 +119,14 @@ private fun UsageRow(app: HubApp, most: Long, onOpen: () -> Unit) {
 
 /** The app's sheet: a daily limit in one tap, the focus list, and in-app feed blocks where they exist. */
 @Composable
-private fun AppSheet(app: HubApp, hub: HubView, actions: Actions, close: () -> Unit) {
+private fun AppSheet(app: HubApp, hub: HubView, actions: Actions, dismiss: () -> Unit) {
     val colors = Theme.colors
+    // A typed limit is saved as the sheet closes, so "120" never passes through a 12 minute limit.
+    var draft by rememberSaveable(app.pkg) { mutableStateOf(app.limitMinutes?.toInt() ?: 60) }
+    val close = {
+        if (app.limitMinutes != null && draft.toLong() != app.limitMinutes) actions.setLimit(app.pkg, draft.toLong())
+        dismiss()
+    }
     Dialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(Modifier.fillMaxSize().clickable(onClick = close, indication = null, interactionSource = null), contentAlignment = Alignment.BottomCenter) {
             Column(
@@ -129,6 +137,7 @@ private fun AppSheet(app: HubApp, hub: HubView, actions: Actions, close: () -> U
                     // Taps inside the sheet must not reach the scrim behind it.
                     .clickable(onClick = {}, indication = null, interactionSource = null)
                     .navigationBarsPadding()
+                    .imePadding()
                     .padding(horizontal = Space.margin, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -140,16 +149,13 @@ private fun AppSheet(app: HubApp, hub: HubView, actions: Actions, close: () -> U
                         Txt("${Format.duration(Duration.ofMinutes(app.usedMinutes))} today · ${app.category}", Type.small, colors.muted)
                     }
                 }
-                Txt("Daily limit", Type.bodyStrong)
-                PRESETS.forEach { row ->
-                    Segmented(row, app.limitMinutes.takeIf { it in row }, ::presetLabel) { actions.setLimit(app.pkg, it) }
-                }
-                Txt(
-                    app.limitMinutes?.let { "Locks for the rest of the day after ${Format.duration(Duration.ofMinutes(it))}, with or without a session." }
-                        ?: "No limit. Pick one to lock the app once today's time runs out.",
-                    Type.small,
-                    colors.muted,
-                )
+                SwitchRow(
+                    "Daily limit",
+                    app.limitMinutes?.let { "Locks for the rest of the day after ${Format.duration(Duration.ofMinutes(it))}, with or without a session" }
+                        ?: "Off. Turn on to lock the app once today's time runs out",
+                    app.limitMinutes != null,
+                ) { on -> actions.setLimit(app.pkg, if (on) draft.toLong() else null) }
+                if (app.limitMinutes != null) MinutesField("Minutes a day", draft, UsageLimits.MINUTES, PRESETS) { draft = it }
                 Rule()
                 SwitchRow("Block in focus sessions", "Adds it to your focus list", app.onList) { actions.setFocusApp(app.pkg, it) }
                 FEEDS[app.pkg]?.let { (feed, title) ->
@@ -162,8 +168,3 @@ private fun AppSheet(app: HubApp, hub: HubView, actions: Actions, close: () -> U
     }
 }
 
-private fun presetLabel(minutes: Long?): String = when (minutes) {
-    null -> "Off"
-    in 0 until 60 -> "${minutes}m"
-    else -> if (minutes % 60 == 0L) "${minutes / 60}h" else "${minutes / 60}h ${minutes % 60}"
-}

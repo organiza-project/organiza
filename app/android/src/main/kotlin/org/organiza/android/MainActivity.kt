@@ -35,6 +35,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import java.io.IOException
 import java.time.Duration
 import androidx.activity.compose.BackHandler
@@ -43,7 +48,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import org.organiza.android.feature.arena.ArenaScreen
-import org.organiza.android.feature.blocker.BlockerHubScreen
 import org.organiza.android.feature.ai.CopilotScreen
 import org.organiza.android.feature.focus.SessionInput
 import org.organiza.android.feature.habits.HabitsScreen
@@ -376,7 +380,7 @@ private fun Root(ui: UiSnapshot, actions: Actions) {
                 .verticalScroll(scroll)
                 .wrapContentWidth(Alignment.CenterHorizontally)
                 .widthIn(max = 720.dp)
-                .padding(horizontal = Space.margin),
+                .padding(start = Space.margin, end = Space.margin, bottom = Space.margin),
             verticalArrangement = Arrangement.spacedBy(Space.gap),
         ) {
             when {
@@ -385,7 +389,6 @@ private fun Root(ui: UiSnapshot, actions: Actions) {
                 route == Route.AGENDA -> CalendarScreen(ui, actions, back, open)
                 route == Route.IMPORT -> ImportScreen(ui, actions, back, open)
                 route == Route.DICTATION -> DictationScreen(ui, actions, back)
-                route == Route.BLOCKER -> BlockerHubScreen(ui, actions, back)
                 route == Route.COPILOT -> CopilotScreen(ui, actions, back)
                 tab == Tab.HOME -> HomeScreen(ui, actions, open) { tab = it }
                 tab == Tab.HABITS -> HabitsScreen(ui, actions, open)
@@ -393,11 +396,21 @@ private fun Root(ui: UiSnapshot, actions: Actions) {
                 tab == Tab.METRICS -> MetricsScreen(ui, actions)
                 else -> ProfileScreen(ui, actions)
             }
-            // Room under the last panel so the copilot button never covers it.
-            Spacer(Modifier.height(if (onTab) 80.dp else 8.dp))
         }
-        if (onTab) CopilotFab(Modifier.align(Alignment.BottomEnd).padding(16.dp)) { open(Route.COPILOT) }
+        // The page ends at its last panel. The copilot button steps aside there instead of
+        // padding every page with empty space for it.
+        val atEnd = scroll.maxValue > 0 && scroll.value >= scroll.maxValue - END_SLACK
+        FadingFab(onTab && !atEnd, Modifier.align(Alignment.BottomEnd).padding(16.dp)) { open(Route.COPILOT) }
         }
         if (onTab) BottomBar(tab) { tab = it }
     }
 }
+
+/** The copilot button, faded out at the end of a page so it never covers the last panel. */
+@Composable
+private fun FadingFab(visible: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    AnimatedVisibility(visible, modifier, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) { CopilotFab(onClick = onClick) }
+}
+
+// Within this many pixels of the end counts as the end, so a fling that stops just short still clears the button.
+private const val END_SLACK = 24

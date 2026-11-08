@@ -109,7 +109,6 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.compose.ui)
     // Only for the reminder clock dial (ADR-0020); every other control is the house design system.
-    implementation(libs.compose.material3)
     implementation(libs.activity.compose)
     implementation(project(":core:scheduler"))
     implementation(libs.sqlcipher)

@@ -68,7 +68,10 @@ class HubController(private val app: OrganizaApp) {
 
     fun setLimit(pkg: String, minutes: Long?) = edit { stores ->
         val app = parsePackage(pkg) ?: return@edit
-        if (minutes == null) stores.limits.remove(app) else stores.limits.set(app, UsageLimits.nearest(Duration.ofMinutes(minutes)))
+        when {
+            minutes == null -> stores.limits.remove(app)
+            minutes in UsageLimits.MINUTES.first..UsageLimits.MINUTES.last -> stores.limits.set(app, Duration.ofMinutes(minutes))
+        }
     }
 
     fun setFeed(feed: ShortFormFeed, on: Boolean) = edit { stores ->

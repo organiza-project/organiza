@@ -23,10 +23,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import org.organiza.android.feature.focus.FocusCard
+import org.organiza.android.feature.rpg.QuestsPanel
+import org.organiza.android.feature.schedule.CalendarPanel
 import org.organiza.android.ui.*
 import org.organiza.presentation.HomeHabit
 
-/** Home (wireframe screen 2): the daily goal dial, the session card and today's habits. */
+/**
+ * Home (ADR-0021): a session to start and the calendar first, then the daily goal dial and the same
+ * habits, dailies and to-dos as the Habits tab, read from the one snapshot.
+ */
 @Composable
 fun HomeScreen(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit, goTo: (Tab) -> Unit) {
     val colors = Theme.colors
@@ -36,17 +41,16 @@ fun HomeScreen(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit, goTo: (T
             Txt("Home", Type.title, modifier = Modifier.semantics { heading() })
             Txt(home?.headline ?: "", Type.body, colors.muted)
         }
-        Box(Modifier.clickable(role = Role.Button) { goTo(Tab.PROFILE) }.semantics { contentDescription = "Profile" }) {
-            Avatar(ui.selfName)
-        }
+        Box(Modifier.semantics { contentDescription = "Organiza" }) { LogoMark(44.dp) }
     }
+    MessagePanel(ui.message)
+    FocusCard(ui, actions) { goTo(Tab.METRICS) }
+    CalendarPanel(ui.calendar, actions) { open(Route.AGENDA) }
     if (home != null) {
         Box(Modifier.fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally).padding(vertical = 8.dp)) {
             Dial(home.completion, "${(home.completion * 100).toInt()}%", "Daily goal")
         }
     }
-    MessagePanel(ui.message)
-    FocusCard(ui, actions, open)
     Panel {
         PanelHeader("Today's habits") { Action("New", ButtonKind.TEXT) { open(Route.NEW_HABIT) } }
         val habits = home?.habits.orEmpty()
@@ -59,6 +63,7 @@ fun HomeScreen(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit, goTo: (T
             habits.forEach { habit -> HabitCard(habit) { done -> actions.markToday(habit.id, habit.name, done) } }
         }
     }
+    QuestsPanel(ui.rpg, actions)
 }
 
 /** One habit: a small ring, its name, a pill of the period's progress, and today's toggle. */

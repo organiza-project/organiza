@@ -84,3 +84,23 @@ key: it bypasses row-level security for every user, and the app refuses it.
 The account's email address, a password hash, mailbox IDs, message sizes and timing, and network
 addresses. It cannot see habits, sessions, blocked apps or sites, overrides, AI keys, or challenge
 results.
+
+## Checking Arena sync end to end
+
+`ArenaSyncE2ETest` (in `core/sync`) runs two phones through a one-day challenge over real HTTP: sign
+in, create, join, close the day, publish signed commitments, then reveal and confirm. `./gradlew test`
+always runs it against a local stand-in built from `supabase/migrations`. To run it against your own
+project, hosted or self-hosted, create two throwaway accounts and run:
+
+```bash
+ORGANIZA_E2E_SUPABASE_URL=https://YOUR-PROJECT.supabase.co \
+ORGANIZA_E2E_SUPABASE_KEY=YOUR_PUBLISHABLE_OR_ANON_KEY \
+ORGANIZA_E2E_ALICE='alice@example.org:a-long-password' \
+ORGANIZA_E2E_BOB='bob@example.org:another-long-password' \
+./gradlew :core:sync:test --tests '*ArenaSyncE2ETest*' --rerun
+```
+
+Add `ORGANIZA_E2E_SIGN_UP=1` to create the two accounts first; that works when email confirmation
+is off. Each run leaves a few padded ciphertext messages under a random mailbox; deleting the two
+accounts removes them.
+

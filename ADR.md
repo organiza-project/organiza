@@ -928,3 +928,54 @@ A Supabase Edge Function for deletion: a second runtime and a service key for wh
 does. Coil for icons: a dependency for a bitmap that `PackageManager` already gives. Android's
 `SpeechRecognizer`: may send audio to a vendor without the consent Organiza already asks for, so the
 chat reuses the Groq Whisper path. A rule-level tier: lost with the manual rule when a session ends.
+
+## ADR-0021: Home leads with focus, the blocker moves to Metrics, typed times and named ranks
+
+### Status
+Accepted, 2026-11-08.
+
+### Context
+Starting a session or seeing the day's plan took a scroll or a second screen. The blocker hub sat
+behind a button on the session card, apart from the usage it acts on. Long pages ended in an 80dp
+blank kept free for the copilot button. The session length read "3 × 15 min = 45 min", and times
+were set with steppers and the Material 3 clock dial, which is slow for "45 minutes" or "08:30".
+Habitica-style habits, dailies and to-dos lived only on the Habits tab, and levels had five titles
+that changed every few levels with no milestone to aim for.
+
+### Decision
+- **Home** opens with the session card, then the calendar (`CalendarPanel`, shared with the full
+  calendar; a tapped day opens it), then the dial, today's habits and the same `QuestsPanel` as the
+  Habits tab. The header shows the logo instead of an initial.
+- **One source.** Both tabs render the one `UiSnapshot` that `refreshUi` builds from the SQLCipher
+  stores (ADR-0018), so a task added on either tab shows on both after the same refresh. No
+  per-screen flows or view models are added.
+- **Metrics** holds the blocker hub (`BlockerHub`) under the usage dashboard. The hub route is gone;
+  the start form's link to the focus list switches to the Metrics tab.
+- **Page end.** Content ends with the 16dp margin. The copilot button fades out within 24px of the
+  end of a page, instead of every page carrying blank space for it.
+- **Typed times.** `MinutesField` (a number-pad box with one-tap presets) and `ClockField` (hour and
+  minute boxes, AM and PM when the phone keeps a 12 hour clock) replace the steppers and the dial for
+  session length, limits, habit goals, logged time, calendar blocks and reminders. The first digit
+  after a tap replaces the box, so typing never appends to the old number. Parsing and the
+  first-keystroke rule live in `TimeInput` (core/presentation) with tests. Material 3 is removed.
+- **Limits** are kept as typed, 5 to 720 minutes as the schema already allowed, instead of snapping
+  to slider steps. A typed limit is saved when its sheet closes or on Save limit, so typing "120"
+  never passes through a 12 minute limit.
+- **Ranks.** Level n starts at 25 n (n - 1) XP, half the old curve, so early levels come in days.
+  Ranks: Novice 1, Initiate 10, Focus Adept 20, Stoic Master 30, Zen Grandmaster 50. The hero card
+  shows the rank, a level badge, a five-step ladder and the XP to the next rank.
+- **Arena over Supabase, end to end.** `ArenaSyncE2ETest` runs two phones through sign-in, create,
+  join, a closed day, commitments and reveals over real HTTP. It always runs against `LocalSupabase`:
+  the Auth password endpoints and PostgREST's rpc route over embedded PostgreSQL with the real
+  migrations. With `ORGANIZA_E2E_*` set, the same test runs against a hosted or self-hosted project.
+
+### Consequences
+Home is longer, with the habits below the calendar. Lowering the curve raises existing heroes a few
+levels. `LocalSupabase` stands in for GoTrue and PostgREST, so a change in either is only caught by
+the configured run, which needs two accounts on that project.
+
+### Alternatives Considered
+A wheel picker: slower than typing for a known number, and fiddly with large fonts. Keeping the
+spacer and shrinking it: still blank space. A `Flow` per screen: a second state path beside the
+snapshot, for data the snapshot already shares. The Supabase CLI stack for the E2E test: needs
+Docker on every machine that runs `./gradlew test`.

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -18,7 +19,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.organiza.android.feature.blocker.BlockerHubScreen
+import org.organiza.android.feature.blocker.BlockerHub
 import org.organiza.android.feature.habits.NewHabitScreen
 import org.organiza.android.feature.home.HomeScreen
 import org.organiza.android.ui.HubApp
@@ -81,7 +82,7 @@ class WireframeScreensTest {
             apps = listOf(HubApp("com.instagram.android", "Instagram", onList = true, usedMinutes = 50, limitMinutes = null, locked = false)),
             usageAllowed = true,
         )
-        show { BlockerHubScreen(UiSnapshot(hub = hub), actions) {} }
+        show { BlockerHub(UiSnapshot(hub = hub), actions) }
         compose.onNodeWithText("Block Reels tab only").performClick()
         compose.onNodeWithText("Daily limit").performScrollTo().performClick()
         assertEquals(listOf("setFeed INSTAGRAM_REELS true", "setLimit com.instagram.android 60"), actions.calls)
@@ -98,13 +99,12 @@ class WireframeScreensTest {
             usageAllowed = true,
             screenTime = "53 m",
         )
-        show { BlockerHubScreen(UiSnapshot(hub = hub), actions) {} }
-        compose.onNodeWithText("53 m").assertExists()
+        show { BlockerHub(UiSnapshot(hub = hub), actions) }
         compose.onNodeWithText("50/60 min today").performScrollTo().assertExists()
         compose.onNodeWithText("Add apps").performScrollTo().performClick()
         compose.onNodeWithText("Search apps").performScrollTo()
-        // The search field comes before the website field.
-        compose.onAllNodes(hasSetTextAction())[0].performTextInput("che")
+        // The search field comes after Instagram's minutes box and before the website field.
+        compose.onAllNodes(hasSetTextAction() and !hasContentDescription("Minutes a day"))[0].performTextInput("che")
         compose.onNodeWithText("Maps").assertDoesNotExist()
         compose.onNodeWithText("Games").performScrollTo().assertExists()
         compose.onNodeWithText("Block").performScrollTo().performClick()
@@ -119,7 +119,7 @@ class WireframeScreensTest {
         show { CalendarScreen(UiSnapshot(calendar = calendar), actions, {}, {}) }
         compose.onNodeWithContentDescription("${Format.dayMonth(other)}, 0 blocks").performClick()
         compose.onNodeWithText("Add block").performScrollTo().performClick()
-        compose.onNodeWithText("Week").performClick()
+        compose.onNodeWithText("Week").performScrollTo().performClick()
         assertEquals(listOf("selectDay $other null", "saveFocusBlock null $today 540 60", "showCalendar WEEK"), actions.calls)
     }
 
@@ -127,11 +127,15 @@ class WireframeScreensTest {
     fun dailiesCheckOffAndHabitsCountBothWays() {
         val rpg = RpgView(
             hp = 42,
-            badge = "Lvl 3 · Focus Novice",
+            badge = "Lvl 3 · Novice",
+            level = 3,
+            rankLine = "Initiate at level 10 · 2,100 XP to go",
             tasks = listOf(RpgTaskView("d", RpgKind.DAILY, "Drink water", done = false), RpgTaskView("h", RpgKind.HABIT, "Stretch", done = false)),
         )
         show { QuestsPanel(rpg, actions) }
         compose.onNodeWithContentDescription("HP 42 / 50").assertExists()
+        compose.onNodeWithText("Novice").assertExists()
+        compose.onNodeWithContentDescription("Level 3").assertExists()
         compose.onNodeWithContentDescription("Done Drink water").performClick()
         compose.onNodeWithText("Habits 1").performClick()
         compose.onNodeWithContentDescription("Did Stretch").performClick()

@@ -24,6 +24,9 @@ import android.graphics.Canvas
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -34,19 +37,16 @@ import androidx.compose.ui.unit.dp
 import org.organiza.android.ui.*
 import org.organiza.enforcement.ShortFormFeed
 import org.organiza.enforcement.UsageLimits
-import org.organiza.presentation.Permission
 
-/** The distraction blocker hub (wireframe screen 6): the focus list, daily limits and short video switches. */
+/** The distraction blocker hub, inside Metrics (ADR-0021): the focus list, daily limits and short video switches. */
 @Composable
-fun BlockerHubScreen(ui: UiSnapshot, actions: Actions, back: () -> Unit) {
+fun BlockerHub(ui: UiSnapshot, actions: Actions) {
     val colors = Theme.colors
     val hub = ui.hub
     var showAll by rememberSaveable { mutableStateOf(false) }
     var site by rememberSaveable { mutableStateOf("") }
     var search by rememberSaveable { mutableStateOf("") }
-    TopBar("Distraction blocker hub", back)
-    MessagePanel(ui.message)
-    hub.screenTime?.let { TitleBlock(it, "Screen time today, across your apps") }
+    Txt("Distraction blocker", Type.section, modifier = Modifier.padding(top = 8.dp).semantics { heading() })
     Panel {
         PanelHeader("Inside apps")
         SwitchRow("Block Reels tab only", "Instagram stays open; its Reels feed is paused all day", hub.blockReels) {
@@ -57,20 +57,13 @@ fun BlockerHubScreen(ui: UiSnapshot, actions: Actions, back: () -> Unit) {
             actions.setFeed(ShortFormFeed.YOUTUBE_SHORTS, it)
         }
     }
-    if (!hub.usageAllowed) {
-        Panel {
-            Txt("Daily limits need usage access to see how long each app was open today.", Type.body)
-            Spacer(Modifier.height(8.dp))
-            Action("Allow usage access", ButtonKind.SECONDARY) { actions.grant(Permission.USAGE) }
-        }
-    }
     val mine = hub.apps.filter { it.onList || it.limitMinutes != null }
     Panel {
         PanelHeader("Your apps") { Action(if (showAll) "Done" else "Add apps", ButtonKind.TEXT) { showAll = !showAll } }
         if (mine.isEmpty()) Txt("No apps yet. Choose Add apps to pick some.", Type.body, colors.muted)
         mine.forEachIndexed { index, app ->
             if (index > 0) Rule()
-            HubAppRow(app, actions)
+            key(app.pkg) { HubAppRow(app, actions) }
         }
     }
     if (showAll) {
@@ -170,16 +163,13 @@ private fun HubAppRow(app: HubApp, actions: Actions) {
             actions.setLimit(app.pkg, if (it) 60 else null)
         }
         if (limit != null) {
-            val steps = UsageLimits.STEPS
-            val index = steps.indexOfFirst { it.toMinutes() == limit }.coerceAtLeast(0)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                val range = steps.first().toMinutes().toInt()..steps.last().toMinutes().toInt()
-                // Minus and plus move one step along the slider's values, not one minute.
-                Stepper(limit.toInt(), "min a day", range) { wanted ->
-                    val next = if (wanted > limit) steps.getOrNull(index + 1) else steps.getOrNull(index - 1)
-                    next?.let { actions.setLimit(app.pkg, it.toMinutes()) }
-                }
+            var draft by rememberSaveable { mutableStateOf(limit.toInt()) }
+            MinutesField("Minutes a day", draft, UsageLimits.MINUTES, LIMIT_PRESETS) { draft = it }
+            if (draft.toLong() != limit) {
+                Action("Save limit", ButtonKind.SECONDARY, modifier = Modifier.padding(top = 8.dp)) { actions.setLimit(app.pkg, draft.toLong()) }
             }
         }
     }
 }
+
+private val LIMIT_PRESETS = listOf(15, 30, 60, 120)

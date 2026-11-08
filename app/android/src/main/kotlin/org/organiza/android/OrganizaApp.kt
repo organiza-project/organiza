@@ -317,7 +317,7 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
             FocusTier.STANDARD -> {
                 val rule = hub.focusRule(active)
                 if (rule.packages.isEmpty() && rule.domains.isEmpty() && !shortForm) {
-                    statusMessage = "Add apps or sites in the distraction blocker hub first"
+                    statusMessage = "Add apps or sites to your focus list in Metrics first"
                     return@onStorageThread
                 }
                 ManualRequest(rule.packages, rule.domains, strict, shortForm)

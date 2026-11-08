@@ -121,21 +121,33 @@ public data class ProgressionModel(
     val toNext: Int,
     val fraction: Double,
     val badges: List<Badge>,
+    val rank: Rank = Rank.of(level),
+    val rankLine: String = "",
 )
 
-public object Progression {
-    /** Level n starts at 50 n (n - 1) XP, so each level takes 100 XP more than the last. */
-    public fun level(xp: Int): Int = ((1 + sqrt(1 + 4 * xp / 50.0)) / 2).toInt().coerceAtLeast(1)
+/** Named tiers over the levels, so progress has milestones worth reaching (ADR-0021). */
+public enum class Rank(public val title: String, public val from: Int) {
+    NOVICE("Novice", 1),
+    INITIATE("Initiate", 10),
+    FOCUS_ADEPT("Focus Adept", 20),
+    STOIC_MASTER("Stoic Master", 30),
+    ZEN_GRANDMASTER("Zen Grandmaster", 50),
+    ;
 
-    public fun startOf(level: Int): Int = 50 * level * (level - 1)
+    public val next: Rank? get() = entries.getOrNull(ordinal + 1)
 
-    public fun titleFor(level: Int): String = when {
-        level < 4 -> "Focus Novice"
-        level < 8 -> "Focus Apprentice"
-        level < 13 -> "Focus Keeper"
-        level < 18 -> "Focus Adept"
-        else -> "Focus Master"
+    public companion object {
+        public fun of(level: Int): Rank = entries.last { level >= it.from }
     }
+}
+
+public object Progression {
+    /** Level n starts at 25 n (n - 1) XP, so each level takes 50 XP more than the last. */
+    public fun level(xp: Int): Int = ((1 + sqrt(1 + 4 * xp / 25.0)) / 2).toInt().coerceAtLeast(1)
+
+    public fun startOf(level: Int): Int = 25 * level * (level - 1)
+
+    public fun titleFor(level: Int): String = Rank.of(level).title
 
     public fun xp(facts: ProgressFacts): Int =
         facts.habitDaysMet * 10 + (facts.focusMinutes / 5).toInt() + facts.stayedFocused * 5 + facts.challengesCompleted * 100
@@ -162,6 +174,9 @@ public object Progression {
             startOf(level + 1) - xp,
             (xp - startOf(level)).toDouble() / span,
             badges,
+            Rank.of(level),
+            Rank.of(level).next?.let { "${it.title} at level ${it.from} · ${"%,d".format(Locale.UK, startOf(it.from) - xp)} XP to go" }
+                ?: "Highest rank reached",
         )
     }
 }

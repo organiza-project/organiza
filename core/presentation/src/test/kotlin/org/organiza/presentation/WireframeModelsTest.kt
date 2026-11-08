@@ -87,8 +87,9 @@ class WireframeModelsTest {
     fun `xp comes from local results and sets the level and title`() {
         val model = Progression.build(ProgressFacts(habitDaysMet = 60, focusMinutes = 1500, stayedFocused = 40, longestStreak = 9, challengesJoined = 1, challengesCompleted = 0))
         assertEquals(60 * 10 + 1500 / 5 + 40 * 5, model.xp)
-        assertEquals(5, model.level)
-        assertEquals("Level 5 · Focus Apprentice", model.title)
+        assertEquals(7, model.level)
+        assertEquals("Level 7 · Novice", model.title)
+        assertEquals("Initiate at level 10 · 1,150 XP to go", model.rankLine)
         assertTrue(model.fraction in 0.0..1.0)
         assertEquals(setOf("first-session", "week-streak", "held-the-line", "team-player"), model.badges.filter { it.earned }.map { it.id }.toSet())
     }
@@ -96,10 +97,23 @@ class WireframeModelsTest {
     @Test
     fun `levels grow further apart`() {
         assertEquals(1, Progression.level(0))
-        assertEquals(2, Progression.level(100))
-        assertEquals(3, Progression.level(300))
-        assertEquals(14, Progression.level(9100))
-        assertEquals("Focus Adept", Progression.titleFor(14))
+        assertEquals(2, Progression.level(50))
+        assertEquals(3, Progression.level(150))
+        assertEquals(9, Progression.level(2249))
+        assertEquals(10, Progression.level(2250))
+        assertEquals(50, Progression.level(61250))
+    }
+
+    @Test
+    fun `ranks change every ten levels, then at thirty and fifty`() {
+        assertEquals(
+            listOf("Novice", "Novice", "Initiate", "Initiate", "Focus Adept", "Stoic Master", "Stoic Master", "Zen Grandmaster", "Zen Grandmaster"),
+            listOf(1, 9, 10, 19, 20, 30, 49, 50, 80).map { Rank.of(it).title },
+        )
+        assertEquals(Rank.FOCUS_ADEPT, Rank.of(12).next)
+        assertEquals(null, Rank.ZEN_GRANDMASTER.next)
+        assertEquals("Highest rank reached", Progression.of(Progression.startOf(55)).rankLine)
+        assertEquals("Stoic Master at level 30 · 50 XP to go", Progression.of(Progression.startOf(30) - 50).rankLine)
     }
 
     @Test

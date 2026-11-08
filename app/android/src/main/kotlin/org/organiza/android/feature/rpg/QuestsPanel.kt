@@ -40,21 +40,34 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import org.organiza.android.ui.*
+import org.organiza.presentation.Rank
 import org.organiza.storage.RpgKind
 
 private val EDGE = 2.dp
 private val DROP = 4.dp
 private val CORNER = RoundedCornerShape(6.dp)
 
-/** The hero and the Habitica-style lists (ADR-0019): thick ink edges and hard shadows that give way when pressed. */
+/**
+ * The hero and the Habitica-style lists (ADR-0019): thick ink edges and hard shadows that give way
+ * when pressed. Home and the Habits tab show this same panel over the same snapshot (ADR-0021).
+ */
 @Composable
 fun QuestsPanel(rpg: RpgView, actions: Actions) {
     val colors = Theme.colors
     var kind by rememberSaveable { mutableStateOf(RpgKind.DAILY) }
     var title by rememberSaveable { mutableStateOf("") }
     Slab {
-        Txt(rpg.badge, Type.section, modifier = Modifier.semantics { heading() })
-        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).semantics(mergeDescendants = true) { heading() }) {
+                Txt("Rank", Type.small, colors.muted)
+                Txt(rpg.rank.title, Type.title)
+            }
+            LevelBadge(rpg.level)
+        }
+        Spacer(Modifier.height(10.dp))
+        RankLadder(rpg.rank)
+        Txt(rpg.rankLine, Type.small, colors.muted, Modifier.padding(top = 6.dp))
+        Spacer(Modifier.height(14.dp))
         StatBar("HP", rpg.hp.toDouble() / rpg.maxHp, "${rpg.hp} / ${rpg.maxHp}", colors.negative)
         Spacer(Modifier.height(10.dp))
         StatBar("XP", rpg.xpFraction, rpg.xpCaption, colors.data)
@@ -89,6 +102,47 @@ private fun rule(kind: RpgKind) = when (kind) {
     RpgKind.HABIT -> "Tap + for a good one (+5 XP) and − for a slip (−5 HP), as often as it happens."
     RpgKind.DAILY -> "+10 XP each. Left undone at midnight, each costs 8 HP."
     RpgKind.TODO -> "+15 XP once, then it is gone."
+}
+
+/** The level in a square key, like the task buttons. */
+@Composable
+private fun LevelBadge(level: Int) {
+    val colors = Theme.colors
+    Box(Modifier.padding(end = DROP, bottom = DROP).semantics(mergeDescendants = true) { contentDescription = "Level $level" }) {
+        Box(Modifier.matchParentSize().offset(DROP, DROP).background(colors.border, CORNER))
+        Column(
+            Modifier.background(colors.primary, CORNER).border(EDGE, colors.border, CORNER).padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Txt("Level", Type.small, colors.onPrimary)
+            Txt(level.toString(), Type.section, colors.onPrimary)
+        }
+    }
+}
+
+/** The five ranks as steps: reached ones filled, the current one marked, so the next milestone is in view. */
+@Composable
+private fun RankLadder(current: Rank) {
+    val colors = Theme.colors
+    val description = Rank.entries.joinToString { "${it.title} from level ${it.from}" }
+    Row(Modifier.fillMaxWidth().semantics { contentDescription = "Ranks: $description" }, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Rank.entries.forEach { rank ->
+            val reached = rank.ordinal <= current.ordinal
+            Column(Modifier.weight(1f)) {
+                // Every step sits in the same 10dp row, so the level numbers under them line up.
+                Box(Modifier.fillMaxWidth().height(10.dp), contentAlignment = Alignment.CenterStart) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(if (rank == current) 10.dp else 6.dp)
+                            .background(if (reached) colors.data else colors.raised, CORNER)
+                            .border(if (rank == current) EDGE else 0.dp, colors.border, CORNER),
+                    )
+                }
+                Txt("${rank.from}", Type.small, if (reached) colors.text else colors.muted, Modifier.padding(top = 2.dp))
+            }
+        }
+    }
 }
 
 /** A labelled bar with a thick edge, its fill eased to the new value. */

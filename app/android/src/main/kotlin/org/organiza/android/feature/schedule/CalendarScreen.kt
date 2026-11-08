@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,17 +50,37 @@ fun CalendarScreen(ui: UiSnapshot, actions: Actions, back: () -> Unit, open: (Ro
     val calendar = ui.calendar
     TopBar("Calendar", back)
     MessagePanel(ui.message)
-    Segmented(CalendarMode.entries, calendar.mode, { it.name.lowercase().replaceFirstChar(Char::uppercase) }, actions::showCalendar)
+    CalendarPanel(calendar, actions)
+    DayPanel(calendar.selected, calendar.blocks, actions)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Action("Import schedule", ButtonKind.SECONDARY) { open(Route.IMPORT) }
+        Action("Import .ics", ButtonKind.SECONDARY) { actions.importCalendar() }
+    }
+}
+
+/**
+ * Month, week or day at a glance. On Home, [openDay] takes a tapped day to the full calendar,
+ * where its blocks are added and moved (ADR-0021).
+ */
+@Composable
+fun CalendarPanel(calendar: CalendarView, actions: Actions, openDay: (() -> Unit)? = null) {
     val day = calendar.selected
+    val pick: (LocalDate, CalendarMode?) -> Unit = { date, then ->
+        actions.selectDay(date, then)
+        openDay?.invoke()
+    }
     Panel {
+        PanelHeader("Calendar") { openDay?.let { Action("Plan a block", ButtonKind.TEXT, onClick = it) } }
+        Segmented(CalendarMode.entries, calendar.mode, { it.name.lowercase().replaceFirstChar(Char::uppercase) }, actions::showCalendar)
+        Spacer(Modifier.height(12.dp))
         when (calendar.mode) {
             CalendarMode.MONTH -> {
                 Stepped(calendar.month?.title.orEmpty(), { actions.selectDay(day.minusMonths(1), null) }, { actions.selectDay(day.plusMonths(1), null) })
-                calendar.month?.let { MonthGrid(it) { date -> actions.selectDay(date, null) } }
+                calendar.month?.let { MonthGrid(it) { date -> pick(date, null) } }
             }
             CalendarMode.WEEK -> {
                 Stepped("Week of ${Format.dayMonth(CalendarMonth.weekOf(day).first())}", { actions.selectDay(day.minusWeeks(1), null) }, { actions.selectDay(day.plusWeeks(1), null) })
-                WeekColumns(calendar.week, CalendarMonth.weekOf(day), day) { date -> actions.selectDay(date, CalendarMode.DAY) }
+                WeekColumns(calendar.week, CalendarMonth.weekOf(day), day) { date -> pick(date, CalendarMode.DAY) }
             }
             CalendarMode.DAY -> {
                 Stepped(dayTitle(day), { actions.selectDay(day.minusDays(1), null) }, { actions.selectDay(day.plusDays(1), null) })
@@ -67,11 +88,6 @@ fun CalendarScreen(ui: UiSnapshot, actions: Actions, back: () -> Unit, open: (Ro
                 calendar.day?.let { AgendaGrid(it) }
             }
         }
-    }
-    DayPanel(day, calendar.blocks, actions)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Action("Import schedule", ButtonKind.SECONDARY) { open(Route.IMPORT) }
-        Action("Import .ics", ButtonKind.SECONDARY) { actions.importCalendar() }
     }
 }
 
@@ -193,8 +209,7 @@ private fun WeekColumns(week: List<AgendaModel>, dates: List<LocalDate>, chosen:
 private fun DayPanel(day: LocalDate, blocks: List<CalendarBlock>, actions: Actions) {
     val colors = Theme.colors
     var editing by rememberSaveable(day) { mutableStateOf<String?>(null) }
-    var hour by rememberSaveable(day) { mutableIntStateOf(9) }
-    var quarter by rememberSaveable(day) { mutableIntStateOf(0) }
+    var start by rememberSaveable(day) { mutableIntStateOf(9 * 60) }
     var length by rememberSaveable(day) { mutableIntStateOf(60) }
     Panel {
         PanelHeader(dayTitle(day)) { Txt(Format.count(blocks.size, "session", "sessions"), Type.small, colors.muted) }
@@ -209,8 +224,7 @@ private fun DayPanel(day: LocalDate, blocks: List<CalendarBlock>, actions: Actio
                 if (block.editable) {
                     Action("Edit", ButtonKind.TEXT) {
                         editing = block.id
-                        hour = block.startMinute / 60
-                        quarter = block.startMinute % 60 / 15
+                        start = block.startMinute
                         length = block.minutes
                     }
                     Spacer(Modifier.size(8.dp))
@@ -221,24 +235,18 @@ private fun DayPanel(day: LocalDate, blocks: List<CalendarBlock>, actions: Actio
     }
     Panel {
         PanelHeader(if (editing == null) "Add a focus block" else "Move this focus block")
-        Txt("Starts", Type.bodyStrong, modifier = Modifier.padding(bottom = 6.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            Stepper(hour, "h", 0..23) { hour = it }
-        }
-        Spacer(Modifier.height(8.dp))
-        Segmented(listOf(0, 1, 2, 3), quarter, { ":%02d".format(it * 15) }) { quarter = it }
-        Spacer(Modifier.height(12.dp))
-        Txt("Length", Type.bodyStrong, modifier = Modifier.padding(bottom = 6.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            // Minus and plus move a quarter hour, not a minute.
-            Stepper(length, "min", MIN_LENGTH..MAX_LENGTH) { wanted -> length = (if (wanted > length) length + 15 else length - 15).coerceIn(MIN_LENGTH, MAX_LENGTH) }
+        // Keyed by the block, so choosing Edit refills the boxes with that block's time.
+        key(day, editing) {
+            ClockField("Starts at", start) { start = it }
+            Spacer(Modifier.height(12.dp))
+            MinutesField("Length", length, MIN_LENGTH..MAX_LENGTH, listOf(30, 60, 90, 120)) { length = it }
         }
         Spacer(Modifier.height(12.dp))
         Txt("The blocker arms itself at the start with your focus list.", Type.small, colors.muted)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Action(if (editing == null) "Add block" else "Save", ButtonKind.PRIMARY) {
-                actions.saveFocusBlock(editing, day, hour * 60 + quarter * 15, length)
+                actions.saveFocusBlock(editing, day, start, length)
                 editing = null
             }
             if (editing != null) Action("Cancel", ButtonKind.SECONDARY) { editing = null }

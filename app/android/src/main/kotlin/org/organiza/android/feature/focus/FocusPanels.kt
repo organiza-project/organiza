@@ -23,16 +23,17 @@ import org.organiza.presentation.ChoicesModel
 import org.organiza.presentation.Format
 import org.organiza.presentation.FocusState
 import org.organiza.presentation.ProtectionItem
+import org.organiza.presentation.TimeInput
 import org.organiza.storage.FocusTier
 
-/** The session card on Home: what is blocked and until when, with start or stop (ADR-0018). */
+/** The session card that opens Home: what is blocked and until when, with start or stop (ADR-0018, ADR-0021). */
 @Composable
-fun FocusCard(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit) {
+fun FocusCard(ui: UiSnapshot, actions: Actions, editList: () -> Unit) {
     val focus = ui.focus ?: return
     val colors = Theme.colors
     var starting by rememberSaveable { mutableStateOf(false) }
     Panel {
-        PanelHeader("Focus") {
+        PanelHeader("Focus session") {
             if (focus.state == FocusState.STRICT) Pill("Strict", colors.raised, colors.text)
         }
         Row(verticalAlignment = Alignment.Bottom) {
@@ -52,18 +53,13 @@ fun FocusCard(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit) {
         )
         if (legend.isNotEmpty()) Legend(*legend.toTypedArray())
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (focus.state == FocusState.OFF) {
-                Action("Start a session", ButtonKind.PRIMARY) { starting = !starting }
-            } else if (ui.canStop) {
-                Action("Stop session", ButtonKind.SECONDARY) { actions.stopSession() }
-            }
-            Action("Calendar", ButtonKind.TEXT) { open(Route.AGENDA) }
-            Action("Blocker hub", ButtonKind.TEXT) { open(Route.BLOCKER) }
+        if (focus.state == FocusState.OFF && !starting) {
+            Action("Start a focus session", ButtonKind.PRIMARY, modifier = Modifier.fillMaxWidth()) { starting = true }
+        } else if (focus.state != FocusState.OFF && ui.canStop) {
+            Action("Stop session", ButtonKind.SECONDARY) { actions.stopSession() }
         }
         if (starting && focus.state == FocusState.OFF) {
-            Rule()
-            StartForm(ui, actions, open) { starting = false }
+            StartForm(ui, actions, editList) { starting = false }
         }
         if (focus.state != FocusState.OFF) {
             Rule()
@@ -94,15 +90,18 @@ private fun MonitorSummary(monitor: MonitorView, hasKey: Boolean, actions: Actio
     }
 }
 
+/** Three plain questions, in the order people decide them: how long, how strict, then start. */
 @Composable
-private fun StartForm(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit, close: () -> Unit) {
+private fun StartForm(ui: UiSnapshot, actions: Actions, editList: () -> Unit, close: () -> Unit) {
     val colors = Theme.colors
     var minutes by rememberSaveable { mutableStateOf(45) }
     var strict by rememberSaveable { mutableStateOf(false) }
     var shortForm by rememberSaveable { mutableStateOf(false) }
     var tier by rememberSaveable { mutableStateOf(FocusTier.STANDARD) }
     val listed = ui.hub.apps.count { it.onList } + ui.hub.sites.size
-    Txt("How hard should it block?", Type.bodyStrong, modifier = Modifier.padding(bottom = 6.dp))
+    MinutesField("Session length", minutes, SESSION_MINUTES, listOf(25, 45, 60, 90)) { minutes = it }
+    Spacer(Modifier.height(16.dp))
+    Txt("What to block", Type.bodyStrong, modifier = Modifier.padding(bottom = 6.dp))
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ChoiceRow("Total lockdown", "Every app is paused except calls, messages and the home screen", tier == FocusTier.LOCKDOWN) {
             tier = FocusTier.LOCKDOWN
@@ -116,24 +115,25 @@ private fun StartForm(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit, c
             tier = FocusTier.MONITOR
         }
     }
-    if (tier == FocusTier.STANDARD) Action("Edit the focus list", ButtonKind.TEXT) { open(Route.BLOCKER) }
-    Spacer(Modifier.height(8.dp))
-    Stepper(minutes / 15, "× 15 min = $minutes min", 1..96) { minutes = it * 15 }
+    if (tier == FocusTier.STANDARD) Action("Edit the focus list in Metrics", ButtonKind.TEXT, onClick = editList)
+    if (tier == FocusTier.STANDARD && listed == 0) Txt("Your focus list is empty, so only short videos can be blocked.", Type.small, colors.muted)
     if (tier != FocusTier.MONITOR) {
-        SwitchRow("Strict", "Cannot be stopped early, and opening a blocked app takes a longer pause. Up to 24 hours", strict) { strict = it }
+        SwitchRow("Strict", "Cannot be stopped early, and opening a blocked app takes a longer pause", strict) { strict = it }
         SwitchRow("Shorts and Reels", "Block every short video feed for this session", shortForm) { shortForm = it }
     }
     Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Action("Start", ButtonKind.PRIMARY) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Action("Start ${TimeInput.length(minutes)}", ButtonKind.PRIMARY, modifier = Modifier.weight(1f)) {
             val blocking = tier != FocusTier.MONITOR
             actions.startFocus(minutes, strict && blocking, shortForm && blocking, tier)
             close()
         }
         Action("Cancel", ButtonKind.TEXT, onClick = close)
     }
-    if (tier == FocusTier.STANDARD && listed == 0) Txt("Your focus list is empty, so only short videos can be blocked.", Type.small, colors.muted)
 }
+
+// Strict sessions are capped at a day; anything shorter than five minutes is not a session.
+private val SESSION_MINUTES = 5..1440
 
 @Composable
 private fun BlockedNow(ui: UiSnapshot) {

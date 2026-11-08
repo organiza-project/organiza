@@ -15,16 +15,19 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.organiza.android.feature.ai.CopilotPanel
+import org.organiza.android.feature.blocker.BlockerHub
 import org.organiza.android.feature.focus.ChoicesPanel
 import org.organiza.android.feature.focus.ProtectionPanel
 import org.organiza.android.ui.*
 import org.organiza.presentation.FocusWeek
 
-/** Metrics: today's app usage, focus this week, today's choices, the copilot and protection. */
+/** Metrics: today's app usage, the distraction blocker, focus this week, today's choices, the copilot and protection. */
 @Composable
 fun MetricsScreen(ui: UiSnapshot, actions: Actions) {
     TitleBlock("Metrics", ui.week?.total)
+    MessagePanel(ui.message)
     UsageDashboard(ui, actions)
+    BlockerHub(ui, actions)
     ui.week?.let { FocusWeekPanel(it) }
     ui.choices?.let { ChoicesPanel(it) }
     CopilotPanel(ui, actions)
