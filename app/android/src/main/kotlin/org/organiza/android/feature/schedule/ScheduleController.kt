@@ -17,7 +17,7 @@ import org.organiza.ai.Sanitizer
 import org.organiza.ai.SuggestedBlock
 import org.organiza.ai.UrlConnectionTransport
 import org.organiza.android.OrganizaApp
-import org.organiza.android.ui.ImportView
+import org.organiza.ui.ImportView
 import org.organiza.scheduler.VoiceOutcome
 import org.organiza.voice.VoiceCommand
 import org.organiza.voice.VoicePipeline

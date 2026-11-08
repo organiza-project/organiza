@@ -45,7 +45,7 @@ import org.organiza.android.feature.habits.Reminders
 import org.organiza.android.feature.schedule.ScheduleController
 import org.organiza.android.feature.schedule.CalendarController
 import org.organiza.android.feature.rpg.RpgController
-import org.organiza.android.feature.blocker.InterventionHost
+import org.organiza.feature.blocker.InterventionHost
 import org.organiza.android.feature.blocker.OrganizaAccessibilityService
 import org.organiza.android.feature.blocker.OrganizaDeviceAdminReceiver
 import org.organiza.android.feature.onboarding.Permissions
@@ -97,11 +97,11 @@ import org.organiza.storage.StoredRule
 import org.organiza.storage.RuleStore
 import org.organiza.storage.TamperStore
 import androidx.compose.runtime.mutableStateOf
-import org.organiza.android.ui.ChallengeView
-import org.organiza.android.ui.HabitProgressView
-import org.organiza.android.ui.MonitorView
-import org.organiza.android.ui.UiSnapshot
-import org.organiza.android.ui.Upcoming
+import org.organiza.ui.ChallengeView
+import org.organiza.ui.HabitProgressView
+import org.organiza.ui.MonitorView
+import org.organiza.ui.UiSnapshot
+import org.organiza.ui.Upcoming
 import org.organiza.presentation.AgendaModel
 import org.organiza.presentation.ArenaModel
 import org.organiza.presentation.FocusWeek

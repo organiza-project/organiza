@@ -10,7 +10,7 @@ import org.organiza.ai.DistractionWindow
 import org.organiza.ai.DistractionWindows
 import org.organiza.ai.Sanitizer
 import org.organiza.android.OrganizaApp
-import org.organiza.android.ui.CopilotView
+import org.organiza.ui.CopilotView
 import org.organiza.storage.InterventionChoice
 import org.organiza.storage.InterventionStore
 import org.organiza.storage.StoredIntervention

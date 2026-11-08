@@ -1,5 +1,6 @@
 package org.organiza.android.feature.blocker
 
+import org.organiza.feature.blocker.InterventionScreen
 import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.content.Context
@@ -18,7 +19,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import org.organiza.android.OrganizaApp
-import org.organiza.android.ui.OrganizaTheme
+import org.organiza.ui.OrganizaTheme
 import org.organiza.domain.port.BlockSurface
 import org.organiza.domain.port.BlockTarget
 import org.organiza.enforcement.Friction

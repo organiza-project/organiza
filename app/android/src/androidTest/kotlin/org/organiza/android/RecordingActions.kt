@@ -1,6 +1,6 @@
 package org.organiza.android
 
-import org.organiza.android.ui.Actions
+import org.organiza.ui.Actions
 import org.organiza.enforcement.ShortFormFeed
 import org.organiza.storage.FocusTier
 import org.organiza.storage.HabitFrequency
@@ -8,7 +8,7 @@ import org.organiza.presentation.Permission
 import org.organiza.presentation.ProtectionItem
 import org.organiza.sync.BackendKind
 import org.organiza.storage.RpgKind
-import org.organiza.android.ui.CalendarMode
+import org.organiza.ui.CalendarMode
 import java.time.LocalDate
 
 /** Records what the screens ask for, by name, for UI tests. */

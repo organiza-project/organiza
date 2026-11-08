@@ -102,15 +102,12 @@ tasks.register("dogfoodApks") { dependsOn(dogfoodSigned) }
 fun quoted(value: String?): String = "\"" + value.orEmpty().replace("\\", "").replace("\"", "") + "\""
 
 dependencies {
-    implementation(project(":core:arena"))
-    implementation(project(":core:sync"))
-    implementation(project(":core:presentation"))
+    implementation(project(":app:shared"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.foundation)
     implementation(libs.compose.ui)
     // Only for the reminder clock dial (ADR-0020); every other control is the house design system.
     implementation(libs.activity.compose)
-    implementation(project(":core:scheduler"))
     implementation(libs.sqlcipher)
     implementation(libs.androidx.sqlite)
     implementation(libs.tesseract)

@@ -6,9 +6,9 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import org.organiza.android.OrganizaApp
-import org.organiza.android.ui.CalendarBlock
-import org.organiza.android.ui.CalendarMode
-import org.organiza.android.ui.CalendarView
+import org.organiza.ui.CalendarBlock
+import org.organiza.ui.CalendarMode
+import org.organiza.ui.CalendarView
 import org.organiza.presentation.AgendaModel
 import org.organiza.presentation.CalendarMonth
 import org.organiza.presentation.SessionView

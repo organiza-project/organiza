@@ -5,6 +5,9 @@ plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.kotlin.multiplatform) apply false
+    alias(libs.plugins.android.kmp.library) apply false
+    alias(libs.plugins.compose.multiplatform) apply false
 }
 
 subprojects {
@@ -14,8 +17,8 @@ subprojects {
                 jvmTarget.set(JvmTarget.JVM_17)
                 allWarningsAsErrors.set(true)
             }
-            // Libraries state their API; applications under :platform have none to state.
-            if (!path.startsWith(":platform")) explicitApi()
+            // Libraries state their API; applications under :platform and :app have none to state.
+            if (!path.startsWith(":platform") && !path.startsWith(":app")) explicitApi()
         }
         extensions.configure<JavaPluginExtension> {
             sourceCompatibility = JavaVersion.VERSION_17

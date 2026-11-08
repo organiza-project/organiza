@@ -4,8 +4,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import org.organiza.android.OrganizaApp
-import org.organiza.android.ui.RpgTaskView
-import org.organiza.android.ui.RpgView
+import org.organiza.ui.RpgTaskView
+import org.organiza.ui.RpgView
 import org.organiza.presentation.Badge
 import org.organiza.presentation.DailyInput
 import org.organiza.presentation.HeroModel

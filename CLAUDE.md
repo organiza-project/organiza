@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Organiza delivers **OS-level focus enforcement that is hard to bypass and mindful by
 design** (ADR-0005, ADR-0016) with **100% local data ownership**: calendar-driven
 scheduling, BYOK AI coaching, and zero-knowledge peer accountability. Android is the
-only platform in active development (ADR-0014); Linux is frozen, and Windows and iOS
-wait for an approved next phase.
+main platform; the Linux desktop app shares its screens and is being ported (ADR-0023).
+Windows and iOS wait for an approved next phase.
 
 ## 1. Git & GitHub Mandates
 - **Remote:** `origin` → `https://github.com/organiza-project/organiza`. Verify the
@@ -53,9 +53,12 @@ Recorded in ADR-0002 and ADR-0014. `./gradlew test` runs every JVM test.
 - `core/arena` — challenges, Ed25519 commitments, encrypted padded relay messages (ADR-0011).
 - `core/sync` — auth and sync ports with local-only and Supabase implementations (ADR-0015).
 - `core/presentation` — screen models: every sentence and state a screen shows, with tests (ADR-0012).
-- `app/android` — the app, grouped by feature under `feature/`; design system in `ui/`.
+- `app/shared` — Compose Multiplatform: design system (`org.organiza.ui`) and every screen
+  (`org.organiza.feature.*`) in `commonMain`; small `actual`s in `androidMain`/`desktopMain` (ADR-0023).
+- `app/android` — the Android app: state holder, controllers, services and adapters, by feature under `feature/`.
+- `app/desktop` — the Linux desktop app (Compose Desktop); `DesktopApp` is its state holder.
 - `supabase/` — backend schema; `setup.sql` must contain each migration verbatim (a test checks).
-- `platform/linux` — frozen (ADR-0014); keep it compiling, add nothing.
+- `platform/linux` — frozen (ADR-0014); keep it compiling, add nothing. The desktop daemon replaces it.
 - `.claude/rules/` — working rules for architecture, testing and privacy. Read them.
 
 ## 5. Commands
@@ -65,6 +68,7 @@ The Android build needs a full JDK 17: `export JAVA_HOME=/usr/lib/jvm/java-17-op
 ./gradlew test                                              # all JVM tests (CI runs test assembleDebug)
 ./gradlew :core:enforcement:test --tests '*BlockEngineTest*' # one class; works per module
 ./gradlew :app:android:connectedDebugAndroidTest             # Compose instrumentation tests, emulator needed
+./gradlew :app:desktop:run                                  # the Linux desktop window
 ./gradlew :app:android:dogfoodApks                           # dist/organiza-{debug,release}.apk, v1+v2+v3 signed
 scripts/verify-android.sh                                    # end-to-end enforcement checks on an emulator
 scripts/seed-screens.sh                                      # sample data for screenshot reviews

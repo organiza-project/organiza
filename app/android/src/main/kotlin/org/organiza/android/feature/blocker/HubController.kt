@@ -6,8 +6,8 @@ import java.time.Duration
 import java.time.ZoneId
 import org.organiza.android.OrganizaApp
 import org.organiza.android.data.AndroidUsageHistory
-import org.organiza.android.ui.HubApp
-import org.organiza.android.ui.HubView
+import org.organiza.ui.HubApp
+import org.organiza.ui.HubView
 import org.organiza.domain.DomainName
 import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed

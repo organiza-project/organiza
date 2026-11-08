@@ -14,9 +14,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.organiza.android.feature.blocker.InterventionHost
-import org.organiza.android.feature.blocker.InterventionScreen
-import org.organiza.android.ui.OrganizaTheme
+import org.organiza.feature.blocker.InterventionHost
+import org.organiza.feature.blocker.InterventionScreen
+import org.organiza.ui.OrganizaTheme
 import org.organiza.domain.OverrideReason
 import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed

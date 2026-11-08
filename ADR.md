@@ -1012,3 +1012,47 @@ months or weeks takes a tap into the full calendar.
 ### Alternatives Considered
 Keeping the month grid on Home: it pushes the habits a full screen down. A horizontal scrolling day
 strip: hides days off screen, where a seven-day row fits at every width tested.
+
+## ADR-0023: Linux desktop through a shared Compose Multiplatform UI
+
+### Status
+Accepted, 2026-11-08. Lifts the Linux part of the platform freeze in ADR-0014.
+
+### Context
+The Android app has been dogfooded, and Linux (Ubuntu/Debian) is the next target, with the same
+screens and the same behaviour. Every screen lived in `:app:android`, but almost none of it used
+Android: the Compose code reads only a `UiSnapshot` and calls `Actions` (ADR-0012), and every
+decision already lives in the plain Kotlin/JVM `:core` modules.
+
+### Decision
+- **`:app:shared`** is a Kotlin Multiplatform module with an Android library target and a `desktop`
+  JVM target. `commonMain` holds the design system (`org.organiza.ui`), every screen
+  (`org.organiza.feature.*`), `UiSnapshot`, `Actions` and `OrganizaRoot`, the tab and screen stack
+  that `MainActivity` used to own. It uses Compose Multiplatform 1.11, which resolves to the androidx
+  Compose that the app's BOM already brings on Android.
+- **Four platform calls** go through `expect`/`actual`: the Geist font (an Android font resource;
+  the same file on the desktop classpath), whether the clock is 24 hour, the back handler (a no-op on
+  the desktop, where each screen has its own back button) and an installed app's icon.
+- **`:core` stays plain Kotlin/JVM.** Android and the desktop are both JVMs, so `commonMain` uses the
+  core modules and `java.time` directly. Rewriting core for non-JVM targets (kotlinx-datetime,
+  SQLDelight or Room KMP instead of the `Database` port) would buy nothing for Linux, and SQLCipher
+  stays behind the existing `Database` port, which the desktop can back with the encrypted SQLite
+  JDBC driver already used in tests.
+- **`:app:desktop`** is the Compose Desktop application: `./gradlew :app:desktop:run` opens the
+  window, `:app:desktop:packageDeb` builds a Debian package. Its `DesktopApp` is the desktop state
+  holder. In this first stage it only draws the screens and answers every action with a "Not on
+  Linux yet" message; storage, sync, AI, usage tracking and enforcement come in the next stages.
+- **Android-only code stays in `:app:android`** under `org.organiza.android`: the state holder,
+  controllers, services, receivers and Keystore adapters, so the manifest and the enforcement path
+  are untouched.
+- `:platform:linux` stays frozen until the desktop daemon replaces it.
+
+### Consequences
+A screen is written once and drawn on both platforms. The desktop build and its UI test run with
+`./gradlew test`. The desktop app does nothing useful until its state holder is wired, so it is not
+released before then. Compose Multiplatform 1.12 needs compileSdk 37 and AGP 9.1, so moving to it
+waits for that toolchain update.
+
+### Alternatives Considered
+Converting every `:core` module to Kotlin Multiplatform: a rewrite of tested code for targets that
+are not planned. A separate desktop UI: two copies of every screen to keep alike by hand.

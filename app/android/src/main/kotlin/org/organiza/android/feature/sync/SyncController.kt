@@ -7,7 +7,7 @@ import org.organiza.ai.UrlConnectionTransport
 import org.organiza.android.BuildConfig
 import org.organiza.android.OrganizaApp
 import org.organiza.android.data.KeystoreSecretStore
-import org.organiza.android.ui.AccountView
+import org.organiza.ui.AccountView
 import org.organiza.sync.AuthResult
 import org.organiza.sync.AuthState
 import org.organiza.sync.Backend

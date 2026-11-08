@@ -6,7 +6,7 @@ import org.organiza.ai.AiResult
 import org.organiza.ai.ChatTurn
 import org.organiza.ai.GroqClient
 import org.organiza.android.OrganizaApp
-import org.organiza.android.ui.ChatView
+import org.organiza.ui.ChatView
 import org.organiza.voice.CommandParser
 
 /**

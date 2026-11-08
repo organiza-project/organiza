@@ -18,10 +18,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.organiza.android.feature.onboarding.OnboardingScreen
-import org.organiza.android.ui.AccountView
-import org.organiza.android.ui.OrganizaTheme
-import org.organiza.android.ui.UiSnapshot
+import org.organiza.feature.onboarding.OnboardingScreen
+import org.organiza.ui.AccountView
+import org.organiza.ui.OrganizaTheme
+import org.organiza.ui.UiSnapshot
 import org.organiza.presentation.Permission
 import org.organiza.sync.BackendKind
 

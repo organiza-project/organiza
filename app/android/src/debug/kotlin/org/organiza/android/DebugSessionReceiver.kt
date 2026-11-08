@@ -14,7 +14,7 @@ import java.time.Instant
 import java.time.ZoneId
 import org.organiza.android.data.AndroidUsageHistory
 import org.organiza.ai.GroqEndpoint
-import org.organiza.android.feature.focus.SessionInput
+import org.organiza.feature.focus.SessionInput
 import org.organiza.android.feature.voice.VoiceRecorder
 import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
