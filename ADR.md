@@ -979,3 +979,36 @@ A wheel picker: slower than typing for a known number, and fiddly with large fon
 spacer and shrinking it: still blank space. A `Flow` per screen: a second state path beside the
 snapshot, for data the snapshot already shares. The Supabase CLI stack for the E2E test: needs
 Docker on every machine that runs `./gradlew test`.
+
+## ADR-0022: Home opens with the daily goal, then the session, the week and the habits
+
+### Status
+Accepted, 2026-11-08. Amends the Home order in ADR-0021.
+
+### Context
+After ADR-0021, Home led with the session card and a full month grid, and the daily goal dial sat
+below both, out of sight without a scroll. The month grid alone took most of a phone screen, and
+the hero card repeated what the Habits tab already shows.
+
+### Decision
+- **Order.** A header (the logo, a greeting for the hour, today's date), then the daily goal, the
+  session card, the week, today's habits, and the quests. Each sits in its own `Panel`, spaced by
+  `Space.gap` as on every tab.
+- **Daily goal** is a panel with a 128dp dial beside the goals met and what is left ("1 goal left
+  today", "Every goal met today"). `HomeModel` builds the greeting, date and these lines from the
+  hour and date it is given, so they are tested in core.
+- **This week.** `WeekPanel` shows the chosen day's week as one row of days and today's blocks still
+  to come, up to three. A tapped day, or Open calendar, opens the full calendar, which keeps the
+  month, week and day views (`CalendarPanel`).
+- **Quests on Home** are the same lists as the Habits tab under a "Quests" heading, without the hero
+  card (`QuestsPanel(hero = false)`); the rank stays on the Habits tab.
+- **Blocker settings stay in Metrics.** Home only offers the session's own switches in the start
+  form: strict, and short videos for that one session.
+
+### Consequences
+The dial, the header and the session card fit a standard phone screen without a scroll. Changing
+months or weeks takes a tap into the full calendar.
+
+### Alternatives Considered
+Keeping the month grid on Home: it pushes the habits a full screen down. A horizontal scrolling day
+strip: hides days off screen, where a seven-day row fits at every width tested.

@@ -769,7 +769,7 @@ class OrganizaApp : Application(), EnforcementCapabilities, InterventionHost {
             val progression = hero.progression
             val nudges = arenaList.flatMap { challenge -> active.arena.nudgesForMe(challenge.id).map { "$it nudged you in ${challenge.title}" } }
             UiSnapshot(
-                home = HomeModel.build(today, plans),
+                home = HomeModel.build(today, plans, now.atZone(zone).hour),
                 agendaToday = AgendaModel.build(now, zone, today, views),
                 agendaTomorrow = AgendaModel.build(now, zone, today.plusDays(1), views),
                 progression = progression,

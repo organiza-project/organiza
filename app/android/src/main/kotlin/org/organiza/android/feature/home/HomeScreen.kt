@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,33 +23,30 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import org.organiza.android.feature.focus.FocusCard
 import org.organiza.android.feature.rpg.QuestsPanel
-import org.organiza.android.feature.schedule.CalendarPanel
+import org.organiza.android.feature.schedule.WeekPanel
 import org.organiza.android.ui.*
 import org.organiza.presentation.HomeHabit
+import org.organiza.presentation.HomeModel
 
 /**
- * Home (ADR-0021): a session to start and the calendar first, then the daily goal dial and the same
- * habits, dailies and to-dos as the Habits tab, read from the one snapshot.
+ * Home (ADR-0022), in the order a day is checked: the daily goal, the session to start, the week and
+ * today's blocks, then the same habits, dailies and to-dos as the Habits tab, read from the one snapshot.
  */
 @Composable
 fun HomeScreen(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit, goTo: (Tab) -> Unit) {
     val colors = Theme.colors
     val home = ui.home
     Row(Modifier.fillMaxWidth().padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Txt("Home", Type.title, modifier = Modifier.semantics { heading() })
-            Txt(home?.headline ?: "", Type.body, colors.muted)
+        Box(Modifier.semantics { contentDescription = "Organiza" }) { LogoMark(40.dp) }
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Txt(home?.greeting ?: "Home", Type.title, modifier = Modifier.semantics { heading() })
+            home?.let { Txt(it.date, Type.small, colors.muted) }
         }
-        Box(Modifier.semantics { contentDescription = "Organiza" }) { LogoMark(44.dp) }
     }
     MessagePanel(ui.message)
+    home?.let { GoalPanel(it) }
     FocusCard(ui, actions) { goTo(Tab.METRICS) }
-    CalendarPanel(ui.calendar, actions) { open(Route.AGENDA) }
-    if (home != null) {
-        Box(Modifier.fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally).padding(vertical = 8.dp)) {
-            Dial(home.completion, "${(home.completion * 100).toInt()}%", "Daily goal")
-        }
-    }
+    WeekPanel(ui.calendar, ui.agendaToday, actions) { open(Route.AGENDA) }
     Panel {
         PanelHeader("Today's habits") { Action("New", ButtonKind.TEXT) { open(Route.NEW_HABIT) } }
         val habits = home?.habits.orEmpty()
@@ -63,7 +59,23 @@ fun HomeScreen(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit, goTo: (T
             habits.forEach { habit -> HabitCard(habit) { done -> actions.markToday(habit.id, habit.name, done) } }
         }
     }
-    QuestsPanel(ui.rpg, actions)
+    QuestsPanel(ui.rpg, actions, hero = false)
+}
+
+/** The day's status at a glance: the dial beside the goals met and what is left. */
+@Composable
+private fun GoalPanel(home: HomeModel) {
+    val colors = Theme.colors
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Dial(home.completion, "${(home.completion * 100).toInt()}%", "today", 128.dp)
+            Column(Modifier.weight(1f).padding(start = 20.dp)) {
+                Txt("Daily goal", Type.small, colors.muted, modifier = Modifier.semantics { heading() })
+                Txt(home.headline, Type.section)
+                Txt(home.detail, Type.small, colors.muted, Modifier.padding(top = 2.dp))
+            }
+        }
+    }
 }
 
 /** One habit: a small ring, its name, a pill of the period's progress, and today's toggle. */

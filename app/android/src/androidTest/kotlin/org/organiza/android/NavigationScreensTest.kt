@@ -32,9 +32,15 @@ import org.organiza.android.ui.RpgView
 import org.organiza.android.ui.Tab
 import org.organiza.android.ui.UiSnapshot
 import org.organiza.enforcement.SessionPolicy
+import org.organiza.presentation.AgendaBlock
+import org.organiza.presentation.AgendaModel
+import org.organiza.presentation.BarKind
 import org.organiza.presentation.CalendarMonth
 import org.organiza.presentation.FocusModel
 import org.organiza.presentation.Format
+import org.organiza.storage.HabitPlan
+import org.organiza.presentation.HomeHabitInput
+import org.organiza.presentation.HomeModel
 import org.organiza.storage.RpgKind
 
 /** Home's new order, the hub's way to Metrics, and typed times (ADR-0021). */
@@ -48,16 +54,25 @@ class NavigationScreensTest {
     }
 
     @Test
-    fun homeLeadsWithTheSessionAndCalendarThenTheSameQuestsAsHabits() {
+    fun homeLeadsWithTheDailyGoalThenTheSessionTheWeekAndTheHabits() {
         val today = LocalDate.now()
         val focus = FocusModel.build(Instant.now(), ZoneId.systemDefault(), SessionPolicy.IDLE, emptyList(), emptySet(), 0)
         val calendar = CalendarView(selected = today, month = CalendarMonth.build(YearMonth.from(today), today, today, emptyMap()))
+        val agenda = AgendaModel("Today", 6, 24, listOf(AgendaBlock("s", "#deep", "09:00–10:30", 0.2, 0.3, BarKind.LATER)), null)
+        val home = HomeModel.build(today, listOf(HomeHabitInput("a", "Read", HabitPlan.DAILY, emptyMap())), hour = 9)
         val rpg = RpgView(tasks = listOf(RpgTaskView("d", RpgKind.DAILY, "Drink water", done = false)))
         val opened = mutableListOf<Route>()
         val tabs = mutableListOf<Tab>()
-        show { HomeScreen(UiSnapshot(focus = focus, calendar = calendar, rpg = rpg), actions, { opened += it }, { tabs += it }) }
+        show { HomeScreen(UiSnapshot(home = home, focus = focus, calendar = calendar, agendaToday = agenda, rpg = rpg), actions, { opened += it }, { tabs += it }) }
         compose.onNodeWithContentDescription("Organiza").assertExists()
-        compose.onNodeWithText("Start a focus session").assertExists()
+        val tops = listOf("Good morning", "Daily goal", "Focus session", "This week", "Today's habits", "Quests").map {
+            compose.onNodeWithText(it).fetchSemanticsNode().boundsInRoot.top
+        }
+        assertEquals(tops.sorted(), tops)
+        compose.onNodeWithText("1 goal left today").assertExists()
+        compose.onNodeWithText("09:00–10:30").assertExists()
+        // The rank card stays on the Habits tab; the blocker's settings live in Metrics.
+        listOf("Rank", "Distraction blocker", "Daily limit").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
         compose.onNodeWithContentDescription("${Format.dayMonth(today)}, 0 blocks").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Done Drink water").performScrollTo().performClick()
         compose.onNodeWithText("Start a focus session").performScrollTo().performClick()

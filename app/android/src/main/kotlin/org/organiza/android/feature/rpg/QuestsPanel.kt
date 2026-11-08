@@ -49,14 +49,16 @@ private val CORNER = RoundedCornerShape(6.dp)
 
 /**
  * The hero and the Habitica-style lists (ADR-0019): thick ink edges and hard shadows that give way
- * when pressed. Home and the Habits tab show this same panel over the same snapshot (ADR-0021).
+ * when pressed. Home and the Habits tab show the same lists over the same snapshot (ADR-0021); Home
+ * leaves the hero card to the Habits tab and heads the lists "Quests" instead (ADR-0022).
  */
 @Composable
-fun QuestsPanel(rpg: RpgView, actions: Actions) {
+fun QuestsPanel(rpg: RpgView, actions: Actions, hero: Boolean = true) {
     val colors = Theme.colors
     var kind by rememberSaveable { mutableStateOf(RpgKind.DAILY) }
     var title by rememberSaveable { mutableStateOf("") }
-    Slab {
+    if (!hero) Txt("Quests", Type.section, modifier = Modifier.padding(top = 8.dp).semantics { heading() })
+    if (hero) Slab {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).semantics(mergeDescendants = true) { heading() }) {
                 Txt("Rank", Type.small, colors.muted)

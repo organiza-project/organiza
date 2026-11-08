@@ -59,18 +59,47 @@ fun CalendarScreen(ui: UiSnapshot, actions: Actions, back: () -> Unit, open: (Ro
 }
 
 /**
- * Month, week or day at a glance. On Home, [openDay] takes a tapped day to the full calendar,
- * where its blocks are added and moved (ADR-0021).
+ * Home's calendar (ADR-0022): the chosen day's week as one row of days, and today's blocks still to
+ * come. A tapped day opens the full calendar on it.
  */
 @Composable
-fun CalendarPanel(calendar: CalendarView, actions: Actions, openDay: (() -> Unit)? = null) {
-    val day = calendar.selected
-    val pick: (LocalDate, CalendarMode?) -> Unit = { date, then ->
-        actions.selectDay(date, then)
-        openDay?.invoke()
-    }
+fun WeekPanel(calendar: CalendarView, today: AgendaModel?, actions: Actions, openDay: () -> Unit) {
+    val colors = Theme.colors
+    val week = calendar.month?.weeks?.firstOrNull { days -> days.any { it.date == calendar.selected } }
     Panel {
-        PanelHeader("Calendar") { openDay?.let { Action("Plan a block", ButtonKind.TEXT, onClick = it) } }
+        PanelHeader("This week") { Action("Open calendar", ButtonKind.TEXT, onClick = openDay) }
+        week?.let { days ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                days.forEach { day ->
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Txt(day.date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.UK), Type.small, colors.muted)
+                        // A fixed height, or the cells grow with the width on a tablet.
+                        DayCell(day, Modifier.fillMaxWidth().height(56.dp), shaped = false) { actions.selectDay(day.date, null); openDay() }
+                    }
+                }
+            }
+        }
+        val coming = today?.blocks.orEmpty().filter { it.kind != BarKind.PAST }
+        Spacer(Modifier.height(12.dp))
+        if (coming.isEmpty()) Txt("Nothing else planned today", Type.small, colors.muted)
+        coming.take(3).forEach { block ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).background(if (block.kind == BarKind.NOW) colors.data else colors.text, CircleShape))
+                Txt(block.time, Type.body, modifier = Modifier.padding(horizontal = 10.dp))
+                Txt(block.label, Type.body, colors.muted, Modifier.weight(1f), maxLines = 1)
+            }
+        }
+        if (coming.size > 3) Txt("${coming.size - 3} more in the calendar", Type.small, colors.muted)
+    }
+}
+
+/** Month, week or day at a glance, above the chosen day's blocks on the full calendar. */
+@Composable
+fun CalendarPanel(calendar: CalendarView, actions: Actions) {
+    val day = calendar.selected
+    val pick: (LocalDate, CalendarMode?) -> Unit = { date, then -> actions.selectDay(date, then) }
+    Panel {
+        PanelHeader("Calendar")
         Segmented(CalendarMode.entries, calendar.mode, { it.name.lowercase().replaceFirstChar(Char::uppercase) }, actions::showCalendar)
         Spacer(Modifier.height(12.dp))
         when (calendar.mode) {
@@ -135,7 +164,7 @@ private fun MonthGrid(month: CalendarMonth, onPick: (LocalDate) -> Unit) {
 
 /** A day: ink when chosen, a blue ring on today, one dot per block up to three. */
 @Composable
-private fun DayCell(day: CalendarDay, modifier: Modifier, onClick: () -> Unit) {
+private fun DayCell(day: CalendarDay, modifier: Modifier, shaped: Boolean = true, onClick: () -> Unit) {
     val colors = Theme.colors
     val shape = RoundedCornerShape(8.dp)
     val ink = when {
@@ -146,7 +175,7 @@ private fun DayCell(day: CalendarDay, modifier: Modifier, onClick: () -> Unit) {
     Column(
         modifier
             .heightIn(min = Space.target)
-            .aspectRatio(0.9f)
+            .then(if (shaped) Modifier.aspectRatio(0.9f) else Modifier)
             .background(if (day.selected) colors.primary else colors.surface, shape)
             .then(if (day.isToday && !day.selected) Modifier.border(2.dp, colors.data, shape) else Modifier)
             .clickable(role = Role.Button, onClick = onClick)

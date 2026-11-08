@@ -67,6 +67,7 @@ class WireframeScreensTest {
         val home = HomeModel.build(
             today,
             listOf(HomeHabitInput("a", "Read", HabitPlan.DAILY, mapOf(today to true)), HomeHabitInput("b", "Run", HabitPlan(HabitFrequency.WEEKLY, 3, null), emptyMap())),
+            hour = 9,
         )
         show { HomeScreen(UiSnapshot(home = home), actions, {}, {}) }
         compose.onNodeWithText("50%").assertExists()

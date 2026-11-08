@@ -45,17 +45,30 @@ class WireframeModelsTest {
                 HomeHabitInput("b", "Stretch", HabitPlan.DAILY, emptyMap()),
                 HomeHabitInput("c", "Run", HabitPlan(HabitFrequency.WEEKLY, 2, null), met("2026-11-02", "2026-11-03")),
             ),
+            hour = 9,
         )
         assertEquals(2.0 / 3, home.completion, 1e-9)
         assertEquals("2 of 3 goals met", home.headline)
+        assertEquals("1 goal left today", home.detail)
+        assertEquals("Good morning", home.greeting)
+        assertEquals("Wednesday 4 November", home.date)
         assertEquals(listOf("Read", "Stretch", "Run"), home.habits.map { it.name })
     }
 
     @Test
     fun `an empty home says what to do`() {
-        val home = HomeModel.build(today, emptyList())
+        val home = HomeModel.build(today, emptyList(), hour = 14)
         assertEquals(0.0, home.completion)
         assertEquals("No habits yet", home.headline)
+        assertEquals("Habits you add fill the dial", home.detail)
+        assertEquals("Good afternoon", home.greeting)
+    }
+
+    @Test
+    fun `the greeting follows the hour and a full dial says so`() {
+        assertEquals(listOf("Good evening", "Good morning", "Good afternoon", "Good evening"), listOf(4, 5, 12, 18).map { HomeModel.build(today, emptyList(), it).greeting })
+        val done = HomeModel.build(today, listOf(HomeHabitInput("a", "Read", HabitPlan.DAILY, met("2026-11-04"))), hour = 20)
+        assertEquals("Every goal met today", done.detail)
     }
 
     @Test

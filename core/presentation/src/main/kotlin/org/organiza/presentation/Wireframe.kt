@@ -5,6 +5,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.sqrt
@@ -45,14 +46,34 @@ public data class HomeHabitInput(val id: String, val name: String, val plan: Hab
 public data class HomeHabit(val id: String, val name: String, val progress: PeriodProgress)
 
 /** The Home dial and its cards: how many of today's goals are met. */
-public data class HomeModel(val completion: Double, val headline: String, val habits: List<HomeHabit>) {
+/** Home's header and daily goal (ADR-0022): a greeting for the hour, today's date, and the dial in words. */
+public data class HomeModel(
+    val completion: Double,
+    val headline: String,
+    val habits: List<HomeHabit>,
+    val greeting: String = "",
+    val date: String = "",
+    val detail: String = "",
+) {
     public companion object {
-        public fun build(today: LocalDate, habits: List<HomeHabitInput>): HomeModel {
+        private val DATE = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.UK)
+
+        public fun build(today: LocalDate, habits: List<HomeHabitInput>, hour: Int): HomeModel {
             val rows = habits.map { HomeHabit(it.id, it.name, HabitPeriods.progress(it.plan, it.results, today)) }
             // A daily habit counts once it is done today; a weekly or monthly one once its target is met.
             val met = rows.count { it.progress.met }
             val headline = if (rows.isEmpty()) "No habits yet" else "$met of ${rows.size} goals met"
-            return HomeModel(if (rows.isEmpty()) 0.0 else met.toDouble() / rows.size, headline, rows)
+            val detail = when {
+                rows.isEmpty() -> "Habits you add fill the dial"
+                met == rows.size -> "Every goal met today"
+                else -> Format.count(rows.size - met, "goal", "goals") + " left today"
+            }
+            val greeting = when (hour) {
+                in 5..11 -> "Good morning"
+                in 12..17 -> "Good afternoon"
+                else -> "Good evening"
+            }
+            return HomeModel(if (rows.isEmpty()) 0.0 else met.toDouble() / rows.size, headline, rows, greeting, today.format(DATE), detail)
         }
     }
 }
