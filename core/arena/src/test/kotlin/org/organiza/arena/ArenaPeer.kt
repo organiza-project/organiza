@@ -2,7 +2,7 @@ package org.organiza.arena
 
 import java.time.Duration
 import java.time.Instant
-import java.time.ZoneOffset
+import java.time.ZoneId
 import org.organiza.ai.UrlConnectionTransport
 import org.organiza.domain.port.Capability
 import org.organiza.domain.port.Clock
@@ -29,19 +29,21 @@ fun main(args: Array<String>) {
         return
     }
     var now = Instant.now()
+    // The app counts days in the device zone, which the emulator takes from this host.
+    val zone = ZoneId.systemDefault()
     val db = JdbcDatabase().also { Migrations.migrate(it) }
     val habits = HabitStore(db).apply { add("h", "Peer private habit", now) }
     val engine = ArenaEngine(
         db,
         Clock { now },
-        ZoneOffset.UTC,
+        zone,
         FakeSecretStore(),
         UsageHistory { _, _, _ -> Duration.ZERO },
         EnforcementCapabilities { setOf(Capability.USAGE_STATS) },
         allowInsecureRelay = true,
     ) { relay }
     println("peer: " + engine.join(inviteText, "h", "Peer"))
-    habits.mark("h", now.atZone(ZoneOffset.UTC).toLocalDate(), true)
+    habits.mark("h", now.atZone(zone).toLocalDate(), true)
     now = now.plus(Duration.ofDays(1))
     engine.closeDays()
     println("peer: " + engine.sync(invite.challengeId))
