@@ -26,7 +26,7 @@ class OnboardingTest {
     @Test
     fun `every permission says why, and app blocking is the one that is required`() {
         val rows = Onboarding.permissions(emptySet())
-        assertEquals(Permission.entries, rows.map { it.permission })
+        assertEquals(Device.PHONE.permissions, rows.map { it.permission })
         assertEquals(listOf(Permission.ACCESSIBILITY), rows.filter { it.required }.map { it.permission })
         Permission.entries.forEach {
             assertTrue(it.why.isNotBlank())
@@ -48,6 +48,18 @@ class OnboardingTest {
         assertEquals("Continue", Onboarding.continueLabel(OnboardingStep.PERMISSIONS, setOf(Permission.ACCESSIBILITY)))
         assertEquals("Skip for now", Onboarding.continueLabel(OnboardingStep.AI, emptySet()))
         assertEquals("Start", Onboarding.continueLabel(OnboardingStep.WELCOME, emptySet()))
+    }
+
+    @Test
+    fun `the desktop asks for tracking, starting at login, the tray and a shortcut, and tracking is required`() {
+        val rows = Onboarding.permissions(emptySet(), Device.DESKTOP)
+        assertEquals(listOf(Permission.TRACKING, Permission.AUTOSTART, Permission.TRAY, Permission.SHORTCUT), rows.map { it.permission })
+        assertEquals(listOf(Permission.TRACKING), rows.filter { it.required }.map { it.permission })
+        assertTrue(rows.all { it.grantable && !it.granted })
+        assertEquals("Continue without blocking", Onboarding.continueLabel(OnboardingStep.PERMISSIONS, emptySet(), Device.DESKTOP))
+        assertEquals("Continue", Onboarding.continueLabel(OnboardingStep.PERMISSIONS, setOf(Permission.TRACKING), Device.DESKTOP))
+        // A phone permission never turns up on the desktop, and the other way round.
+        assertTrue(Device.PHONE.permissions.none { it in Device.DESKTOP.permissions })
     }
 
     @Test

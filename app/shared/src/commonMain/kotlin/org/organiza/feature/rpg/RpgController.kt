@@ -1,9 +1,9 @@
-package org.organiza.android.feature.rpg
+package org.organiza.feature.rpg
 
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
-import org.organiza.android.OrganizaApp
+import org.organiza.app.OrganizaCore
 import org.organiza.ui.RpgTaskView
 import org.organiza.ui.RpgView
 import org.organiza.presentation.Badge
@@ -17,7 +17,7 @@ import org.organiza.storage.RpgReason
 import org.organiza.storage.Setting
 
 /** Habits, dailies and to-dos with health and XP (ADR-0019). The rules live in core's [Rpg]. */
-class RpgController(private val app: OrganizaApp) {
+class RpgController(private val app: OrganizaCore) {
     fun add(kind: RpgKind, title: String) = edit { stores, _ ->
         val clean = title.trim().take(MAX_TITLE)
         if (clean.isNotEmpty()) stores.rpg.addTask(UUID.randomUUID().toString(), kind, clean, app.clock.now())
@@ -46,7 +46,7 @@ class RpgController(private val app: OrganizaApp) {
      * Charges the days since the last settlement for undone dailies and broken focus blocks, then
      * faints the hero at zero health. Storage thread, on every refresh; a day is charged once.
      */
-    fun settle(stores: OrganizaApp.Storage, today: LocalDate, zone: ZoneId, baseXp: Int) {
+    fun settle(stores: OrganizaCore.Storage, today: LocalDate, zone: ZoneId, baseXp: Int) {
         val settled = stores.settings.text(Setting.RPG_SETTLED)?.let(LocalDate::parse)
         if (settled != null && settled < today.minusDays(1)) {
             val from = maxOf(settled.plusDays(1), today.minusDays(MAX_CATCH_UP))
@@ -72,9 +72,9 @@ class RpgController(private val app: OrganizaApp) {
         }
     }
 
-    fun hero(stores: OrganizaApp.Storage, baseXp: Int, badges: List<Badge>): HeroModel = Rpg.hero(baseXp, entries(stores), badges)
+    fun hero(stores: OrganizaCore.Storage, baseXp: Int, badges: List<Badge>): HeroModel = Rpg.hero(baseXp, entries(stores), badges)
 
-    fun view(stores: OrganizaApp.Storage, today: LocalDate, hero: HeroModel): RpgView {
+    fun view(stores: OrganizaCore.Storage, today: LocalDate, hero: HeroModel): RpgView {
         val checks = stores.rpg.dailyChecks()
         val tasks = stores.rpg.tasks().filter { it.doneAt == null }.map { task ->
             RpgTaskView(task.id, task.kind, task.title, task.kind == RpgKind.DAILY && today in checks[task.id].orEmpty())
@@ -86,12 +86,12 @@ class RpgController(private val app: OrganizaApp) {
         )
     }
 
-    private fun entries(stores: OrganizaApp.Storage) = stores.rpg.entries().map { (xp, hp) -> RpgEntry(xp, hp) }
+    private fun entries(stores: OrganizaCore.Storage) = stores.rpg.entries().map { (xp, hp) -> RpgEntry(xp, hp) }
 
-    private fun log(stores: OrganizaApp.Storage, reason: RpgReason, id: String?, day: LocalDate, entry: RpgEntry) =
+    private fun log(stores: OrganizaCore.Storage, reason: RpgReason, id: String?, day: LocalDate, entry: RpgEntry) =
         stores.rpg.log(reason, id, day, entry.xp, entry.hp, app.clock.now())
 
-    private fun edit(work: (OrganizaApp.Storage, LocalDate) -> Unit) = app.onStores { stores ->
+    private fun edit(work: (OrganizaCore.Storage, LocalDate) -> Unit) = app.onStores { stores ->
         work(stores, app.clock.now().atZone(ZoneId.systemDefault()).toLocalDate())
         app.requestUiRefresh()
     }

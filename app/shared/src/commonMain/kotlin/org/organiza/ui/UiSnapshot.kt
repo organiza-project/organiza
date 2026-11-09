@@ -13,6 +13,7 @@ import org.organiza.presentation.ProgressionModel
 import org.organiza.presentation.ChoicesModel
 import org.organiza.presentation.FocusModel
 import org.organiza.presentation.HabitMatrix
+import org.organiza.presentation.Device
 import org.organiza.presentation.Permission
 import org.organiza.presentation.CalendarMonth
 import org.organiza.presentation.Rpg
@@ -121,6 +122,7 @@ data class CopilotView(val advice: CopilotAdvice? = null, val ranOn: String? = n
 data class UiSnapshot(
     val onboarding: Boolean = false,
     val permissions: Set<Permission> = emptySet(),
+    val device: Device = Device.PHONE,
     val focus: FocusModel? = null,
     val home: HomeModel? = null,
     val agendaToday: AgendaModel? = null,

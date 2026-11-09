@@ -1,12 +1,8 @@
-package org.organiza.android.feature.blocker
+package org.organiza.feature.blocker
 
-import android.content.Intent
-import android.content.pm.ApplicationInfo
 import java.time.Duration
 import java.time.ZoneId
-import org.organiza.android.OrganizaApp
-import org.organiza.android.data.AndroidUsageHistory
-import org.organiza.feature.blocker.hubView
+import org.organiza.app.OrganizaCore
 import org.organiza.ui.HubView
 import org.organiza.domain.DomainName
 import org.organiza.domain.PackageName
@@ -20,7 +16,7 @@ import org.organiza.storage.StoredRule
  * The distraction blocker hub (ADR-0018): the focus list that sessions block, daily limits per app,
  * and the always-on short video switches. It keeps the limits and feeds the services read.
  */
-class HubController(private val app: OrganizaApp) {
+class HubController(private val app: OrganizaCore) {
     /** Read by the accessibility service on every foreground change. */
     @Volatile var limits: Map<PackageName, Duration> = emptyMap()
         private set
@@ -28,14 +24,14 @@ class HubController(private val app: OrganizaApp) {
     @Volatile var feeds: Set<ShortFormFeed> = emptySet()
         private set
 
-    private val usage by lazy { AndroidUsageHistory(app) }
+    private val usage get() = app.platform.usage
 
-    fun focusRule(stores: OrganizaApp.Storage): StoredRule =
+    fun focusRule(stores: OrganizaCore.Storage): StoredRule =
         stores.rules.all().firstOrNull { it.calendarTag == FOCUS_TAG }
             ?: StoredRule(FOCUS_RULE, "Focus list", FOCUS_TAG, strict = false, blockShortForm = false, enabled = true, emptySet(), emptySet())
                 .also { stores.scheduler.saveRule(it) }
 
-    fun load(stores: OrganizaApp.Storage) {
+    fun load(stores: OrganizaCore.Storage) {
         limits = stores.limits.all()
         feeds = buildSet {
             if (stores.settings.flag(Setting.BLOCK_REELS)) add(ShortFormFeed.INSTAGRAM_REELS)
@@ -81,44 +77,27 @@ class HubController(private val app: OrganizaApp) {
     }
 
     /** Today's use of every launchable app, its category and limit, and the day's screen time. Storage thread. */
-    fun view(stores: OrganizaApp.Storage, zone: ZoneId): HubView {
+    fun view(stores: OrganizaCore.Storage, zone: ZoneId): HubView {
         val allowed = usage.permitted()
         val now = app.clock.now()
         val start = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
         // One pass over today's events covers every app, rather than one query per row.
         val today = if (allowed) usage.perApp(start, now).mapKeys { it.key.value } else emptyMap()
-        return hubView(launchable(), today, stores.rules.all(), limits, feeds, allowed)
+        return hubView(app.platform.launchable(), today, stores.rules.all(), limits, feeds, allowed)
     }
 
     /** The category each launchable app declares, by package. Usage is only ever sent to the AI this way. */
-    fun categories(): Map<String, String> = launchable().associate { (pkg, _, category) -> pkg to category }
+    fun categories(): Map<String, String> = app.platform.launchable().associate { it.pkg to it.category }
 
-    private fun edit(work: (OrganizaApp.Storage) -> Unit) = app.onStores { stores ->
+    private fun edit(work: (OrganizaCore.Storage) -> Unit) = app.onStores { stores ->
         work(stores)
         load(stores)
         app.requestUiRefresh()
     }
 
-    private var launchableCache: List<Triple<String, String, String>>? = null
-
-    /** Package, label and the store category each app declares, or Other. */
-    private fun launchable(): List<Triple<String, String, String>> = launchableCache ?: run {
-        val pm = app.packageManager
-        val main = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        pm.queryIntentActivities(main, 0)
-            .filter { it.activityInfo.packageName != app.packageName }
-            .distinctBy { it.activityInfo.packageName }
-            .map { info ->
-                val category = ApplicationInfo.getCategoryTitle(app, info.activityInfo.applicationInfo.category)?.toString() ?: "Other"
-                Triple(info.activityInfo.packageName, info.loadLabel(pm).toString(), category)
-            }
-            .also { launchableCache = it }
-    }
-
     private fun parsePackage(raw: String): PackageName? = (PackageName.parse(raw) as? Parsed.Valid)?.value
 
-    companion object {
-        const val FOCUS_TAG = org.organiza.feature.blocker.FOCUS_TAG
-        private const val FOCUS_RULE = "focus-list"
+    private companion object {
+        const val FOCUS_RULE = "focus-list"
     }
 }

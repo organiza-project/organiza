@@ -146,7 +146,7 @@ private fun BlockedNow(ui: UiSnapshot) {
     }
     if (ui.monitoring && ui.blockedApps.isEmpty() && ui.blockedSites.isEmpty()) {
         Txt("Monitor only", Type.bodyStrong)
-        Txt("Nothing is blocked. The apps you use are counted on this phone and shown when the session ends.", Type.body, colors.muted)
+        Txt("Nothing is blocked. The apps you use are counted on this device and shown when the session ends.", Type.body, colors.muted)
         return
     }
     Txt("Blocked now", Type.bodyStrong)

@@ -50,7 +50,7 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
             }
             Spacer(Modifier.height(8.dp))
             ProgressPill(progression.fraction, ink = colors.data)
-            Txt("Earned on this phone from habits, focus time and staying focused. Never shared.", Type.small, colors.muted, Modifier.padding(top = 8.dp))
+            Txt("Earned on this device from habits, focus time and staying focused. Never shared.", Type.small, colors.muted, Modifier.padding(top = 8.dp))
         }
         Panel {
             PanelHeader("Badges") { Txt("${progression.badges.count { it.earned }} of ${progression.badges.size}", Type.small, colors.muted) }
@@ -86,7 +86,7 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
         }
         Action(if (showBackend) "Hide backend settings" else "Backend settings", ButtonKind.TEXT) { showBackend = !showBackend }
         Rule()
-        SwitchRow("API configuration", if (ui.hasApiKey) "Groq key saved in Android Keystore" else "No Groq key", ui.hasApiKey) { on ->
+        SwitchRow("API configuration", if (ui.hasApiKey) "Groq key saved in the system keystore" else "No Groq key", ui.hasApiKey) { on ->
             if (!on && ui.hasApiKey) actions.removeKey() else showKey = true
         }
         Action(if (showKey) "Hide key settings" else "Key settings", ButtonKind.TEXT) { showKey = !showKey }
@@ -101,10 +101,10 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
 private fun VaultPanels(ui: UiSnapshot, actions: Actions) {
     val colors = Theme.colors
     Panel {
-        PanelHeader("On this phone")
+        PanelHeader("On this device")
         ui.stored.forEach { (label, value) -> KeyValue(label, value) }
         Rule()
-        Txt("Encrypted with a key held by Android Keystore. App names, websites and calendar titles never leave the phone.", Type.small, colors.muted)
+        Txt("Encrypted with a key held by the system keystore. App names, websites and calendar titles never leave this device.", Type.small, colors.muted)
     }
     Panel {
         PanelHeader("Voice")

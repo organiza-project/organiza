@@ -71,13 +71,13 @@ object Reminders {
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Reminders.notify(context, Reminders.readName(intent), Reminders.readId(intent))
-        OrganizaApp.from(context).rescheduleReminders()
+        OrganizaApp.from(context).core.rescheduleReminders()
     }
 }
 
 /** Alarms do not survive a reboot, so they are set again. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) OrganizaApp.from(context).rescheduleReminders()
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) OrganizaApp.from(context).core.rescheduleReminders()
     }
 }

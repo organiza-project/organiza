@@ -9,11 +9,13 @@ import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.util.concurrent.TimeUnit
+import org.organiza.ai.ApiKey
+import org.organiza.ai.ApiKeyStore
+import org.organiza.app.StorageUnavailable
 import org.organiza.arena.SecretStore
+import org.organiza.domain.Parsed
 import org.organiza.storage.Database
 import org.organiza.storage.Row
-
-class StorageUnavailable(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /** The desktop database (ADR-0024): SQLCipher, keyed from the login keyring. */
 object DesktopStorage {
@@ -32,6 +34,19 @@ object DesktopStorage {
         }
         Files.createDirectories(file.parent)
         return EncryptedDatabase.open(file, key)
+    }
+}
+
+/** The user's Groq key, in the login keyring like the database key (ADR-0009). */
+class KeyringApiKeyStore(private val keyring: SecretStore) : ApiKeyStore {
+    override fun save(key: ApiKey) = keyring.put(NAME, key.value.toByteArray())
+
+    override fun load(): ApiKey? = keyring.get(NAME)?.let { (ApiKey.parse(it.decodeToString()) as? Parsed.Valid)?.value }
+
+    override fun clear() = keyring.remove(NAME)
+
+    private companion object {
+        const val NAME = "groq-key"
     }
 }
 

@@ -35,7 +35,7 @@ fun CopilotPanel(ui: UiSnapshot, actions: Actions) {
         PanelHeader("Copilot") { copilot.ranOn?.let { Txt(it, Type.small, colors.muted) } }
         if (!ui.hasApiKey) {
             Txt(
-                "Add your Groq key in Profile for weekly focus blocks and habit tips. Your hardest hours are worked out on this phone without one.",
+                "Add your Groq key in Profile for weekly focus blocks and habit tips. Your hardest hours are worked out on this device without one.",
                 Type.small,
                 colors.muted,
             )
@@ -75,7 +75,7 @@ fun AiKeyPanel(ui: UiSnapshot, actions: Actions, title: String = "AI coach") {
     Panel {
         PanelHeader(title) { Pill(if (ui.hasApiKey) "Key saved" else "No key", colors.raised, colors.text) }
         Txt(
-            "Optional, with your own Groq key, kept in Android Keystore. What is sent: counts of blocked attempts by hour, " +
+            "Optional, with your own Groq key, kept in the system keystore. What is sent: counts of blocked attempts by hour, " +
                 "screen time by app category, habit names and results, calendar times, what you type to the copilot, and in " +
                 "strict sessions the reason you type, with names, links and numbers removed where detected. App and website " +
                 "names are never sent.",

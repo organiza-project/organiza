@@ -36,6 +36,40 @@ public enum class Permission(public val title: String, public val why: String, p
         "Means Organiza cannot be removed in one step. You can always turn it off in Settings.",
         "Optional. Blocking works without it.",
     ),
+    TRACKING(
+        "Usage tracking",
+        "Lets Organiza see which app is in front, so it can count screen time and pause you before a blocked app. " +
+            "It reads the app's name only, never window titles, and nothing leaves this computer.",
+        "On GNOME this adds a small shell extension, which starts after you log out and back in once.",
+    ),
+    AUTOSTART(
+        "Start at login",
+        "Runs Organiza in the background from login, so scheduled sessions start on time. If it is closed by force, it starts again.",
+        "Without it, sessions only start while Organiza is open.",
+    ),
+    TRAY(
+        "Keep running when closed",
+        "Closing the window leaves Organiza in the top bar, so tracking and blocking carry on.",
+        "On GNOME the top bar icon needs the AppIndicator extension, which Ubuntu includes.",
+    ),
+    SHORTCUT(
+        "Copilot shortcut",
+        "Super+Shift+Space opens the copilot from anywhere, so you can plan without leaving what you are doing.",
+        "Outside GNOME, bind organiza --copilot to a key in your keyboard settings.",
+    ),
+}
+
+/** The permissions and protections a kind of device offers, in the order they are shown (ADR-0025). */
+public enum class Device(public val permissions: List<Permission>, public val protections: List<Protection>) {
+    PHONE(
+        listOf(Permission.ACCESSIBILITY, Permission.OVERLAY, Permission.BATTERY, Permission.VPN, Permission.USAGE, Permission.DEVICE_ADMIN),
+        listOf(Protection.ACCESSIBILITY, Protection.VPN_CONSENT, Protection.BATTERY, Protection.DEVICE_ADMIN, Protection.USAGE),
+    ),
+    DESKTOP(listOf(Permission.TRACKING, Permission.AUTOSTART, Permission.TRAY, Permission.SHORTCUT), listOf(Protection.TRACKING, Protection.AUTOSTART)),
+    ;
+
+    /** Blocking needs this one; the rest are optional. */
+    public val required: Permission get() = permissions.first()
 }
 
 /** [grantable] is false for a row that comes with another permission and has no button. */
@@ -53,14 +87,14 @@ public object Onboarding {
 
     public fun progress(step: OnboardingStep): String = "Step ${VISIBLE.indexOf(step) + 1} of ${VISIBLE.size}"
 
-    public fun permissions(granted: Set<Permission>): List<PermissionRow> = Permission.entries.map { permission ->
+    public fun permissions(granted: Set<Permission>, device: Device = Device.PHONE): List<PermissionRow> = device.permissions.map { permission ->
         val on = if (permission == Permission.OVERLAY) Permission.ACCESSIBILITY in granted else permission in granted
-        PermissionRow(permission, on, required = permission == Permission.ACCESSIBILITY, grantable = permission != Permission.OVERLAY)
+        PermissionRow(permission, on, required = permission == device.required, grantable = permission != Permission.OVERLAY)
     }
 
-    public fun continueLabel(step: OnboardingStep, granted: Set<Permission>): String = when (step) {
+    public fun continueLabel(step: OnboardingStep, granted: Set<Permission>, device: Device = Device.PHONE): String = when (step) {
         OnboardingStep.WELCOME -> "Start"
-        OnboardingStep.PERMISSIONS -> if (Permission.ACCESSIBILITY in granted) "Continue" else "Continue without blocking"
+        OnboardingStep.PERMISSIONS -> if (device.required in granted) "Continue" else "Continue without blocking"
         OnboardingStep.BACKEND -> "Continue"
         OnboardingStep.AI -> "Skip for now"
         OnboardingStep.DONE -> "Done"

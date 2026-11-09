@@ -160,4 +160,13 @@ class FocusModelTest {
         val model = FocusModel.build(now, zone, SessionPolicy.IDLE, emptyList(), all, 0, batteryExempt = false)
         assertEquals(listOf(Protection.BATTERY), model.protection.filterNot { it.on }.map { it.kind })
     }
+
+    @Test
+    fun `the desktop lists its own protections, from tracking and the background service`() {
+        val off = FocusModel.build(now, zone, SessionPolicy.IDLE, emptyList(), emptySet(), 0, device = Device.DESKTOP)
+        assertEquals(listOf(Protection.TRACKING, Protection.AUTOSTART), off.protection.map { it.kind })
+        assertEquals("2 protections are off", off.protectionSummary)
+        val on = FocusModel.build(now, zone, SessionPolicy.IDLE, emptyList(), setOf(Capability.USAGE_STATS, Capability.DAEMON), 0, device = Device.DESKTOP)
+        assertEquals("All protections are on", on.protectionSummary)
+    }
 }

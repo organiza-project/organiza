@@ -2,23 +2,42 @@ package org.organiza.desktop
 
 import java.io.IOException
 import java.lang.ProcessBuilder.Redirect
+import java.net.UnixDomainSocketAddress
+import java.nio.channels.Channels
+import java.nio.channels.SocketChannel
 import java.nio.file.Files
-import java.nio.file.StandardCopyOption
+import java.nio.file.Path
 import kotlin.concurrent.thread
 
-/** Reports the app in front by its desktop file ID, or null when nothing is (ADR-0024). */
+/** The app in front, by desktop file ID, and the process of its window when the desktop says. */
+data class Focus(val app: String, val pid: Long?)
+
+/** Reports the app in front, or null when nothing is (ADR-0024, ADR-0025). */
 fun interface FocusSource {
     /** Starts reporting, or returns null when this desktop cannot say which app is in front. */
-    fun start(onChange: (String?) -> Unit): AutoCloseable?
+    fun start(onChange: (Focus?) -> Unit): AutoCloseable?
 
     /** Sets up what [start] needs, and says what happens next. */
-    fun enable(): String = "Usage tracking does not work on this desktop yet. It works on GNOME and on X11 desktops."
+    fun enable(): String = UNSUPPORTED
 
     companion object {
-        fun forSession(env: Map<String, String> = System.getenv()): FocusSource = when {
+        const val UNSUPPORTED = "Usage tracking does not work on this desktop yet. It works on GNOME, Hyprland, Sway and X11 desktops."
+
+        /** The first source this session supports, checked in order: GNOME, Hyprland, Sway, then X11. */
+        fun forSession(env: Map<String, String> = System.getenv(), apps: List<LinuxApp> = LinuxApps.installed): FocusSource = when {
             "GNOME" in env["XDG_CURRENT_DESKTOP"].orEmpty().split(':') -> GnomeFocus
-            env["XDG_SESSION_TYPE"] == "x11" -> X11Focus(LinuxApps.installed)
+            !env["HYPRLAND_INSTANCE_SIGNATURE"].isNullOrEmpty() -> HyprlandFocus(apps)
+            !env["SWAYSOCK"].isNullOrEmpty() -> SwayFocus(apps)
+            env["XDG_SESSION_TYPE"] == "x11" -> X11Focus(apps)
             else -> FocusSource { null }
+        }
+
+        /** The entry a window belongs to: its exact ID first, then its WM_CLASS-style names. */
+        fun match(apps: List<LinuxApp>, exact: String?, vararg names: String): String? {
+            apps.firstOrNull { it.id == exact }?.let { return it.id }
+            return names.filter(String::isNotEmpty).firstNotNullOfOrNull { name ->
+                apps.firstOrNull { it.wmClass.equals(name, ignoreCase = true) || it.id.equals(name, ignoreCase = true) }
+            }?.id
         }
     }
 }
@@ -27,35 +46,53 @@ fun interface FocusSource {
 object GnomeFocus : FocusSource {
     const val UUID = "organiza-focus@organiza.org"
     private const val PATH = "/org/organiza/Focus"
-    private val ID = Regex("""\((['"])(.*)\1,\)""")
+    private val REPLY = Regex("""\((['"])(.*?)\1(?:, (\d+))?,?\)""")
 
-    override fun start(onChange: (String?) -> Unit): AutoCloseable? {
+    override fun start(onChange: (Focus?) -> Unit): AutoCloseable? {
         // Listening starts before the first question, so no change falls between the two.
         val monitor = follow(listOf("gdbus", "monitor", "--session", "--dest", "org.gnome.Shell", "--object-path", PATH), onChange) { line ->
-            appId(line)?.let { onChange(it.ifEmpty { null }) }
+            if ("org.organiza.Focus.Changed" in line) focus(line)?.let { onChange(it.takeIf { it.app.isNotEmpty() }) }
         } ?: return null
         val current = output("gdbus", "call", "--session", "--dest", "org.gnome.Shell", "--object-path", PATH, "--method", "org.organiza.Focus.Current")
-            ?.let(::appId)
+            ?.let(::focus)
         if (current == null) {
             monitor.close()
             return null
         }
-        onChange(current.ifEmpty { null })
+        onChange(current.takeIf { it.app.isNotEmpty() })
         return monitor
     }
 
     override fun enable(): String {
-        val dir = LinuxApps.dataDirs().first().resolve("gnome-shell/extensions/$UUID")
-        Files.createDirectories(dir)
-        for (name in listOf("metadata.json", "extension.js")) {
-            checkNotNull(javaClass.getResourceAsStream("/gnome-extension/$name")) { "$name is missing" }
-                .use { Files.copy(it, dir.resolve(name), StandardCopyOption.REPLACE_EXISTING) }
-        }
+        install(installDir())
         return if (turnOn()) {
             "The Organiza extension for GNOME is installed. Log out and back in once, and usage tracking starts."
         } else {
             "The extension is installed but could not be turned on. Turn on Organiza Focus in the Extensions app."
         }
+    }
+
+    private val FILES = listOf("metadata.json", "extension.js")
+
+    fun installDir(): Path = LinuxApps.dataDirs().first().resolve("gnome-shell/extensions/$UUID")
+
+    private fun bundled(name: String): ByteArray =
+        checkNotNull(javaClass.getResourceAsStream("/gnome-extension/$name")) { "$name is missing" }.use { it.readAllBytes() }
+
+    fun install(dir: Path) {
+        Files.createDirectories(dir)
+        FILES.forEach { Files.write(dir.resolve(it), bundled(it)) }
+    }
+
+    /**
+     * Replaces an installed extension older than this app's, and says so. GNOME loads the new one at
+     * the next login. Nothing happens when none is installed: that waits for the person to allow it.
+     */
+    fun updateIfOld(dir: Path = installDir()): String? {
+        if (!Files.exists(dir.resolve("extension.js"))) return null
+        if (FILES.all { Files.exists(dir.resolve(it)) && Files.readAllBytes(dir.resolve(it)).contentEquals(bundled(it)) }) return null
+        install(dir)
+        return "The GNOME extension was updated so pauses can stop blocked apps. Log out and back in once to finish."
     }
 
     // GNOME on Wayland finds a new extension only at login, so `enable` can fail until then.
@@ -67,19 +104,78 @@ object GnomeFocus : FocusSource {
         return output("gsettings", "set", "org.gnome.shell", "enabled-extensions", list.joinToString(", ", "[", "]") { "'$it'" }) != null
     }
 
-    /** The desktop ID in a `gdbus` reply or signal line, "" for nothing in front, null for other lines. */
-    fun appId(line: String): String? {
-        val id = ID.find(line)?.groupValues?.get(2) ?: return null
+    /** The desktop ID and process in a `gdbus` reply or signal, with "" for nothing in front. */
+    fun focus(line: String): Focus? {
+        val match = REPLY.find(line) ?: return null
+        val id = match.groupValues[2]
+        val pid = match.groupValues[3].toLongOrNull()?.takeIf { it > 0 }
         // GNOME names a window it cannot match to a desktop entry `window:N`.
-        return if (id.startsWith("window:")) "" else id.removeSuffix(".desktop")
+        return if (id.startsWith("window:")) Focus("", null) else Focus(id.removeSuffix(".desktop"), pid)
+    }
+}
+
+/** Hyprland announces each focus change on its event socket; `hyprctl` names the window's app. */
+class HyprlandFocus(private val apps: List<LinuxApp>) : FocusSource {
+    override fun start(onChange: (Focus?) -> Unit): AutoCloseable? {
+        val runtime = System.getenv("XDG_RUNTIME_DIR") ?: return null
+        val socket = Path.of(runtime, "hypr", System.getenv("HYPRLAND_INSTANCE_SIGNATURE").orEmpty(), ".socket2.sock")
+        val channel = try {
+            SocketChannel.open(UnixDomainSocketAddress.of(socket))
+        } catch (_: IOException) {
+            return null
+        }
+        thread(isDaemon = true, name = "hyprland-events") {
+            runCatching {
+                Channels.newReader(channel, Charsets.UTF_8).buffered().forEachLine { line ->
+                    if (line.startsWith("activewindowv2>>")) onChange(output("hyprctl", "-j", "activewindow")?.let { focus(it, apps) })
+                }
+            }
+            onChange(null)
+        }
+        return channel
+    }
+
+    override fun enable(): String = "Usage tracking on Hyprland needs hyprctl, which comes with Hyprland. Open Organiza from your Hyprland session."
+
+    companion object {
+        private val CLASS = Regex(""""class":\s*"([^"]*)"""")
+        private val PID = Regex(""""pid":\s*(\d+)""")
+
+        fun focus(json: String, apps: List<LinuxApp>): Focus? {
+            val id = FocusSource.match(apps, null, CLASS.find(json)?.groupValues?.get(1).orEmpty()) ?: return null
+            return Focus(id, PID.find(json)?.groupValues?.get(1)?.toLongOrNull()?.takeIf { it > 0 })
+        }
+    }
+}
+
+/** Sway reports window events on its IPC socket; native windows carry an app ID, X11 ones a class. */
+class SwayFocus(private val apps: List<LinuxApp>) : FocusSource {
+    override fun start(onChange: (Focus?) -> Unit): AutoCloseable? =
+        follow(listOf("swaymsg", "-t", "subscribe", "-m", "[\"window\"]"), onChange) { line ->
+            if (CHANGE.find(line)?.groupValues?.get(1) == "focus") onChange(focus(line, apps))
+        }
+
+    override fun enable(): String = "Usage tracking on Sway needs swaymsg, which comes with Sway. Open Organiza from your Sway session."
+
+    companion object {
+        private val CHANGE = Regex(""""change":\s*"([^"]*)"""")
+        private val APP_ID = Regex(""""app_id":\s*"([^"]*)"""")
+        private val CLASS = Regex(""""class":\s*"([^"]*)"""")
+        private val PID = Regex(""""pid":\s*(\d+)""")
+
+        fun focus(json: String, apps: List<LinuxApp>): Focus? {
+            val appId = APP_ID.find(json)?.groupValues?.get(1).orEmpty()
+            val id = FocusSource.match(apps, appId, appId, CLASS.find(json)?.groupValues?.get(1).orEmpty()) ?: return null
+            return Focus(id, PID.find(json)?.groupValues?.get(1)?.toLongOrNull()?.takeIf { it > 0 })
+        }
     }
 }
 
 /** X11 publishes the active window on the root window, and `xprop -spy` reports each change. */
 class X11Focus(private val apps: List<LinuxApp>) : FocusSource {
-    override fun start(onChange: (String?) -> Unit): AutoCloseable? =
+    override fun start(onChange: (Focus?) -> Unit): AutoCloseable? =
         follow(listOf("xprop", "-root", "-spy", "_NET_ACTIVE_WINDOW"), onChange) { line ->
-            onChange(window(line)?.let { output("xprop", "-id", it, "_GTK_APPLICATION_ID", "WM_CLASS") }?.let { appId(it, apps) })
+            onChange(window(line)?.let { output("xprop", "-id", it, "_GTK_APPLICATION_ID", "WM_CLASS", "_NET_WM_PID") }?.let { focus(it, apps) })
         }
 
     override fun enable(): String = "Usage tracking on X11 needs xprop. Install the x11-utils package and open Organiza again."
@@ -88,24 +184,22 @@ class X11Focus(private val apps: List<LinuxApp>) : FocusSource {
         private val WINDOW = Regex("""window id # 0x([0-9a-fA-F]+)""")
         private val GTK = Regex("""_GTK_APPLICATION_ID\(UTF8_STRING\) = "([^"]*)"""")
         private val CLASS = Regex("""WM_CLASS\(STRING\) = "([^"]*)", "([^"]*)"""")
+        private val PID = Regex("""_NET_WM_PID\(CARDINAL\) = (\d+)""")
 
         fun window(line: String): String? =
             WINDOW.find(line)?.groupValues?.get(1)?.takeIf { it.trimStart('0').isNotEmpty() }?.let { "0x$it" }
 
         /** The entry a window belongs to: its GTK application ID, else its WM_CLASS instance or class. */
-        fun appId(props: String, apps: List<LinuxApp>): String? {
-            val gtk = GTK.find(props)?.groupValues?.get(1)
-            apps.firstOrNull { it.id == gtk }?.let { return it.id }
-            val classes = CLASS.find(props)?.groupValues?.drop(1).orEmpty()
-            return classes.firstNotNullOfOrNull { name ->
-                apps.firstOrNull { it.wmClass.equals(name, ignoreCase = true) || it.id.equals(name, ignoreCase = true) }
-            }?.id
+        fun focus(props: String, apps: List<LinuxApp>): Focus? {
+            val classes = CLASS.find(props)?.groupValues?.drop(1).orEmpty().toTypedArray()
+            val id = FocusSource.match(apps, GTK.find(props)?.groupValues?.get(1), *classes) ?: return null
+            return Focus(id, PID.find(props)?.groupValues?.get(1)?.toLongOrNull()?.takeIf { it > 0 })
         }
     }
 }
 
 /** Hands each line [command] prints to [onLine] until closed. When it ends, nothing is known to be in front. */
-private fun follow(command: List<String>, onChange: (String?) -> Unit, onLine: (String) -> Unit): AutoCloseable? {
+private fun follow(command: List<String>, onChange: (Focus?) -> Unit, onLine: (String) -> Unit): AutoCloseable? {
     val process = try {
         ProcessBuilder(command).redirectError(Redirect.DISCARD).start()
     } catch (_: IOException) {
@@ -120,7 +214,7 @@ private fun follow(command: List<String>, onChange: (String?) -> Unit, onLine: (
 }
 
 /** Standard output of a command that succeeded, or null. */
-private fun output(vararg command: String): String? = try {
+internal fun output(vararg command: String): String? = try {
     val process = ProcessBuilder(*command).redirectError(Redirect.DISCARD).start()
     val out = process.inputStream.bufferedReader().readText()
     out.takeIf { process.waitFor() == 0 }

@@ -23,8 +23,10 @@ compose.desktop {
         mainClass = "org.organiza.desktop.MainKt"
         nativeDistributions {
             targetFormats(TargetFormat.Deb)
+            // The encrypted SQLite driver needs java.sql; TLS to Groq and Supabase needs the EC ciphers.
+            modules("java.sql", "jdk.unsupported", "jdk.crypto.ec")
             packageName = "organiza"
-            packageVersion = "0.2.0"
+            packageVersion = "0.3.0"
         }
     }
 }

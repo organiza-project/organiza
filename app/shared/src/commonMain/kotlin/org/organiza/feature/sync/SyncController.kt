@@ -1,12 +1,8 @@
-package org.organiza.android.feature.sync
+package org.organiza.feature.sync
 
-import android.content.Context
-import android.util.Log
 import java.util.concurrent.Executors
 import org.organiza.ai.UrlConnectionTransport
-import org.organiza.android.BuildConfig
-import org.organiza.android.OrganizaApp
-import org.organiza.android.data.KeystoreSecretStore
+import org.organiza.app.OrganizaCore
 import org.organiza.ui.AccountView
 import org.organiza.sync.AuthResult
 import org.organiza.sync.AuthState
@@ -20,9 +16,9 @@ import org.organiza.sync.BackendProblem
  * Holds the backend choice and its auth and sync pair (ADR-0015). Screens and Arena only see
  * [backend], so switching between local only, hosted and self-hosted changes nothing else.
  */
-class SyncController(private val app: OrganizaApp) {
-    private val prefs = app.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-    private val vault = KeystoreSecretStore(app)
+class SyncController(private val app: OrganizaCore) {
+    private val prefs = app.platform.prefs(PREFERENCES)
+    private val vault = app.platform.secrets
     private val transport = UrlConnectionTransport()
 
     // Sign-in can take seconds, so it runs here and never on the storage or main thread.
@@ -32,7 +28,7 @@ class SyncController(private val app: OrganizaApp) {
 
     /** The hosted project set at build time, or null when this build has none. */
     val hosted: BackendConfig.Supabase? = (
-        BackendConfig.supabase(BackendKind.HOSTED, BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_ANON_KEY, BuildConfig.DEBUG)
+        BackendConfig.supabase(BackendKind.HOSTED, app.platform.hostedUrl, app.platform.hostedKey, app.platform.debug)
             as? BackendCheck.Valid
         )?.config
 
@@ -54,7 +50,7 @@ class SyncController(private val app: OrganizaApp) {
         val config: BackendConfig = when (kind) {
             null -> BackendConfig.LocalOnly
             BackendKind.HOSTED -> hosted ?: return app.showMessage("The hosted backend is not available in this build")
-            BackendKind.SELF_HOSTED -> when (val check = BackendConfig.supabase(kind, url, key, BuildConfig.DEBUG)) {
+            BackendKind.SELF_HOSTED -> when (val check = BackendConfig.supabase(kind, url, key, app.platform.debug)) {
                 is BackendCheck.Valid -> check.config
                 is BackendCheck.Invalid -> return app.showMessage(problem(check.problem))
             }
@@ -63,7 +59,7 @@ class SyncController(private val app: OrganizaApp) {
             backend.auth.signOut()
             save(config)
             backend = Backend.create(config, transport, vault, app.clock)
-            app.showMessage(if (config == BackendConfig.LocalOnly) "Using this phone only" else "Backend saved. Sign in to sync")
+            app.showMessage(if (config == BackendConfig.LocalOnly) "Using this device only" else "Backend saved. Sign in to sync")
         }
     }
 
@@ -86,7 +82,7 @@ class SyncController(private val app: OrganizaApp) {
             try {
                 work()
             } catch (failure: RuntimeException) {
-                Log.e(TAG, "sync work failed: ${failure.javaClass.simpleName}")
+                app.platform.log("sync work failed: ${failure.javaClass.simpleName}")
                 app.showMessage("Sync error")
             } finally {
                 busy = false
@@ -96,25 +92,24 @@ class SyncController(private val app: OrganizaApp) {
     }
 
     private fun stored(): BackendConfig {
-        val kind = prefs.getString(KIND, null)?.let { runCatching { BackendKind.valueOf(it) }.getOrNull() }
+        val kind = prefs.string(KIND)?.let { runCatching { BackendKind.valueOf(it) }.getOrNull() }
         return when (kind) {
             null -> BackendConfig.LocalOnly
             BackendKind.HOSTED -> hosted ?: BackendConfig.LocalOnly
             BackendKind.SELF_HOSTED -> (
-                BackendConfig.supabase(kind, prefs.getString(URL, "").orEmpty(), prefs.getString(KEY, "").orEmpty(), BuildConfig.DEBUG)
+                BackendConfig.supabase(kind, prefs.string(URL).orEmpty(), prefs.string(KEY).orEmpty(), app.platform.debug)
                     as? BackendCheck.Valid
                 )?.config ?: BackendConfig.LocalOnly
         }
     }
 
     private fun save(config: BackendConfig) {
-        val editor = prefs.edit().clear()
+        prefs.clear()
         if (config is BackendConfig.Supabase) {
-            editor.putString(KIND, config.kind.name)
             // Only a self-hosted project is stored. The hosted one always comes from the build.
-            if (config.kind == BackendKind.SELF_HOSTED) editor.putString(URL, config.url).putString(KEY, config.anonKey)
+            val selfHosted = config.kind == BackendKind.SELF_HOSTED
+            prefs.put(mapOf(KIND to config.kind.name, URL to config.url.takeIf { selfHosted }, KEY to config.anonKey.takeIf { selfHosted }))
         }
-        editor.apply()
     }
 
     private fun problem(problem: BackendProblem) = when (problem) {
@@ -139,7 +134,6 @@ class SyncController(private val app: OrganizaApp) {
     }
 
     private companion object {
-        const val TAG = "Organiza"
         const val PREFERENCES = "organiza_backend"
         const val KIND = "kind"
         const val URL = "url"

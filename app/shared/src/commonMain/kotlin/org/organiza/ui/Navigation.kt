@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -77,6 +81,50 @@ fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit) {
         }
     }
 }
+
+/** The tabs down the side of a wide window, with the copilot below them (ADR-0025). */
+@Composable
+fun SideBar(selected: Tab?, onSelect: (Tab) -> Unit, onCopilot: () -> Unit) {
+    val colors = Theme.colors
+    Column(
+        Modifier.fillMaxHeight().width(SIDEBAR).background(colors.ground).padding(horizontal = 12.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(Modifier.padding(start = 8.dp, bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            LogoMark(28.dp)
+            Txt("Organiza", Type.bodyStrong, modifier = Modifier.padding(start = 10.dp))
+        }
+        Tab.entries.forEach { tab -> SideItem(tab.glyph, tab.label, tab == selected, Role.Tab) { onSelect(tab) } }
+        Spacer(Modifier.weight(1f))
+        SideItem(Glyph.CHAT, "Copilot", false, Role.Button, onCopilot)
+    }
+}
+
+@Composable
+private fun SideItem(glyph: Glyph, label: String, active: Boolean, role: Role, onClick: () -> Unit) {
+    val colors = Theme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 44.dp)
+            .background(if (active) colors.surface else colors.ground, RoundedCornerShape(10.dp))
+            .border(Space.stroke, if (active) colors.border else colors.ground, RoundedCornerShape(10.dp))
+            .clickable(role = role, onClick = onClick)
+            .semantics {
+                contentDescription = label
+                this.selected = active
+            }
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(glyph, if (active) colors.text else colors.muted, 20.dp)
+        Txt(label, Type.body, if (active) colors.text else colors.muted, Modifier.padding(start = 12.dp))
+    }
+}
+
+/** At this width and above the tabs move from the bottom bar to [SideBar]. */
+val WIDE = 840.dp
+private val SIDEBAR = 220.dp
 
 /** The title row of a screen opened on top: back, then its name. */
 @Composable

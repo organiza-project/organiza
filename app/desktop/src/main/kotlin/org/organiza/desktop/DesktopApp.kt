@@ -1,188 +1,245 @@
 package org.organiza.desktop
 
 import androidx.compose.runtime.mutableStateOf
-import java.time.LocalDate
+import java.awt.FileDialog
+import java.awt.Frame
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
+import java.io.File
+import java.io.IOException
+import java.time.Duration
 import java.time.ZoneId
 import java.util.concurrent.Executors
-import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
-import org.organiza.domain.port.Clock
-import org.organiza.enforcement.ShortFormFeed
-import org.organiza.feature.blocker.hubView
+import javax.swing.JOptionPane
+import org.organiza.app.CoreActions
+import org.organiza.app.OrganizaCore
+import org.organiza.app.Recorder
+import org.organiza.domain.PackageName
+import org.organiza.domain.port.BlockSurface
+import org.organiza.domain.port.BlockTarget
+import org.organiza.enforcement.BlockEngine
+import org.organiza.enforcement.Friction
+import org.organiza.enforcement.InterventionFlow
+import org.organiza.enforcement.InterventionOutcome
+import org.organiza.enforcement.SessionPolicy
+import org.organiza.enforcement.UsageLimits
 import org.organiza.presentation.Permission
-import org.organiza.presentation.ProtectionItem
-import org.organiza.storage.Database
 import org.organiza.storage.FocusLog
-import org.organiza.storage.FocusTier
-import org.organiza.storage.HabitFrequency
-import org.organiza.storage.MigrationResult
-import org.organiza.storage.Migrations
-import org.organiza.storage.RpgKind
-import org.organiza.storage.RuleStore
-import org.organiza.storage.Setting
-import org.organiza.storage.SettingsStore
-import org.organiza.storage.UsageLimitStore
-import org.organiza.sync.BackendKind
-import org.organiza.ui.Actions
-import org.organiza.ui.CalendarMode
-import org.organiza.ui.UiSnapshot
 
 /**
- * The desktop state holder (ADR-0023). It keeps the focus log and shows today's use (ADR-0024).
- * Sync, AI and enforcement come in the next stages, so until then those actions say so on screen.
- * All storage work runs on one thread, as on Android.
+ * What only the desktop does around the shared core (ADR-0024, ADR-0025): it records the app in
+ * front, and blocks during sessions and past daily limits with a full-screen pause while the app's
+ * processes are stopped. The block engine runs on the UI thread, as on Android.
  */
 class DesktopApp(
-    private val db: Database,
-    private val clock: Clock,
+    val core: OrganizaCore,
+    private val platform: DesktopPlatform,
     private val focus: FocusSource,
-    private val apps: List<LinuxApp>,
-    private val zone: ZoneId = ZoneId.systemDefault(),
-) : Actions, AutoCloseable {
-    val ui = mutableStateOf(UiSnapshot())
+    private val freezer: Freezer = Freezer(platform.dataDir.resolve("frozen")),
+) : AutoCloseable {
+    /** The pause on screen, if any. */
+    val pause = mutableStateOf<InterventionFlow?>(null)
 
-    private val storage = Executors.newSingleThreadScheduledExecutor { Thread(it, "storage").apply { isDaemon = true } }
-    private val log = FocusLog(db)
-    private val usage = LoggedUsage(log)
-    private val packages = apps.associate { it.id to it.pkg }
-
+    private val packages = platform.apps.associate { it.id to it.pkg }
+    private val ticker = Executors.newSingleThreadScheduledExecutor { Thread(it, "organiza-blocker").apply { isDaemon = true } }
+    private var limitTick: ScheduledFuture<*>? = null
+    private var passEnd: ScheduledFuture<*>? = null
     @Volatile private var tracking: AutoCloseable? = null
-
+    @Volatile private var current: Focus? = null
     @Volatile private var closed = false
+    private var logged = false
+
+    private val surface = object : BlockSurface {
+        override fun showOverlay(target: BlockTarget) {
+            val shown = pause.value
+            if (shown != null && shown.target == target) return
+            if (shown != null) log(shown, InterventionOutcome.Stayed)
+            current?.takeIf { packages[it.app] == target.app }?.pid?.let(freezer::freeze)
+            val strict = core.session.current.strict
+            pause.value = InterventionFlow(target, strict, core.overridesToday, Friction.phrase(strict), reflects = strict && core.hasApiKey(), core.clock)
+            logged = false
+        }
+
+        override fun dismissOverlay() {
+            pause.value?.let { log(it, InterventionOutcome.Stayed) }
+            pause.value = null
+        }
+
+        // The blocked app stays stopped behind the pause; there is no home screen to send it to.
+        override fun goHome() = Unit
+    }
+
+    private val engine = BlockEngine(surface, core.clock, DEBOUNCE, ignored = setOf(DesktopPlatform.SELF), exempt = emptySet(), passes = core.passes)
+
+    private val subscription = core.session.subscribe { policy ->
+        platform.onMain {
+            // A new policy frees what the old one stopped; anything still blocked is stopped again when it comes back.
+            freezer.thawAll()
+            engine.update(policy.blockList, policy != SessionPolicy.IDLE)
+        }
+    }
 
     init {
-        val ready = storage.submit<Boolean> {
-            when (Migrations.migrate(db)) {
-                is MigrationResult.TooNew -> false
-                else -> {
-                    // shortcut: a stretch left open by a crash is dropped, since when it ended is unknown.
-                    log.last()?.takeIf { it.app != null }?.let { log.record(it.at, null) }
-                    true
+        freezer.recover()
+        // shortcut: a stretch left open by a crash is dropped, since when it ended is unknown.
+        core.onStores { stores -> FocusLog(stores.db).last()?.takeIf { it.app != null }?.let { FocusLog(stores.db).record(it.at, null) } }
+        if (focus === GnomeFocus) GnomeFocus.updateIfOld()?.let(core::showMessage)
+        startTracking()
+    }
+
+    /** Starts the focus source if it is not running. False when this desktop cannot report focus yet. */
+    fun startTracking(): Boolean {
+        if (tracking == null) tracking = focus.start(::onFocus)
+        platform.tracking = tracking != null
+        core.requestUiRefresh()
+        return tracking != null
+    }
+
+    private fun onFocus(change: Focus?) {
+        if (closed) return
+        val at = core.clock.now()
+        val app = change?.app?.let(packages::get)
+        current = change?.takeIf { app != null }
+        core.onStores { stores -> FocusLog(stores.db).record(at, app) }
+        if (app != null) {
+            platform.onMain {
+                engine.onForeground(app)
+                checkLimit(app)
+            }
+        }
+        core.requestReconcile()
+    }
+
+    /** The person finished a pause. An override grants its pass and lets the app run again. */
+    fun choose(flow: InterventionFlow, outcome: InterventionOutcome) {
+        log(flow, outcome)
+        if (outcome is InterventionOutcome.Overrode) {
+            core.passes.grant(flow.target, Duration.ofMinutes(outcome.minutes.toLong()))
+            freezer.thawAll()
+            schedulePassEnd()
+        }
+        engine.dismiss()
+    }
+
+    private fun log(flow: InterventionFlow, outcome: InterventionOutcome) {
+        if (logged || flow !== pause.value) return
+        logged = true
+        core.recordIntervention(flow, outcome)
+    }
+
+    private fun schedulePassEnd() {
+        passEnd?.cancel(false)
+        val until = core.passes.nextExpiry() ?: return
+        passEnd = ticker.schedule(
+            { platform.onMain { engine.recheck(); currentApp()?.let(::checkLimit) } },
+            Duration.between(core.clock.now(), until).toMillis() + GRACE_MS,
+            TimeUnit.MILLISECONDS,
+        )
+    }
+
+    private fun currentApp(): PackageName? = current?.app?.let(packages::get)
+
+    /** Blocks [app] once today's use reaches its limit, or checks again when it would (ADR-0018). */
+    private fun checkLimit(app: PackageName) {
+        limitTick?.cancel(false)
+        val limit = core.hub.limits[app] ?: return
+        val target = BlockTarget.Limit(app)
+        if (core.passes.allows(target) || !platform.usage.permitted()) return
+        core.onStores {
+            val now = core.clock.now()
+            val zone = ZoneId.systemDefault()
+            val used = platform.usage.foregroundTime(app, now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant(), now)
+            platform.onMain {
+                if (currentApp() != app) return@onMain
+                if (UsageLimits.over(limit, used)) {
+                    engine.block(target)
+                } else {
+                    limitTick = ticker.schedule({ platform.onMain { checkLimit(app) } }, UsageLimits.left(limit, used).toMillis() + GRACE_MS, TimeUnit.MILLISECONDS)
                 }
             }
-        }.get()
-        if (ready) {
-            tracking = focus.start { id ->
-                val at = clock.now()
-                val app = id?.let(packages::get)
-                onStorage { log.record(at, app) }
-            }
-            storage.scheduleAtFixedRate(::refresh, 1, 1, TimeUnit.MINUTES)
-            refreshUi()
-        } else {
-            say("This data was written by a newer Organiza, so it was left as it is. Update Organiza to open it.")
         }
     }
 
-    /** Rebuilds what the screens show from local data. */
-    fun refreshUi() = onStorage(::refresh)
-
-    private fun refresh() {
-        val now = clock.now()
-        val start = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
-        val allowed = tracking != null
-        val today = if (allowed) usage.perApp(start, now).mapKeys { it.key.value } else emptyMap()
-        val settings = SettingsStore(db)
-        val feeds = buildSet {
-            if (settings.flag(Setting.BLOCK_REELS)) add(ShortFormFeed.INSTAGRAM_REELS)
-            if (settings.flag(Setting.BLOCK_SHORTS)) add(ShortFormFeed.YOUTUBE_SHORTS)
-        }
-        val launchable = apps.mapNotNull { app -> app.pkg?.let { Triple(it.value, app.name, app.category) } }
-        val hub = hubView(launchable, today, RuleStore(db).all(), UsageLimitStore(db).all(), feeds, allowed)
-        ui.value = ui.value.copy(hub = hub)
-    }
-
-    /** Ends the stretch in front and stops tracking. The database stays open for its owner. */
+    /** Ends the stretch in front, frees every stopped app and stops tracking. */
     override fun close() {
         if (closed) return
         closed = true
         tracking?.close()
-        val at = clock.now()
-        storage.submit { log.record(at, null) }.get()
-        storage.shutdown()
+        subscription.close()
+        freezer.thawAll()
+        val at = core.clock.now()
+        val done = java.util.concurrent.CountDownLatch(1)
+        core.onStores { stores -> FocusLog(stores.db).record(at, null); done.countDown() }
+        done.await(2, TimeUnit.SECONDS)
+        ticker.shutdownNow()
     }
 
-    private fun onStorage(work: () -> Unit) {
+    private companion object {
+        val DEBOUNCE: Duration = Duration.ofMillis(800)
+        const val GRACE_MS = 1_000L
+    }
+}
+
+/** The shared actions, with the desktop's file pickers, dialogs, clipboard, microphone and setup steps. */
+class DesktopActions(core: OrganizaCore, private val app: DesktopApp, private val platform: DesktopPlatform, private val focus: FocusSource) : CoreActions(core) {
+    override fun record(): Recorder? = DesktopRecorder.start() ?: null.also { core.showMessage("No microphone could be opened") }
+
+    override fun askVoiceConsent() {
+        val answer = JOptionPane.showConfirmDialog(null, VOICE_NOTICE, "Send recordings to Groq?", JOptionPane.OK_CANCEL_OPTION)
+        if (answer == JOptionPane.OK_OPTION) setVoiceConsent(true)
+    }
+
+    override fun grant(permission: Permission) {
+        val message = when (permission) {
+            Permission.TRACKING, Permission.USAGE, Permission.ACCESSIBILITY ->
+                if (app.startTracking()) "Usage tracking is on" else focus.enable()
+            Permission.AUTOSTART -> platform.autostart.enable()
+            Permission.TRAY -> {
+                platform.trayWanted = true
+                if (java.awt.SystemTray.isSupported()) "Closing the window now leaves Organiza in the top bar" else
+                    "Your desktop shows no top bar icons. On GNOME, turn on the AppIndicator extension"
+            }
+            Permission.SHORTCUT -> Shortcut.install().also { platform.shortcut = Shortcut.installed() }
+            else -> "Not needed on this computer"
+        }
+        core.showMessage(message)
+        core.requestUiRefresh()
+    }
+
+    override fun importCalendar() {
+        val file = choose("Import a calendar", "*.ics") ?: return
         try {
-            if (!closed) storage.execute(work)
-        } catch (_: RejectedExecutionException) {
-            // Closed meanwhile: the last stretch was already ended.
+            core.importCalendar(file.readText())
+        } catch (_: IOException) {
+            core.showMessage("Could not read that file")
         }
     }
 
-    private fun say(text: String) {
-        ui.value = ui.value.copy(message = text)
+    /** Photos are read with Tesseract on this computer when it is installed; nothing is sent. */
+    override fun pickTimetablePhoto() {
+        if (output("which", "tesseract") == null) return core.showMessage("Reading photos needs Tesseract. Install tesseract-ocr, or paste the text")
+        val file = choose("Choose a timetable photo", "*.png;*.jpg;*.jpeg") ?: return
+        core.schedule.readPhoto { output("tesseract", file.absolutePath, "stdout") }
     }
 
-    private fun notYet() = say(NOT_YET)
+    override fun shareInvite() = core.inviteToShare { invite ->
+        if (invite == null) {
+            core.showMessage("Create or join a challenge first")
+        } else {
+            Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(invite), null)
+            core.showMessage("Invite copied. Share it like a password")
+        }
+    }
 
-    override fun startSession(apps: String, sites: String, minutes: String, strict: Boolean, shortForm: Boolean) = notYet()
-    override fun stopSession() = notYet()
-    override fun fix(item: ProtectionItem) = notYet()
-    override fun startFocus(minutes: Int, strict: Boolean, shortForm: Boolean, tier: FocusTier) = notYet()
-    override fun summarizeMonitor() = notYet()
-    override fun setFocusApp(pkg: String, on: Boolean) = notYet()
-    override fun addFocusSite(raw: String) = notYet()
-    override fun removeFocusSite(domain: String) = notYet()
-    override fun setLimit(pkg: String, minutes: Long?) = notYet()
-    override fun setFeed(feed: ShortFormFeed, on: Boolean) = notYet()
-    override fun addHabit(name: String) = notYet()
-    override fun addHabitPlan(
-        name: String,
-        frequency: HabitFrequency,
-        target: Int,
-        reminderMinute: Int?,
-        goalMinutes: Int?,
-        linkedPackage: String?,
-    ) = notYet()
-    override fun logMinutes(habitId: String, minutes: Int) = notYet()
-    override fun markToday(habitId: String, name: String, done: Boolean) = notYet()
-    override fun startTalking() = notYet()
-    override fun stopTalking() = Unit
-    override fun confirmCommand() = notYet()
-    override fun discardCommand() = notYet()
-    override fun importCalendar() = notYet()
-    override fun weeklyReview() = notYet()
-    override fun selectDay(day: LocalDate, then: CalendarMode?) = notYet()
-    override fun showCalendar(mode: CalendarMode) = notYet()
-    override fun saveFocusBlock(replacing: String?, day: LocalDate, startMinute: Int, minutes: Int) = notYet()
-    override fun deleteFocusBlock(id: String) = notYet()
-    override fun addQuest(kind: RpgKind, title: String) = notYet()
-    override fun tapHabit(id: String, up: Boolean) = notYet()
-    override fun checkDaily(id: String, done: Boolean) = notYet()
-    override fun completeTodo(id: String) = notYet()
-    override fun deleteQuest(id: String) = notYet()
-    override fun syncArena() = notYet()
-    override fun shareInvite() = notYet()
-    override fun createChallenge(habit: String, title: String, days: String, freezes: String, relay: String, name: String) = notYet()
-    override fun nudge(challengeId: String, memberId: String) = notYet()
-    override fun pickTimetablePhoto() = notYet()
-    override fun setImportText(text: String) = notYet()
-    override fun extractSchedule() = notYet()
-    override fun addScheduleBlocks() = notYet()
-    override fun clearImport() = notYet()
-    override fun startDictation() = notYet()
-    override fun stopDictation() = Unit
-    override fun dictationLevel(): Float = 0f
-    override fun joinChallenge(invite: String, habit: String, name: String) = notYet()
-    override fun saveKey(key: String) = notYet()
-    override fun removeKey() = notYet()
-    override fun setVoiceConsent(on: Boolean) = notYet()
-    override fun runCopilot() = notYet()
-    override fun sendChat(text: String) = notYet()
-    override fun startChatVoice() = notYet()
-    override fun stopChatVoice() = Unit
-    override fun clearChat() = notYet()
-    override fun grant(permission: Permission) = if (permission == Permission.USAGE) say(focus.enable()) else notYet()
-    override fun finishOnboarding() = notYet()
-    override fun restartOnboarding() = notYet()
-    override fun chooseBackend(kind: BackendKind?, url: String, key: String) = notYet()
-    override fun signIn(email: String, password: String) = notYet()
-    override fun signUp(email: String, password: String) = notYet()
-    override fun signOut() = notYet()
-    override fun deleteAccount() = notYet()
+    override fun deleteAccount() {
+        val answer = JOptionPane.showConfirmDialog(null, DELETE_NOTICE, "Delete account and cloud data?", JOptionPane.OK_CANCEL_OPTION)
+        if (answer == JOptionPane.OK_OPTION) core.sync.deleteAccount()
+    }
 
-    private companion object {
-        const val NOT_YET = "Not on Linux yet. This arrives with the next stage of the desktop app."
+    private fun choose(title: String, pattern: String): File? {
+        val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD).apply { file = pattern; isVisible = true }
+        return dialog.files.firstOrNull()
     }
 }

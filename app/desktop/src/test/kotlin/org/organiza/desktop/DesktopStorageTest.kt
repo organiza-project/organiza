@@ -9,6 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import org.organiza.app.StorageUnavailable
 import org.organiza.storage.Migrations
 import org.organiza.testing.FakeSecretStore
 

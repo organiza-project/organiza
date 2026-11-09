@@ -1,11 +1,5 @@
-package org.organiza.android.feature.schedule
+package org.organiza.feature.schedule
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.net.Uri
-import android.util.Log
-import com.googlecode.tesseract.android.TessBaseAPI
-import java.io.File
 import java.io.IOException
 import java.time.LocalDate
 import java.time.ZoneId
@@ -16,7 +10,7 @@ import org.organiza.ai.GroqClient
 import org.organiza.ai.Sanitizer
 import org.organiza.ai.SuggestedBlock
 import org.organiza.ai.UrlConnectionTransport
-import org.organiza.android.OrganizaApp
+import org.organiza.app.OrganizaCore
 import org.organiza.ui.ImportView
 import org.organiza.scheduler.VoiceOutcome
 import org.organiza.voice.VoiceCommand
@@ -29,7 +23,7 @@ import org.organiza.voice.VoiceResult
  * weekly blocks. Blocks become sessions on the focus list only when the person adds them, and only
  * their times are stored.
  */
-class ScheduleController(private val app: OrganizaApp) {
+class ScheduleController(private val app: OrganizaCore) {
     @Volatile var view: ImportView = ImportView()
         private set
 
@@ -46,18 +40,19 @@ class ScheduleController(private val app: OrganizaApp) {
         app.requestUiRefresh()
     }
 
-    fun readPhoto(uri: Uri) = busy("Reading the photo on this phone") {
+    /** Reads a timetable photo with [read], on this device only, then shows its text for checking. */
+    fun readPhoto(read: () -> String?) = busy("Reading the photo on this device") {
         ocr.execute {
             val text = try {
-                recognise(uri)
+                read()
             } catch (failure: IOException) {
-                Log.e(TAG, "photo read failed: ${failure.javaClass.simpleName}")
+                app.platform.log("photo read failed: ${failure.javaClass.simpleName}")
                 null
             }
             view = if (text.isNullOrBlank()) {
                 view.copy(busy = null, status = "No text was found in that photo")
             } else {
-                view.copy(source = text.take(MAX_TEXT), blocks = emptyList(), busy = null, status = "Read on this phone. Check it, then extract")
+                view.copy(source = text.take(MAX_TEXT), blocks = emptyList(), busy = null, status = "Read on this device. Check it, then extract")
             }
             app.requestUiRefresh()
         }
@@ -124,44 +119,7 @@ class ScheduleController(private val app: OrganizaApp) {
         work()
     }
 
-    private fun recognise(uri: Uri): String? {
-        val bitmap = decode(uri) ?: return null
-        val tess = TessBaseAPI()
-        return try {
-            if (!tess.init(tessData().absolutePath, "eng")) return null
-            tess.setImage(bitmap)
-            tess.utF8Text
-        } finally {
-            tess.recycle()
-            bitmap.recycle()
-        }
-    }
-
-    /** Shrinks the photo so its long side is about 2000 pixels, which Tesseract reads well and fast. */
-    private fun decode(uri: Uri): Bitmap? {
-        val resolver = app.contentResolver
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= LONG_SIDE) sample *= 2
-        val options = BitmapFactory.Options().apply { inSampleSize = sample }
-        return resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
-    }
-
-    /** Tesseract reads its model from a folder named tessdata, so the bundled one is copied out once. */
-    private fun tessData(): File {
-        val root = File(app.noBackupFilesDir, "ocr")
-        val model = File(root, "tessdata/eng.traineddata")
-        if (!model.exists()) {
-            model.parentFile?.mkdirs()
-            app.assets.open("tessdata/eng.traineddata").use { input -> model.outputStream().use(input::copyTo) }
-        }
-        return root
-    }
-
     private companion object {
-        const val TAG = "Organiza"
         const val MAX_TEXT = 4000
-        const val LONG_SIDE = 2000
     }
 }

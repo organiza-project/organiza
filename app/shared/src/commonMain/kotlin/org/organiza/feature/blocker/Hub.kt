@@ -1,6 +1,7 @@
 package org.organiza.feature.blocker
 
 import java.time.Duration
+import org.organiza.app.InstalledApp
 import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
 import org.organiza.enforcement.ShortFormFeed
@@ -18,7 +19,7 @@ const val FOCUS_TAG = "#focus"
  * label and category. Launchers and system UI have no launcher entry, so they never count as screen time.
  */
 fun hubView(
-    launchable: List<Triple<String, String, String>>,
+    launchable: List<InstalledApp>,
     today: Map<String, Duration>,
     rules: List<StoredRule>,
     limits: Map<PackageName, Duration>,

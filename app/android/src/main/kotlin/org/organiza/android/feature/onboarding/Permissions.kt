@@ -10,7 +10,6 @@ import android.provider.Settings
 import org.organiza.android.OrganizaApp
 import org.organiza.domain.port.Capability
 import org.organiza.presentation.Permission
-import org.organiza.presentation.Protection
 
 /** Reads which permissions are granted, and names the screen that grants each one. */
 object Permissions {
@@ -34,17 +33,9 @@ object Permissions {
         Permission.DEVICE_ADMIN -> Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
             .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, OrganizaApp.adminComponent(context))
             .putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, Permission.DEVICE_ADMIN.why)
-        Permission.VPN, Permission.OVERLAY -> null
+        Permission.VPN, Permission.OVERLAY, Permission.TRACKING, Permission.AUTOSTART, Permission.TRAY, Permission.SHORTCUT -> null
     }
 
     /** Some phones refuse the direct battery request, so the general list is the fallback. */
     val batteryFallback: Intent get() = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-
-    fun forProtection(protection: Protection): Permission = when (protection) {
-        Protection.ACCESSIBILITY -> Permission.ACCESSIBILITY
-        Protection.VPN_CONSENT -> Permission.VPN
-        Protection.BATTERY -> Permission.BATTERY
-        Protection.DEVICE_ADMIN -> Permission.DEVICE_ADMIN
-        Protection.USAGE -> Permission.USAGE
-    }
 }

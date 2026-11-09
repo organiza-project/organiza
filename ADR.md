@@ -1112,3 +1112,61 @@ next start.
 - A JVM D-Bus library or JNA for libsecret: a new dependency to replace two short subprocess calls.
 - Widening `PackageName`: desktop IDs can contain spaces, and Android input validation would get
   weaker.
+
+## ADR-0025: One shared app core, and blocking on the Linux desktop
+
+### Status
+Accepted, 2026-11-09. Stages 3 and 4 of the Linux port (ADR-0023, ADR-0024).
+
+### Context
+The desktop drew every screen but did nothing behind them. Habits, quests, sessions, the calendar,
+Arena, sync and the copilot all lived in Android's `OrganizaApp` and its controllers, although almost
+none of that code used Android. Copying it into the desktop would give two state holders to keep
+alike by hand.
+
+### Decision
+- **`OrganizaCore`** (`:app:shared`, `org.organiza.app`) is the old `OrganizaApp` without Android:
+  - It holds storage, sessions, the screen snapshot and every feature controller. The controllers
+    moved with it: hub, schedule, calendar, quests, chat, copilot and sync.
+  - **`Platform`** supplies what each OS does differently: preferences, the database, installed
+    apps and their names, granted capabilities, reminders, the site blocking layer, the UI thread
+    and logging.
+  - **`CoreActions`** maps every screen action onto the core. A platform adds only its pickers,
+    dialogs, settings screens and microphone.
+  - Android's `OrganizaApp` is now the Android `Platform`, and `MainActivity` supplies Android's
+    actions.
+- **Permissions by device.** `Device.PHONE` and `Device.DESKTOP` list the onboarding permissions and
+  protection rows each offers. The desktop asks for:
+  - usage tracking, which is required for blocking;
+  - starting at login;
+  - keeping running in the top bar;
+  - a copilot shortcut.
+- **Focus sources are probed in order:** the GNOME extension (Wayland or X11), Hyprland's event
+  socket, Sway's IPC, then X11 through `xprop`. Each reports the app and its window's process. KDE
+  on Wayland has none yet, and onboarding says so.
+- **Background running.** The window process is the background service. Starting at login installs
+  a systemd user unit tied to `graphical-session.target`, with `Restart=on-failure`, so a killed
+  Organiza comes back. A Unix socket in `$XDG_RUNTIME_DIR` keeps one instance per login: a second
+  start shows the window, or opens the copilot when given `--copilot`. Super+Shift+Space is a GNOME
+  custom shortcut that runs that command.
+- **The desktop pause.** The shared `BlockEngine` runs on the UI thread, fed by the focus source.
+  - A block opens the shared intervention in a full-screen, always-on-top, undecorated window.
+  - The blocked app's processes are stopped with SIGSTOP. Stopping keeps their memory, so no work
+    is lost.
+  - They continue (SIGCONT) when the person overrides, when the session's policy changes, when
+    Organiza quits, and at the next start. The frozen process IDs are kept in a file for that.
+  - The desktop session's own processes are never stopped: the shell, Xwayland, the compositor and
+    Organiza with its parents.
+- **Dictation** uses Java Sound, which reaches PipeWire and PulseAudio through ALSA.
+
+### Consequences
+Every feature works on the desktop with the code Android runs, and a change to one platform's
+behaviour is a change in one place. Website blocking on the desktop waits for a root helper that can
+edit `/etc/hosts`; until then sites are blocked only on Android. Reading timetable photos on the
+desktop needs the `tesseract` command.
+
+### Alternatives Considered
+- A separate root daemon for app blocking (the frozen `:platform:linux`): it cannot see which app
+  is in front on Wayland, and it splits state across two processes.
+- Killing blocked apps instead of stopping them: that loses unsaved work.
+- Closing their windows instead: Wayland gives other clients no way to do that.

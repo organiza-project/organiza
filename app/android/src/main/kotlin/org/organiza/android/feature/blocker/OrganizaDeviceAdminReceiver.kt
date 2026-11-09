@@ -11,6 +11,6 @@ class OrganizaDeviceAdminReceiver : DeviceAdminReceiver() {
         context.getString(R.string.admin_disable_warning)
 
     override fun onDisabled(context: Context, intent: Intent) {
-        OrganizaApp.from(context).checkTamper()
+        OrganizaApp.from(context).core.checkTamper()
     }
 }

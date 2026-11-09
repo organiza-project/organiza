@@ -47,14 +47,14 @@ class InterventionOverlay(
         val shown = current.value
         if (shown != null && shown.target == target && root != null) return
         if (shown != null) log(shown, InterventionOutcome.Stayed)
-        val strict = app.session.current.strict
+        val strict = app.core.session.current.strict
         current.value = InterventionFlow(
             target,
             strict,
-            app.overridesToday,
+            app.core.overridesToday,
             Friction.phrase(strict),
-            reflects = strict && app.hasApiKey(),
-            app.clock,
+            reflects = strict && app.core.hasApiKey(),
+            app.core.clock,
         )
         logged = false
         if (root == null) attach()
@@ -91,7 +91,7 @@ class InterventionOverlay(
     private fun log(flow: InterventionFlow, outcome: InterventionOutcome) {
         if (logged || flow !== current.value) return
         logged = true
-        app.recordIntervention(flow, outcome)
+        app.core.recordIntervention(flow, outcome)
     }
 
     private fun attach() {
@@ -100,7 +100,7 @@ class InterventionOverlay(
             setContent {
                 OrganizaTheme {
                     current.value?.let { flow ->
-                        InterventionScreen(flow, app, onDone = { outcome -> choose(flow, outcome) })
+                        InterventionScreen(flow, app.core, onDone = { outcome -> choose(flow, outcome) })
                     }
                 }
             }

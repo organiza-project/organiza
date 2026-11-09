@@ -9,6 +9,10 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +24,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,54 +46,78 @@ import org.organiza.feature.schedule.CalendarScreen
 import org.organiza.feature.schedule.DictationScreen
 import org.organiza.feature.schedule.ImportScreen
 
-/** Every tab and screen, the same on each platform. The platform supplies the snapshot and the actions. */
+/**
+ * Every tab and screen, the same on each platform. The platform supplies the snapshot and the actions,
+ * and can open a screen from outside, such as the copilot from a keyboard shortcut: each new [request]
+ * opens its route once.
+ */
 @Composable
-fun OrganizaRoot(ui: UiSnapshot, actions: Actions) {
+fun OrganizaRoot(ui: UiSnapshot, actions: Actions, request: Pair<Route, Long>? = null) {
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     // Screens opened on top of a tab (ADR-0018). Back closes the top one.
     val stack = remember { mutableStateListOf<Route>() }
     val open: (Route) -> Unit = { stack.add(it) }
     val back: () -> Unit = { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }
     BackHandler(enabled = stack.isNotEmpty() && !ui.onboarding) { back() }
+    LaunchedEffect(request) {
+        val route = request?.first ?: return@LaunchedEffect
+        stack.clear()
+        stack.add(route)
+    }
     val colors = Theme.colors
-    Column(Modifier.fillMaxSize().background(colors.ground).windowInsetsPadding(WindowInsets.safeDrawing)) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(colors.ground).windowInsetsPadding(WindowInsets.safeDrawing)) {
+        val wide = maxWidth >= WIDE
         val route = stack.lastOrNull()
         // Each tab and screen keeps its own scroll position, so switching never opens one halfway down.
         val scroll = rememberSaveable(tab, route, saver = ScrollState.Saver) {
             ScrollState(0)
         }
         val onTab = !ui.onboarding && route == null
-        // Content stops at 720dp and centres on a tablet, so short panels never stretch across it.
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(scroll)
-                .wrapContentWidth(Alignment.CenterHorizontally)
-                .widthIn(max = 720.dp)
-                .padding(start = Space.margin, end = Space.margin, bottom = Space.margin),
-            verticalArrangement = Arrangement.spacedBy(Space.gap),
-        ) {
-            when {
-                ui.onboarding -> OnboardingScreen(ui, actions)
-                route == Route.NEW_HABIT -> NewHabitScreen(ui, actions, back)
-                route == Route.AGENDA -> CalendarScreen(ui, actions, back, open)
-                route == Route.IMPORT -> ImportScreen(ui, actions, back, open)
-                route == Route.DICTATION -> DictationScreen(ui, actions, back)
-                route == Route.COPILOT -> CopilotScreen(ui, actions, back)
-                tab == Tab.HOME -> HomeScreen(ui, actions, open) { tab = it }
-                tab == Tab.HABITS -> HabitsScreen(ui, actions, open)
-                tab == Tab.ARENA -> ArenaScreen(ui, actions)
-                tab == Tab.METRICS -> MetricsScreen(ui, actions)
-                else -> ProfileScreen(ui, actions)
+        val page: @Composable (Modifier) -> Unit = { modifier ->
+            // Content stops at 720dp and centres, so short panels never stretch across a wide window.
+            Box(modifier) {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scroll)
+                        .wrapContentWidth(Alignment.CenterHorizontally)
+                        .widthIn(max = 720.dp)
+                        .padding(start = Space.margin, end = Space.margin, top = if (wide) 12.dp else 0.dp, bottom = Space.margin),
+                    verticalArrangement = Arrangement.spacedBy(Space.gap),
+                ) {
+                    when {
+                        ui.onboarding -> OnboardingScreen(ui, actions)
+                        route == Route.NEW_HABIT -> NewHabitScreen(ui, actions, back)
+                        route == Route.AGENDA -> CalendarScreen(ui, actions, back, open)
+                        route == Route.IMPORT -> ImportScreen(ui, actions, back, open)
+                        route == Route.DICTATION -> DictationScreen(ui, actions, back)
+                        route == Route.COPILOT -> CopilotScreen(ui, actions, back)
+                        tab == Tab.HOME -> HomeScreen(ui, actions, open) { tab = it }
+                        tab == Tab.HABITS -> HabitsScreen(ui, actions, open)
+                        tab == Tab.ARENA -> ArenaScreen(ui, actions)
+                        tab == Tab.METRICS -> MetricsScreen(ui, actions)
+                        else -> ProfileScreen(ui, actions)
+                    }
+                }
+                // The page ends at its last panel. The copilot button steps aside there instead of
+                // padding every page with empty space for it. A wide window has it in the sidebar.
+                val atEnd = scroll.maxValue > 0 && scroll.value >= scroll.maxValue - END_SLACK
+                FadingFab(onTab && !wide && !atEnd, Modifier.align(Alignment.BottomEnd).padding(16.dp)) { open(Route.COPILOT) }
             }
         }
-        // The page ends at its last panel. The copilot button steps aside there instead of
-        // padding every page with empty space for it.
-        val atEnd = scroll.maxValue > 0 && scroll.value >= scroll.maxValue - END_SLACK
-        FadingFab(onTab && !atEnd, Modifier.align(Alignment.BottomEnd).padding(16.dp)) { open(Route.COPILOT) }
+        if (wide && !ui.onboarding) {
+            Row(Modifier.fillMaxSize()) {
+                // Picking a tab from the sidebar also closes any screen opened on top.
+                SideBar(tab.takeIf { route == null }, { stack.clear(); tab = it }) { if (route != Route.COPILOT) open(Route.COPILOT) }
+                Box(Modifier.fillMaxHeight().width(Space.stroke).background(colors.border))
+                page(Modifier.weight(1f).fillMaxHeight())
+            }
+        } else {
+            Column(Modifier.fillMaxSize()) {
+                page(Modifier.weight(1f).fillMaxWidth())
+                if (onTab) BottomBar(tab) { tab = it }
+            }
         }
-        if (onTab) BottomBar(tab) { tab = it }
     }
 }
 

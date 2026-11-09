@@ -63,7 +63,7 @@ fun NewHabitScreen(ui: UiSnapshot, actions: Actions, back: () -> Unit) {
                 Column(Modifier.weight(1f).padding(horizontal = if (app != null) 10.dp else 0.dp)) {
                     Txt(app?.label ?: "No linked app", Type.bodyStrong)
                     Txt(
-                        if (app != null) "Time in this app counts towards the goal, read on this phone" else "Link a reading or practice app to track it for you",
+                        if (app != null) "Time in this app counts towards the goal, read on this device" else "Link a reading or practice app to track it for you",
                         Type.small,
                         colors.muted,
                     )
@@ -80,7 +80,7 @@ fun NewHabitScreen(ui: UiSnapshot, actions: Actions, back: () -> Unit) {
         }
     }
     Panel {
-        SwitchRow("Reminder", "A notification on this phone. The habit's name never leaves it", remind) { remind = it }
+        SwitchRow("Reminder", "A notification on this device. The habit's name never leaves it", remind) { remind = it }
         if (remind) ClockField("Remind me at", minute) { minute = it }
     }
     Spacer(Modifier.height(4.dp))

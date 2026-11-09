@@ -53,11 +53,12 @@ Recorded in ADR-0002 and ADR-0014. `./gradlew test` runs every JVM test.
 - `core/arena` — challenges, Ed25519 commitments, encrypted padded relay messages (ADR-0011).
 - `core/sync` — auth and sync ports with local-only and Supabase implementations (ADR-0015).
 - `core/presentation` — screen models: every sentence and state a screen shows, with tests (ADR-0012).
-- `app/shared` — Compose Multiplatform: design system (`org.organiza.ui`) and every screen
-  (`org.organiza.feature.*`) in `commonMain`; small `actual`s in `androidMain`/`desktopMain` (ADR-0023).
-- `app/android` — the Android app: state holder, controllers, services and adapters, by feature under `feature/`.
-- `app/desktop` — the Linux desktop app (Compose Desktop); `DesktopApp` is its state holder. Usage comes from a
-  focus log fed by the bundled GNOME Shell extension or `xprop` on X11 (ADR-0024).
+- `app/shared` — Compose Multiplatform: design system (`org.organiza.ui`), every screen and feature controller
+  (`org.organiza.feature.*`) and the app core (`org.organiza.app`: `OrganizaCore`, `Platform`, `CoreActions`) in
+  `commonMain`; small `actual`s in `androidMain`/`desktopMain` (ADR-0023, ADR-0025).
+- `app/android` — the Android `Platform` (`OrganizaApp`), `MainActivity`, services and adapters.
+- `app/desktop` — the Linux `Platform`, focus sources (GNOME extension, Hyprland, Sway, X11), the pause window and
+  process freezer, autostart, tray and shortcut (ADR-0024, ADR-0025).
 - `supabase/` — backend schema; `setup.sql` must contain each migration verbatim (a test checks).
 - `platform/linux` — frozen (ADR-0014); keep it compiling, add nothing. The desktop daemon replaces it.
 - `.claude/rules/` — working rules for architecture, testing and privacy. Read them.
@@ -84,11 +85,11 @@ Library modules build with `explicitApi()` and warnings as errors (`build.gradle
 - **Hexagonal.** Logic lives in `core` behind ports; Android classes are thin adapters
   (`OrganizaAccessibilityService`, `DnsVpnService`, `SqlCipherDatabase`, Keystore stores). New OS
   capability = a port in `core/domain` plus a fake in `core/testing`.
-- **One state holder.** `OrganizaApp` (the `Application`) owns storage, the `ActiveSession` policy and
-  the override passes. All storage work runs on one storage thread (`onStorageThread`/`onStores`);
+- **One state holder.** `OrganizaCore` (shared; Android's `OrganizaApp` and the desktop's `DesktopPlatform`
+  implement its `Platform`) owns storage, the `ActiveSession` policy and the override passes. All storage work runs on one storage thread (`onStorageThread`/`onStores`);
   AI and Arena calls have their own threads. `refreshUi()` builds a whole immutable `UiSnapshot` from
   local data and swaps it in; Compose screens only render it and call `ui/Actions`, which
-  `MainActivity` maps to the app. Feature controllers (`HubController`, `ScheduleController`,
+  `CoreActions` maps to the core. Feature controllers (`HubController`, `ScheduleController`,
   `SyncController`, `CopilotController`) keep `OrganizaApp` from growing.
 - **Enforcement path.** Scheduler → `SessionPolicy` → `ActiveSession` → the accessibility service
   feeds `BlockEngine` and `ContentPolicy`; `DnsVpnService` reads the same policy minus passes. A block

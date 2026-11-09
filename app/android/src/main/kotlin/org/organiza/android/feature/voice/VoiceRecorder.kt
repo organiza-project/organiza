@@ -4,17 +4,20 @@ import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import org.organiza.app.Recorder
 import org.organiza.voice.VoicePipeline
 
 /** Records into memory only, while the talk button is held (ADR-0010). */
-class VoiceRecorder {
+class VoiceRecorder : Recorder {
+    override val sampleRate: Int get() = SAMPLE_RATE
+
     private var record: AudioRecord? = null
     private var reader: Thread? = null
     private val samples = ShortArray(SAMPLE_RATE * VoicePipeline.MAX_SECONDS)
     @Volatile private var count = 0
 
     /** The loudness of the last chunk, from 0 to 1, for the dictation waveform. */
-    @Volatile var level: Float = 0f
+    @Volatile override var level: Float = 0f
         private set
 
     /** The caller holds the microphone permission. Returns false if recording could not start. */
@@ -50,7 +53,7 @@ class VoiceRecorder {
         return true
     }
 
-    fun stop(): ShortArray {
+    override fun stop(): ShortArray {
         reader?.interrupt()
         record?.stop()
         reader?.join(JOIN_MS)

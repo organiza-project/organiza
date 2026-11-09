@@ -7,302 +7,126 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import java.io.IOException
-import java.time.Duration
-import androidx.activity.result.PickVisualMediaRequest
-import org.organiza.feature.focus.SessionInput
 import org.organiza.android.feature.onboarding.Permissions
-import org.organiza.enforcement.ShortFormFeed
-import org.organiza.storage.FocusTier
-import org.organiza.storage.HabitFrequency
-import org.organiza.storage.HabitPlan
+import org.organiza.android.feature.schedule.TimetableOcr
 import org.organiza.android.feature.voice.VoiceRecorder
-import org.organiza.ui.Actions
+import org.organiza.app.CoreActions
+import org.organiza.app.Recorder
+import org.organiza.presentation.Permission
+import org.organiza.storage.HabitFrequency
 import org.organiza.ui.OrganizaRoot
 import org.organiza.ui.OrganizaTheme
-import org.organiza.arena.ChallengeRules
-import org.organiza.presentation.Permission
-import org.organiza.presentation.ProtectionItem
-import org.organiza.scheduler.ManualRequest
-import org.organiza.sync.BackendKind
-import org.organiza.storage.RpgKind
-import org.organiza.ui.CalendarMode
-import java.time.LocalDate
 
-class MainActivity : ComponentActivity(), Actions {
+class MainActivity : ComponentActivity() {
     private val app get() = OrganizaApp.from(this)
-    private var recorder: VoiceRecorder? = null
+    private val core get() = app.core
 
     private val calendarPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@registerForActivityResult
         try {
-            contentResolver.openInputStream(uri)?.use { app.importCalendar(it.readBytes().decodeToString()) }
+            contentResolver.openInputStream(uri)?.use { core.importCalendar(it.readBytes().decodeToString()) }
         } catch (_: IOException) {
-            app.showMessage("Could not read that file")
+            core.showMessage("Could not read that file")
         }
     }
-    private val vpnConsent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { app.requestUiRefresh() }
+    private val vpnConsent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { core.requestUiRefresh() }
     private val microphone = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (!granted) app.showMessage("Voice needs the microphone permission")
+        if (!granted) core.showMessage("Voice needs the microphone permission")
     }
     private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (!granted) app.showMessage("Reminders need notifications. Turn them on in Settings to see them")
+        if (!granted) core.showMessage("Reminders need notifications. Turn them on in Settings to see them")
     }
     // The system photo picker needs no storage permission, and hands over only the chosen photo.
     private val timetablePhoto = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
-        uri?.let(app.schedule::readPhoto)
+        uri?.let { core.schedule.readPhoto { TimetableOcr(this).recognise(it) } }
     }
-    private var dictation: VoiceRecorder? = null
-    private var chatVoice: VoiceRecorder? = null
+
+    private val actions by lazy { AndroidActions() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { OrganizaTheme { OrganizaRoot(app.uiState.value, this) } }
+        setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
     }
 
     override fun onResume() {
         super.onResume()
-        app.requestUiRefresh()
-        if (app.onboarded) app.copilot.runIfDue()
+        core.requestUiRefresh()
+        if (core.onboarded) core.copilot.runIfDue()
     }
 
     override fun onPause() {
-        // Recording never continues once the screen is left (ADR-0010).
-        recorder?.stop()
-        recorder = null
-        dictation?.stop()
-        dictation = null
-        chatVoice?.stop()
-        chatVoice = null
+        actions.stopAllRecording()
         super.onPause()
     }
 
-    override fun startSession(apps: String, sites: String, minutes: String, strict: Boolean, shortForm: Boolean) {
-        val input = SessionInput.parse(apps, sites)
-        val request = ManualRequest(input.blockList.packages, input.blockList.domains, strict, shortForm)
-        app.startManual(request, Duration.ofMinutes(minutes.toLongOrNull() ?: 0))
-        if (input.rejected.isNotEmpty()) app.showMessage("Could not read: ${input.rejected.joinToString()}")
-    }
-
-    override fun stopSession() = app.stopSession()
-
-    override fun fix(item: ProtectionItem) = grant(Permissions.forProtection(item.kind))
-
-    override fun grant(permission: Permission) {
-        if (permission == Permission.VPN) {
-            VpnService.prepare(this)?.let(vpnConsent::launch)
-            return
+    /** The shared actions, with Android's pickers, dialogs, settings screens and microphone. */
+    private inner class AndroidActions : CoreActions(core) {
+        override fun record(): Recorder? {
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                microphone.launch(Manifest.permission.RECORD_AUDIO)
+                return null
+            }
+            return VoiceRecorder().takeIf(VoiceRecorder::start) ?: null.also { core.showMessage("Could not start the microphone") }
         }
-        val intent = Permissions.settingsIntent(this, permission) ?: return
-        try {
-            startActivity(intent)
-        } catch (_: ActivityNotFoundException) {
-            if (permission == Permission.BATTERY) startActivity(Permissions.batteryFallback) else app.showMessage("This phone has no screen for that")
-        }
-    }
 
-    override fun finishOnboarding() {
-        app.onboarded = true
-        app.copilot.runIfDue()
-    }
-
-    override fun restartOnboarding() {
-        app.onboarded = false
-    }
-
-    override fun chooseBackend(kind: BackendKind?, url: String, key: String) = app.sync.choose(kind, url, key)
-
-    override fun signIn(email: String, password: String) = app.sync.signIn(email, password)
-
-    override fun signUp(email: String, password: String) = app.sync.signUp(email, password)
-
-    override fun signOut() = app.sync.signOut()
-
-    override fun deleteAccount() {
-        AlertDialog.Builder(this)
-            .setTitle("Delete account and cloud data?")
-            .setMessage(DELETE_NOTICE)
-            .setPositiveButton("Delete") { _, _ -> app.sync.deleteAccount() }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    override fun runCopilot() = app.copilot.run()
-
-    override fun sendChat(text: String) = app.chat.send(text)
-
-    override fun clearChat() = app.chat.clear()
-
-    override fun startChatVoice() {
-        if (!app.voiceConsent) return startTalking()
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            microphone.launch(Manifest.permission.RECORD_AUDIO)
-            return
-        }
-        chatVoice = VoiceRecorder().takeIf(VoiceRecorder::start)
-        if (chatVoice == null) app.showMessage("Could not start the microphone")
-    }
-
-    override fun stopChatVoice() {
-        val active = chatVoice ?: return
-        chatVoice = null
-        app.chatDictated(active.stop(), VoiceRecorder.SAMPLE_RATE)
-    }
-
-    override fun addHabit(name: String) = app.addHabit(name)
-
-    override fun logMinutes(habitId: String, minutes: Int) = app.logMinutes(habitId, minutes)
-
-    override fun addHabitPlan(
-        name: String,
-        frequency: HabitFrequency,
-        target: Int,
-        reminderMinute: Int?,
-        goalMinutes: Int?,
-        linkedPackage: String?,
-    ) {
-        app.addHabitPlan(name, HabitPlan(frequency, target, reminderMinute, goalMinutes, linkedPackage))
-        val needs = reminderMinute != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        if (needs) notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-    }
-
-    override fun startFocus(minutes: Int, strict: Boolean, shortForm: Boolean, tier: FocusTier) =
-        app.startFocus(minutes, strict, shortForm, tier)
-
-    override fun summarizeMonitor() = app.summarizeMonitor()
-
-    override fun setFocusApp(pkg: String, on: Boolean) = app.hub.setApp(pkg, on)
-
-    override fun addFocusSite(raw: String) = app.hub.addSite(raw)
-
-    override fun removeFocusSite(domain: String) = app.hub.removeSite(domain)
-
-    override fun setLimit(pkg: String, minutes: Long?) = app.hub.setLimit(pkg, minutes)
-
-    override fun setFeed(feed: ShortFormFeed, on: Boolean) = app.hub.setFeed(feed, on)
-
-    override fun nudge(challengeId: String, memberId: String) = app.nudge(challengeId, memberId)
-
-    override fun selectDay(day: LocalDate, then: CalendarMode?) = app.calendar.select(day, then)
-
-    override fun showCalendar(mode: CalendarMode) = app.calendar.show(mode)
-
-    override fun saveFocusBlock(replacing: String?, day: LocalDate, startMinute: Int, minutes: Int) =
-        app.calendar.save(replacing, day, startMinute, minutes)
-
-    override fun deleteFocusBlock(id: String) = app.calendar.delete(id)
-
-    override fun addQuest(kind: RpgKind, title: String) = app.game.add(kind, title)
-
-    override fun tapHabit(id: String, up: Boolean) = app.game.habit(id, up)
-
-    override fun checkDaily(id: String, done: Boolean) = app.game.daily(id, done)
-
-    override fun completeTodo(id: String) = app.game.complete(id)
-
-    override fun deleteQuest(id: String) = app.game.delete(id)
-
-    override fun pickTimetablePhoto() = timetablePhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-
-    override fun setImportText(text: String) = app.schedule.setText(text)
-
-    override fun extractSchedule() = app.schedule.extract()
-
-    override fun addScheduleBlocks() = app.schedule.add()
-
-    override fun clearImport() = app.schedule.clear()
-
-    override fun startDictation() {
-        if (!app.voiceConsent) return startTalking()
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            microphone.launch(Manifest.permission.RECORD_AUDIO)
-            return
-        }
-        dictation = VoiceRecorder().takeIf(VoiceRecorder::start)
-        if (dictation == null) app.showMessage("Could not start the microphone")
-    }
-
-    override fun stopDictation() {
-        val active = dictation ?: return
-        dictation = null
-        app.schedule.dictated(active.stop(), VoiceRecorder.SAMPLE_RATE)
-    }
-
-    override fun dictationLevel(): Float = dictation?.level ?: 0f
-
-    override fun markToday(habitId: String, name: String, done: Boolean) = app.markHabit(name, done)
-
-    override fun startTalking() {
-        if (!app.voiceConsent) {
-            AlertDialog.Builder(this)
+        override fun askVoiceConsent() {
+            AlertDialog.Builder(this@MainActivity)
                 .setTitle("Send recordings to Groq?")
                 .setMessage(VOICE_NOTICE)
-                .setPositiveButton("Allow") { _, _ -> app.voiceConsent = true; app.requestUiRefresh() }
+                .setPositiveButton("Allow") { _, _ -> setVoiceConsent(true) }
                 .setNegativeButton("Not now", null)
                 .show()
-            return
         }
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            microphone.launch(Manifest.permission.RECORD_AUDIO)
-            return
+
+        override fun grant(permission: Permission) {
+            if (permission == Permission.VPN) {
+                VpnService.prepare(this@MainActivity)?.let(vpnConsent::launch)
+                return
+            }
+            val intent = Permissions.settingsIntent(this@MainActivity, permission) ?: return
+            try {
+                startActivity(intent)
+            } catch (_: ActivityNotFoundException) {
+                if (permission == Permission.BATTERY) startActivity(Permissions.batteryFallback) else core.showMessage("This phone has no screen for that")
+            }
         }
-        recorder = VoiceRecorder().takeIf(VoiceRecorder::start)
-        if (recorder == null) app.showMessage("Could not start the microphone")
-    }
 
-    override fun stopTalking() {
-        val active = recorder ?: return
-        recorder = null
-        app.handleSpeech(active.stop(), VoiceRecorder.SAMPLE_RATE)
-    }
-
-    override fun confirmCommand() = app.confirmVoiceCommand()
-
-    override fun discardCommand() = app.discardVoiceCommand()
-
-    override fun importCalendar() = calendarPicker.launch(arrayOf("text/calendar", "*/*"))
-
-    override fun weeklyReview() = app.requestWeeklyReview()
-
-    override fun syncArena() = app.arenaNow()
-
-    override fun shareInvite() = app.inviteToShare { invite ->
-        if (invite == null) {
-            app.showMessage("Create or join a challenge first")
-        } else {
-            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, invite)
-            startActivity(Intent.createChooser(send, "Share the invite"))
+        override fun deleteAccount() {
+            AlertDialog.Builder(this@MainActivity)
+                .setTitle("Delete account and cloud data?")
+                .setMessage(DELETE_NOTICE)
+                .setPositiveButton("Delete") { _, _ -> core.sync.deleteAccount() }
+                .setNegativeButton("Cancel", null)
+                .show()
         }
-    }
 
-    override fun createChallenge(habit: String, title: String, days: String, freezes: String, relay: String, name: String) {
-        val rules = ChallengeRules(days.toIntOrNull() ?: 0, freezes.toIntOrNull() ?: 0)
-        app.createChallenge(habit, title, rules, relay.trim(), name)
-    }
+        override fun addHabitPlan(name: String, frequency: HabitFrequency, target: Int, reminderMinute: Int?, goalMinutes: Int?, linkedPackage: String?) {
+            super.addHabitPlan(name, frequency, target, reminderMinute, goalMinutes, linkedPackage)
+            val needs = reminderMinute != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            if (needs) notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
 
-    override fun joinChallenge(invite: String, habit: String, name: String) = app.joinChallenge(invite, habit, name)
+        override fun pickTimetablePhoto() = timetablePhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
 
-    override fun saveKey(key: String) = app.saveApiKey(key)
+        override fun importCalendar() = calendarPicker.launch(arrayOf("text/calendar", "*/*"))
 
-    override fun removeKey() = app.clearApiKey()
-
-    override fun setVoiceConsent(on: Boolean) {
-        app.voiceConsent = on
-        app.requestUiRefresh()
-    }
-
-    private companion object {
-        const val VOICE_NOTICE = "While you hold the button, your voice is recorded and sent to Groq using your own " +
-            "key, so they can turn it into text. Unlike typed text, a recording cannot have names removed first. " +
-            "Organiza keeps no recordings or transcripts, and silence is never sent."
-        const val DELETE_NOTICE = "This deletes your account on the backend and every challenge result it holds for you, " +
-            "right away. It cannot be undone. Habits, sessions and usage on this phone are not touched."
+        override fun shareInvite() = core.inviteToShare { invite ->
+            if (invite == null) {
+                core.showMessage("Create or join a challenge first")
+            } else {
+                val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, invite)
+                startActivity(Intent.createChooser(send, "Share the invite"))
+            }
+        }
     }
 }

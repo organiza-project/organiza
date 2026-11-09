@@ -1,11 +1,11 @@
-package org.organiza.android.feature.schedule
+package org.organiza.feature.schedule
 
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
-import org.organiza.android.OrganizaApp
+import org.organiza.app.OrganizaCore
 import org.organiza.ui.CalendarBlock
 import org.organiza.ui.CalendarMode
 import org.organiza.ui.CalendarView
@@ -21,7 +21,7 @@ import org.organiza.voice.VoiceCommand
  * The calendar (ADR-0019): month, week and day views over every session, and focus blocks added,
  * moved or removed on any day. A block is a scheduled session, so the scheduler arms it at its start.
  */
-class CalendarController(private val app: OrganizaApp) {
+class CalendarController(private val app: OrganizaCore) {
     @Volatile private var selected: LocalDate? = null
     @Volatile private var mode = CalendarMode.MONTH
 

@@ -42,7 +42,7 @@ class OrganizaAccessibilityService : AccessibilityService() {
         val source = trailingSource
         if (blockEngine != null && source != null) {
             lastInspection = SystemClock.elapsedRealtime()
-            inspect(source, app.session.current, blockEngine)
+            inspect(source, app.core.session.current, blockEngine)
         }
     }
 
@@ -66,16 +66,16 @@ class OrganizaAccessibilityService : AccessibilityService() {
         ignored = transientPackages()
         val blockEngine = BlockEngine(
             blockSurface,
-            app.clock,
+            app.core.clock,
             DEBOUNCE,
             ignored,
             exemptPackages(launchers),
             homes = parsePackages(launchers),
-            passes = app.passes,
+            passes = app.core.passes,
         )
         engine = blockEngine
-        app.stayFocusedForTesting = { main.post { blockEngine.dismiss() } }
-        subscription = app.session.subscribe { policy ->
+        app.core.stayFocusedForTesting = { main.post { blockEngine.dismiss() } }
+        subscription = app.core.session.subscribe { policy ->
             main.post { blockEngine.update(policy.blockList, policy != SessionPolicy.IDLE) }
         }
     }
@@ -83,7 +83,7 @@ class OrganizaAccessibilityService : AccessibilityService() {
     /** The person finished an intervention. An override grants its pass and reopens what was blocked. */
     private fun chosen(flow: InterventionFlow, outcome: InterventionOutcome) {
         if (outcome is InterventionOutcome.Overrode) {
-            app.passes.grant(flow.target, Duration.ofMinutes(outcome.minutes.toLong()))
+            app.core.passes.grant(flow.target, Duration.ofMinutes(outcome.minutes.toLong()))
             schedulePassEnd()
         }
         engine?.dismiss()
@@ -93,8 +93,8 @@ class OrganizaAccessibilityService : AccessibilityService() {
     private fun schedulePassEnd() {
         main.removeCallbacks(passEnded)
         main.removeCallbacks(limitTick)
-        val until = app.passes.nextExpiry() ?: return
-        main.postDelayed(passEnded, Duration.between(app.clock.now(), until).toMillis() + PASS_GRACE_MS)
+        val until = app.core.passes.nextExpiry() ?: return
+        main.postDelayed(passEnded, Duration.between(app.core.clock.now(), until).toMillis() + PASS_GRACE_MS)
     }
 
     private fun reopen(target: BlockTarget) {
@@ -105,7 +105,7 @@ class OrganizaAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val blockEngine = engine ?: return
         val source = (PackageName.parse(event.packageName?.toString().orEmpty()) as? Parsed.Valid)?.value ?: return
-        val policy = app.session.current
+        val policy = app.core.session.current
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 // Tracked while idle too, so a new session can act on the app already open.
@@ -115,7 +115,7 @@ class OrganizaAccessibilityService : AccessibilityService() {
                     checkLimit(source)
                 }
                 inspect(source, policy, blockEngine)
-                app.requestReconcile()
+                app.core.requestReconcile()
             }
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
                 val now = SystemClock.elapsedRealtime()
@@ -136,7 +136,7 @@ class OrganizaAccessibilityService : AccessibilityService() {
 
     /** Short video feeds to block now: every feed in a session that asks for it, plus the hub's switches. */
     private fun feeds(policy: SessionPolicy): Set<ShortFormFeed> =
-        (if (policy.blockShortForm) ShortFormFeed.entries.toSet() else emptySet()) + app.hub.feeds
+        (if (policy.blockShortForm) ShortFormFeed.entries.toSet() else emptySet()) + app.core.hub.feeds
 
     private fun inspect(source: PackageName, policy: SessionPolicy, blockEngine: BlockEngine) {
         val feeds = feeds(policy)
@@ -149,11 +149,11 @@ class OrganizaAccessibilityService : AccessibilityService() {
     /** Blocks [source] once today's use reaches its limit, or checks again when it would. */
     private fun checkLimit(source: PackageName) {
         main.removeCallbacks(limitTick)
-        val limit = app.hub.limits[source] ?: return
+        val limit = app.core.hub.limits[source] ?: return
         val target = BlockTarget.Limit(source)
-        if (app.passes.allows(target) || !usage.permitted()) return
+        if (app.core.passes.allows(target) || !usage.permitted()) return
         limitWorker.execute {
-            val now = app.clock.now()
+            val now = app.core.clock.now()
             val zone = ZoneId.systemDefault()
             val used = usage.foregroundTime(source, now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant(), now)
             main.post {

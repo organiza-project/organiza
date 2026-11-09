@@ -121,7 +121,7 @@ fun ImportScreen(ui: UiSnapshot, actions: Actions, back: () -> Unit, open: (Rout
             }
             Spacer(Modifier.height(10.dp))
             Txt("Upload timetable photo", Type.section)
-            Txt("Read on this phone. The photo is never sent.", Type.small, colors.muted)
+            Txt("Read on this device. The photo is never sent.", Type.small, colors.muted)
         }
     }
     Action("Dictate schedule", ButtonKind.SECONDARY, modifier = Modifier.fillMaxWidth()) { open(Route.DICTATION) }

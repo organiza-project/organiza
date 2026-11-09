@@ -67,7 +67,7 @@ fun OnboardingScreen(ui: UiSnapshot, actions: Actions) {
     }
     MessagePanel(ui.message)
     Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        val label = if (step == OnboardingStep.AI && ui.hasApiKey) "Finish" else Onboarding.continueLabel(step, ui.permissions)
+        val label = if (step == OnboardingStep.AI && ui.hasApiKey) "Finish" else Onboarding.continueLabel(step, ui.permissions, ui.device)
         Action(label, ButtonKind.PRIMARY) { advance() }
         if (step != OnboardingStep.WELCOME) Action("Back", ButtonKind.TEXT) { step = Onboarding.back(step) }
     }
@@ -83,9 +83,9 @@ private fun Welcome() {
         Txt("Focus on purpose, on your own terms.", Type.section, colors.muted)
     }
     Panel {
-        Point("Local first", "Sessions, habits and what you block live encrypted on this phone. It all works with no account and no network.")
+        Point("Local first", "Sessions, habits and what you block live encrypted on this device. It all works with no account and no network.")
         Rule()
-        Point("Private by design", "No tracking and no analytics. App names, websites and calendar titles never leave the phone.")
+        Point("Private by design", "No tracking and no analytics. App names, websites and calendar titles never leave this device.")
         Rule()
         Point(
             "Mindful friction",
@@ -106,7 +106,7 @@ private fun Point(title: String, body: String) {
 private fun PermissionsStep(ui: UiSnapshot, actions: Actions) {
     TitleBlock("Permissions", "What each one is for. Grant them now or later from the Focus screen.")
     Panel {
-        Onboarding.permissions(ui.permissions).forEachIndexed { index, row ->
+        Onboarding.permissions(ui.permissions, ui.device).forEachIndexed { index, row ->
             if (index > 0) Rule()
             PermissionItem(row, actions)
         }

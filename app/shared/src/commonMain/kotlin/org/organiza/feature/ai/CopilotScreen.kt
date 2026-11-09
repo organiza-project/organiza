@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.dp
 import org.organiza.ui.*
 
 private val STARTERS = listOf(
-    "How can I spend less time on my phone?",
+    "How can I spend less time on screens?",
     "Log 30 minutes of reading",
     "Schedule a meeting with Sam tomorrow at 2 pm",
     "Create a new daily habit for coding",

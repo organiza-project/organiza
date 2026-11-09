@@ -232,9 +232,9 @@ private fun ReasonStep(flow: InterventionFlow, changed: () -> Unit) {
     Spacer(Modifier.height(4.dp))
     Field(note, { note = it.take(InterventionFlow.MAX_NOTE) }, "A few words, if you like")
     val where = if (flow.strict && flow.reflects) {
-        "Kept on this phone. In a strict session with an AI key, it is sent for a reflection with names removed."
+        "Kept on this device. In a strict session with an AI key, it is sent for a reflection with names removed."
     } else {
-        "Kept on this phone, for your own look back."
+        "Kept on this device, for your own look back."
     }
     Txt(where, Type.small, colors.muted)
     Action("Continue", ButtonKind.SECONDARY, enabled = chosen != null) {

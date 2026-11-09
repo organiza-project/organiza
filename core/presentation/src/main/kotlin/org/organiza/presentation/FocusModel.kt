@@ -30,6 +30,8 @@ public enum class Protection(public val title: String, public val detail: String
     BATTERY("Keep running", "Stops Android pausing Organiza to save battery", "Allow"),
     DEVICE_ADMIN("Uninstall protection", "Stops Organiza being removed in one step", "Enable"),
     USAGE("Usage access", "Lets habits judge screen time on this phone", "Allow"),
+    TRACKING("Usage tracking", "Sees which app is in front, to count time and pause you before blocked ones", "Set up"),
+    AUTOSTART("Start at login", "Keeps Organiza running in the background, so sessions start on time", "Turn on"),
 }
 
 public data class ProtectionItem(val kind: Protection, val on: Boolean)
@@ -56,6 +58,7 @@ public data class FocusModel(
             tamperThisWeek: Int,
             /** Whether Android exempts Organiza from battery optimisation. Not a capability, so not tamper. */
             batteryExempt: Boolean = true,
+            device: Device = Device.PHONE,
         ): FocusModel {
             val active = sessions.filter { it.session.state == SessionState.ACTIVE }
             val state = when {
@@ -65,7 +68,7 @@ public data class FocusModel(
             }
             val until = active.maxOfOrNull { it.session.end }
             val headline = if (state == FocusState.OFF || until == null) "Off" else Format.duration(Duration.between(now, until))
-            val protection = Protection.entries.map { ProtectionItem(it, isOn(it, granted, batteryExempt)) }
+            val protection = device.protections.map { ProtectionItem(it, isOn(it, granted, batteryExempt)) }
             val off = protection.count { !it.on }
             return FocusModel(
                 state = state,
@@ -84,7 +87,8 @@ public data class FocusModel(
             Protection.ACCESSIBILITY -> Capability.ACCESSIBILITY in granted
             Protection.VPN_CONSENT -> Capability.VPN in granted
             Protection.DEVICE_ADMIN -> Capability.DEVICE_ADMIN in granted
-            Protection.USAGE -> Capability.USAGE_STATS in granted
+            Protection.USAGE, Protection.TRACKING -> Capability.USAGE_STATS in granted
+            Protection.AUTOSTART -> Capability.DAEMON in granted
         }
 
         private fun subline(

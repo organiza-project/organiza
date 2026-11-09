@@ -1,11 +1,11 @@
-package org.organiza.android.feature.ai
+package org.organiza.feature.ai
 
 import java.time.ZoneId
 import org.organiza.ai.AiFailure
 import org.organiza.ai.AiResult
 import org.organiza.ai.ChatTurn
 import org.organiza.ai.GroqClient
-import org.organiza.android.OrganizaApp
+import org.organiza.app.OrganizaCore
 import org.organiza.ui.ChatView
 import org.organiza.voice.CommandParser
 
@@ -15,7 +15,7 @@ import org.organiza.voice.CommandParser
  * it suggests is parsed by the same grammar, so the model can never act on its own (ADR-0010).
  * Turns live in memory only.
  */
-class ChatController(private val app: OrganizaApp) {
+class ChatController(private val app: OrganizaCore) {
     @Volatile private var turns: List<ChatTurn> = emptyList()
     @Volatile private var busy = false
 

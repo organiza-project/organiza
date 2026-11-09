@@ -72,7 +72,7 @@ class DnsVpnService : VpnService(), DnsUpstream {
         val pool = Executors.newFixedThreadPool(WORKERS)
         workers = pool
         // A site pass lifts its entry here too, so an override reaches the page (ADR-0016).
-        val sinkhole = DnsSinkhole(this) { app.passes.apply(app.session.current.blockList) }
+        val sinkhole = DnsSinkhole(this) { app.core.passes.apply(app.core.session.current.blockList) }
         val output = FileOutputStream(established.fileDescriptor)
         reader = Thread({ readLoop(FileInputStream(established.fileDescriptor), output, sinkhole, pool) }, "dns-vpn")
             .apply { start() }
@@ -124,7 +124,7 @@ class DnsVpnService : VpnService(), DnsUpstream {
 
     override fun onRevoke() {
         shutDown()
-        app.checkTamper()
+        app.core.checkTamper()
         stopSelf()
     }
 

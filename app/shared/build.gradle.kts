@@ -25,6 +25,8 @@ kotlin {
             api(project(":core:sync"))
             api(project(":core:presentation"))
             api(project(":core:scheduler"))
+            api(project(":core:voice"))
+            api(project(":core:calendar"))
             api(libs.compose.mp.foundation)
         }
         androidMain.dependencies {

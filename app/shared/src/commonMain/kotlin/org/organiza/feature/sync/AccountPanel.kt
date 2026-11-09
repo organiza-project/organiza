@@ -40,14 +40,14 @@ fun BackendPanel(account: AccountView, actions: Actions, withAccount: Boolean = 
     Panel {
         PanelHeader("Where Arena syncs")
         Txt(
-            "Habits, sessions, usage and overrides stay on this phone whatever you choose. A backend only holds your " +
+            "Habits, sessions, usage and overrides stay on this device whatever you choose. A backend only holds your " +
                 "account and encrypted challenge results it cannot read.",
             Type.small,
             colors.muted,
         )
         Spacer(Modifier.height(8.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ChoiceRow("Only this phone", "No account. Challenges use a relay address you enter", kind == null) { kind = null }
+            ChoiceRow("Only this device", "No account. Challenges use a relay address you enter", kind == null) { kind = null }
             ChoiceRow(
                 "Organiza hosted",
                 if (account.hostedAvailable) "A managed Supabase backend. Sign in with email" else "Not available in this build",
@@ -92,7 +92,7 @@ fun AccountPanel(account: AccountView, actions: Actions) {
             Spacer(Modifier.height(8.dp))
             Action("Sign out", ButtonKind.SECONDARY, enabled = !account.busy) { actions.signOut() }
             Rule()
-            Txt("Deleting removes your account and every challenge result the backend holds, at once. Nothing on this phone changes.", Type.small, colors.muted)
+            Txt("Deleting removes your account and every challenge result the backend holds, at once. Nothing on this device changes.", Type.small, colors.muted)
             Spacer(Modifier.height(8.dp))
             Action("Delete account & cloud data", ButtonKind.DANGER, enabled = !account.busy, modifier = Modifier.fillMaxWidth()) {
                 actions.deleteAccount()

@@ -9,13 +9,13 @@ import java.time.Duration
 import java.time.Instant
 import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
-import org.organiza.domain.port.UsageHistory
+import org.organiza.app.AppUsage
 import org.organiza.enforcement.ForegroundTime
 import org.organiza.enforcement.UsageEvent
 
 /** Reads foreground time on this device. The result stays local (ADR-0011, ADR-0019). */
-class AndroidUsageHistory(private val context: Context) : UsageHistory {
-    fun permitted(): Boolean {
+class AndroidUsageHistory(private val context: Context) : AppUsage {
+    override fun permitted(): Boolean {
         val appOps = context.getSystemService(AppOpsManager::class.java)
         val mode = appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
         return mode == AppOpsManager.MODE_ALLOWED
@@ -25,7 +25,7 @@ class AndroidUsageHistory(private val context: Context) : UsageHistory {
         perApp(from, to)[app] ?: Duration.ZERO
 
     /** Every app's foreground time in the window, the sum of which is screen time. */
-    fun perApp(from: Instant, to: Instant): Map<PackageName, Duration> {
+    override fun perApp(from: Instant, to: Instant): Map<PackageName, Duration> {
         val end = minOf(to, Instant.now())
         return ForegroundTime.perApp(events(from.minus(LOOKBACK), end), from, end)
     }
