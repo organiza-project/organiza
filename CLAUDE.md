@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Organiza delivers **OS-level focus enforcement that is hard to bypass and mindful by
 design** (ADR-0005, ADR-0016) with **100% local data ownership**: calendar-driven
 scheduling, BYOK AI coaching, and zero-knowledge peer accountability. Android is the
-main platform; the Linux desktop app shares its screens and is being ported (ADR-0023).
-Windows and iOS wait for an approved next phase.
+main platform; the desktop app shares its screens and core on Linux (ADR-0023) and Windows
+(ADR-0027). iOS waits for an approved next phase.
 
 ## 1. Git & GitHub Mandates
 - **Remote:** `origin` → `https://github.com/organiza-project/organiza`. Verify the
@@ -57,9 +57,11 @@ Recorded in ADR-0002 and ADR-0014. `./gradlew test` runs every JVM test.
   (`org.organiza.feature.*`) and the app core (`org.organiza.app`: `OrganizaCore`, `Platform`, `CoreActions`) in
   `commonMain`; small `actual`s in `androidMain`/`desktopMain` (ADR-0023, ADR-0025).
 - `app/android` — the Android `Platform` (`OrganizaApp`), `MainActivity`, services and adapters.
-- `app/desktop` — the Linux `Platform`, focus sources (GNOME extension, Hyprland, Sway, X11), the pause window and
+- `app/desktop` — the Linux and Windows `Platform`, focus sources (GNOME extension, Hyprland, Sway, X11, Windows User32), the pause window and
   process freezer, autostart, tray and shortcut (ADR-0024, ADR-0025).
 - `supabase/` — backend schema; `setup.sql` must contain each migration verbatim (a test checks).
+  `supabase/self-host/` runs the backend with Docker or Portainer (`docs/SELF_HOSTING.md`).
+- `site/` — the static landing page; preview it with the `site` entry in `.claude/launch.json`.
 - `.claude/rules/` — working rules for architecture, testing and privacy. Read them.
 
 ## 5. Commands
@@ -69,7 +71,8 @@ The Android build needs a full JDK 17: `export JAVA_HOME=/usr/lib/jvm/java-17-op
 ./gradlew test                                              # all JVM tests (CI runs test assembleDebug)
 ./gradlew :core:enforcement:test --tests '*BlockEngineTest*' # one class; works per module
 ./gradlew :app:android:connectedDebugAndroidTest             # Compose instrumentation tests, emulator needed
-./gradlew :app:desktop:run                                  # the Linux desktop window
+./gradlew :app:desktop:run                                  # the desktop window, on Linux or Windows
+./gradlew :app:desktop:packageDeb                           # the Linux installer (needs JDK 17 for jlink); packageMsi on Windows
 ./gradlew :app:android:dogfoodApks                           # dist/organiza-{debug,release}.apk, v1+v2+v3 signed
 scripts/verify-android.sh                                    # end-to-end enforcement checks on an emulator
 scripts/seed-screens.sh                                      # sample data for screenshot reviews

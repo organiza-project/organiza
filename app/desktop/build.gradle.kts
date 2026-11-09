@@ -42,7 +42,7 @@ compose.desktop {
             modules("java.sql", "jdk.unsupported", "jdk.crypto.ec")
             // The name people see in the app grid; the Debian package itself stays lowercase.
             packageName = "Organiza"
-            packageVersion = "0.3.1"
+            packageVersion = "1.0.0"
             description = "Focus sessions, habits and app blocking that stay on your computer"
             vendor = "Organiza Project"
             licenseFile.set(rootProject.file("LICENSE"))

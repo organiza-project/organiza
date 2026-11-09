@@ -87,9 +87,11 @@ Use the anon or publishable key only. The app refuses service-role and secret ke
 
 ## Self-hosting the backend
 
-The backend only stores accounts and encrypted challenge messages. To run your own:
+The backend only stores accounts and encrypted messages: challenge results and the sealed
+device usage reports of ADR-0028. To run your own:
 
-1. Create a Supabase project, or run Supabase yourself.
+1. Create a Supabase project, or run the small Docker stack in `supabase/self-host`
+   ([`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md)).
 2. Run `supabase/setup.sql` in the SQL Editor, or `supabase db push` for the migration alone.
 3. In the app, choose "My own Supabase" and enter the project URL and anon key.
 
