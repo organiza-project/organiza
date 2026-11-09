@@ -1170,3 +1170,22 @@ desktop needs the `tesseract` command.
   is in front on Wayland, and it splits state across two processes.
 - Killing blocked apps instead of stopping them: that loses unsaved work.
 - Closing their windows instead: Wayland gives other clients no way to do that.
+
+## ADR-0026: The frozen Linux daemon is removed
+
+### Status
+Accepted, 2026-11-09. Supersedes ADR-0013 and the freeze in ADR-0014.
+
+### Context
+`:platform:linux` was a root daemon that blocked apps by ending processes and sites through
+`/etc/hosts`. It was frozen until a desktop app could replace it. The desktop app (ADR-0025) now
+tracks usage, blocks apps and keeps its own encrypted database, so the daemon was a second copy of
+the database code that nobody ran.
+
+### Decision
+Remove `:platform:linux`, its root installer in `packaging/linux` and its VM check
+`scripts/verify-linux-vm.sh`. The desktop app is the only Linux build.
+
+### Consequences
+About 1,300 fewer lines to build and test. Website blocking on the desktop still needs a root
+helper for `/etc/hosts`; the daemon's `HostsFile` stays in git history as a starting point.

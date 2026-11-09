@@ -60,7 +60,6 @@ Recorded in ADR-0002 and ADR-0014. `./gradlew test` runs every JVM test.
 - `app/desktop` — the Linux `Platform`, focus sources (GNOME extension, Hyprland, Sway, X11), the pause window and
   process freezer, autostart, tray and shortcut (ADR-0024, ADR-0025).
 - `supabase/` — backend schema; `setup.sql` must contain each migration verbatim (a test checks).
-- `platform/linux` — frozen (ADR-0014); keep it compiling, add nothing. The desktop daemon replaces it.
 - `.claude/rules/` — working rules for architecture, testing and privacy. Read them.
 
 ## 5. Commands

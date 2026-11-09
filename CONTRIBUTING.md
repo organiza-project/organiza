@@ -42,7 +42,6 @@ app/android/     The Android app, grouped by feature (ADR-0014)
   data/               SQLCipher and Keystore glue
   ui/                 Design system: tokens and components (ADR-0012)
 supabase/migrations/  Backend schema, shared by hosted and self-hosted
-platform/linux/       Frozen Linux daemon (ADR-0013, ADR-0014)
 scripts/              End-to-end checks and test servers
 ```
 
@@ -107,7 +106,6 @@ Each signed-in user may append 500 messages a day. Messages are kept until you d
 | Android code | `./gradlew :app:android:connectedDebugAndroidTest` on an emulator |
 | Enforcement, storage or AI wiring on Android | `scripts/verify-android.sh` on an emulator, never a daily phone |
 | UI | `scripts/seed-screens.sh`, then check light, dark, 1.3x font and a tablet |
-| Linux daemon (frozen) | `scripts/verify-linux-vm.sh` |
 
 Core tests use the fakes in `core/testing`, never mocks of framework classes, and time always comes
 from the `Clock` port. A schema change is a new `vN.sql` with migration tests; released versions

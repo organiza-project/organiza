@@ -17,8 +17,8 @@ your phone.
 - **Local first.** SQLCipher storage with a key held by Android Keystore. No telemetry. An account
   is only needed for challenges, on the hosted backend or your own Supabase (ADR-0015).
 
-Android is the only platform in active development. A Linux daemon exists in `platform/linux` and
-is frozen until the Android build is approved (ADR-0014).
+Android is the main platform. The Linux desktop app in `app/desktop` shares its screens and core, and
+blocks apps on GNOME, Hyprland, Sway and X11 desktops (ADR-0023, ADR-0025).
 
 ## Install a dogfood build
 

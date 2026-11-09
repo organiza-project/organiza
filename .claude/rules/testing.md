@@ -10,7 +10,6 @@
 - The Android build needs a full JDK. If the default `java` has no compiler, set `JAVA_HOME`.
 - UI changes: run `scripts/seed-screens.sh`, then screenshot every tab in light, dark, a small phone at 1.3x font
   and a tablet, and critique them against `taste-skill`'s app-screen rules (ADR-0012).
-- Linux daemon changes also need `scripts/verify-linux-vm.sh` (a throwaway VM; never test the root daemon on this machine).
 - Android UI changes also need `./gradlew :app:android:connectedDebugAndroidTest`. Compose skips a composable whose
   parameters are unchanged and ignores parameters it never reads, so pass the values a step shows, not a counter.
 - Never run `uiautomator dump` or `uiautomator events` while checking enforcement: they suspend other accessibility
