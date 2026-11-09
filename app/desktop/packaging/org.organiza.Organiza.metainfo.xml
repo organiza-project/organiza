@@ -19,6 +19,7 @@
       scheduling work offline. AI coaching is optional and uses your own Groq key.
     </p>
   </description>
+  <icon type="stock">organiza</icon>
   <launchable type="desktop-id">organiza-Organiza.desktop</launchable>
   <url type="homepage">https://github.com/organiza-project/organiza</url>
   <url type="bugtracker">https://github.com/organiza-project/organiza/issues</url>

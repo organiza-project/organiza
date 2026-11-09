@@ -35,12 +35,12 @@ compose.desktop {
             modules("java.sql", "jdk.unsupported", "jdk.crypto.ec")
             // The name people see in the app grid; the Debian package itself stays lowercase.
             packageName = "Organiza"
-            packageVersion = "0.3.0"
+            packageVersion = "0.3.1"
             description = "Focus sessions, habits and app blocking that stay on your computer"
             vendor = "Organiza Project"
             licenseFile.set(rootProject.file("LICENSE"))
             linux {
-                iconFile.set(file("src/main/resources/organiza.png"))
+                iconFile.set(file("packaging/organiza.png"))
                 packageName = "organiza"
                 debMaintainer = "radwandoufan@gmail.com"
                 appCategory = "Utility"
@@ -51,7 +51,7 @@ compose.desktop {
     }
 }
 
-// jpackage has no option for the homepage or AppStream metadata, so they are added to the finished .deb.
+// jpackage has no option for the homepage, AppStream metadata or a themed icon, so they are added to the finished .deb.
 tasks.matching { it.name == "packageDeb" }.configureEach {
     doLast {
         val deb = outputs.files.asFileTree.matching { include("*.deb") }.singleFile
