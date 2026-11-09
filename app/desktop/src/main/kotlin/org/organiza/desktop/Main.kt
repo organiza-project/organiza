@@ -27,7 +27,7 @@ fun main(args: Array<String>) {
         repeat(HANDOFF_TRIES) { if (Instance.handOff(socket, command)) return else Thread.sleep(100) }
         return
     }
-    nameWindows()
+    if (!WINDOWS) nameWindows()
     val platform = DesktopPlatform()
     val core = OrganizaCore(platform)
     core.start()

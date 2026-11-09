@@ -209,7 +209,7 @@ class DesktopActions(core: OrganizaCore, private val app: DesktopApp, private va
             Permission.AUTOSTART -> platform.autostart.enable()
             Permission.TRAY -> {
                 platform.trayWanted = true
-                if (java.awt.SystemTray.isSupported()) "Closing the window now leaves Organiza in the top bar" else
+                if (WINDOWS) "Closing the window now leaves Organiza in the notification area" else if (java.awt.SystemTray.isSupported()) "Closing the window now leaves Organiza in the top bar" else
                     "Your desktop shows no top bar icons. On GNOME, turn on the AppIndicator extension"
             }
             Permission.SHORTCUT -> Shortcut.install().also { platform.shortcut = Shortcut.installed() }
@@ -230,7 +230,7 @@ class DesktopActions(core: OrganizaCore, private val app: DesktopApp, private va
 
     /** Photos are read with Tesseract on this computer when it is installed; nothing is sent. */
     override fun pickTimetablePhoto() {
-        if (output("which", "tesseract") == null) return core.showMessage("Reading photos needs Tesseract. Install tesseract-ocr, or paste the text")
+        if (output("tesseract", "--version") == null) return core.showMessage("Reading photos needs Tesseract. Install tesseract-ocr, or paste the text")
         val file = choose("Choose a timetable photo", "*.png;*.jpg;*.jpeg") ?: return
         core.schedule.readPhoto { output("tesseract", file.absolutePath, "stdout") }
     }

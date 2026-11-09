@@ -49,7 +49,7 @@ public enum class Permission(public val title: String, public val why: String, p
     ),
     TRAY(
         "Keep running when closed",
-        "Closing the window leaves Organiza in the top bar, so tracking and blocking carry on.",
+        "Closing the window leaves Organiza in the top bar, or the notification area on Windows, so tracking and blocking carry on.",
         "On GNOME the top bar icon needs the AppIndicator extension, which Ubuntu includes.",
     ),
     SHORTCUT(

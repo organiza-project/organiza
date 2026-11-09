@@ -61,7 +61,7 @@ class DesktopStorageTest {
     private fun core(secrets: SecretStore): OrganizaCore {
         val home = file.parent
         val env = mapOf("HOME" to home.toString(), "XDG_DATA_HOME" to "$home/data", "XDG_CONFIG_HOME" to "$home/config")
-        return OrganizaCore(DesktopPlatform(secrets, emptyList(), env, file, Autostart(home.resolve("config")))).also { it.start() }
+        return OrganizaCore(DesktopPlatform(secrets, emptyList(), env, file, SystemdAutostart(home.resolve("config")))).also { it.start() }
     }
 
     /** Waits for the work queued on the storage thread so far, and the snapshot it published. */

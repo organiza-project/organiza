@@ -1,5 +1,7 @@
 package org.organiza.desktop
 
+import com.sun.jna.platform.win32.User32
+import com.sun.jna.ptr.IntByReference
 import java.io.IOException
 import java.lang.ProcessBuilder.Redirect
 import java.net.UnixDomainSocketAddress
@@ -7,6 +9,8 @@ import java.nio.channels.Channels
 import java.nio.channels.SocketChannel
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /** The app in front, by desktop file ID, and the process of its window when the desktop says. */
@@ -21,10 +25,11 @@ fun interface FocusSource {
     fun enable(): String = UNSUPPORTED
 
     companion object {
-        const val UNSUPPORTED = "Usage tracking does not work on this desktop yet. It works on GNOME, Hyprland, Sway and X11 desktops."
+        const val UNSUPPORTED = "Usage tracking does not work on this desktop yet. It works on Windows and on GNOME, Hyprland, Sway and X11 desktops."
 
-        /** The first source this session supports, checked in order: GNOME, Hyprland, Sway, then X11. */
+        /** The first source this session supports, checked in order: Windows, GNOME, Hyprland, Sway, then X11. */
         fun forSession(env: Map<String, String> = System.getenv(), apps: List<LinuxApp> = LinuxApps.installed): FocusSource = when {
+            WINDOWS -> WindowsFocus(apps)
             "GNOME" in env["XDG_CURRENT_DESKTOP"].orEmpty().split(':') -> GnomeFocus
             !env["HYPRLAND_INSTANCE_SIGNATURE"].isNullOrEmpty() -> HyprlandFocus(apps)
             !env["SWAYSOCK"].isNullOrEmpty() -> SwayFocus(apps)
@@ -195,6 +200,41 @@ class X11Focus(private val apps: List<LinuxApp>) : FocusSource {
             val id = FocusSource.match(apps, GTK.find(props)?.groupValues?.get(1), *classes) ?: return null
             return Focus(id, PID.find(props)?.groupValues?.get(1)?.toLongOrNull()?.takeIf { it > 0 })
         }
+    }
+}
+
+/** Windows names the foreground window, and its process's program file names the app (ADR-0027). */
+class WindowsFocus(private val apps: List<LinuxApp>) : FocusSource {
+    override fun start(onChange: (Focus?) -> Unit): AutoCloseable {
+        val timer = Executors.newSingleThreadScheduledExecutor { Thread(it, "windows-focus").apply { isDaemon = true } }
+        var last: Focus? = null
+        // shortcut: polls twice a second; SetWinEventHook needs a message loop, worth it if this shows in battery use.
+        timer.scheduleWithFixedDelay({
+            val now = runCatching { foreground() }.getOrNull()
+            if (now != last) {
+                last = now
+                onChange(now)
+            }
+        }, 0, POLL_MS, TimeUnit.MILLISECONDS)
+        return AutoCloseable { timer.shutdownNow() }
+    }
+
+    override fun enable(): String = "Usage tracking on Windows needs no setup. Open Organiza again to restart it."
+
+    private fun foreground(): Focus? {
+        val window = User32.INSTANCE.GetForegroundWindow() ?: return null
+        val pid = IntByReference()
+        User32.INSTANCE.GetWindowThreadProcessId(window, pid)
+        // Empty for an elevated program, which this process may not inspect.
+        val exe = ProcessHandle.of(pid.value.toLong()).flatMap { it.info().command() }.orElse(null) ?: return null
+        return focus(exe, pid.value.toLong(), apps)
+    }
+
+    companion object {
+        private const val POLL_MS = 500L
+
+        fun focus(exe: String, pid: Long, apps: List<LinuxApp>): Focus? =
+            FocusSource.match(apps, WindowsApps.id(exe))?.let { Focus(it, pid.takeIf { it > 0 }) }
     }
 }
 

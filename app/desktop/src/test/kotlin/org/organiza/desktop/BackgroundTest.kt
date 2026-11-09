@@ -42,7 +42,7 @@ class BackgroundTest {
 
     @Test
     fun `starting at login links the service into the graphical session, and again does no harm`() {
-        val autostart = Autostart(dir.resolve("config"))
+        val autostart = SystemdAutostart(dir.resolve("config"))
         assertFalse(autostart.enabled())
         autostart.enable(listOf("/opt/organiza/bin/Organiza"))
         autostart.enable(listOf("/opt/organiza/bin/Organiza"))
@@ -73,7 +73,7 @@ class BackgroundTest {
 
     @Test
     fun `the login service restarts after a crash and quotes what systemd would expand`() {
-        val unit = Autostart.unitText(listOf("/opt/organiza/bin/organiza", "--name=50% \$HOME"))
+        val unit = SystemdAutostart.unitText(listOf("/opt/organiza/bin/organiza", "--name=50% \$HOME"))
         assertTrue("ExecStart=\"/opt/organiza/bin/organiza\" \"--name=50%% \$\$HOME\" \"--background\"" in unit)
         assertTrue("Restart=on-failure" in unit)
         assertTrue("WantedBy=graphical-session.target" in unit)

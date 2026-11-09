@@ -34,13 +34,13 @@ import org.organiza.storage.FocusLog
 import org.organiza.storage.HabitReminder
 import org.organiza.voice.VoiceCommand
 
-/** The Linux desktop as the shared core sees it (ADR-0025). Nothing here leaves the computer. */
+/** The Linux or Windows desktop as the shared core sees it (ADR-0025, ADR-0027). Nothing here leaves the computer. */
 class DesktopPlatform(
-    private val keyring: SecretStore = Keyring(),
+    private val keyring: SecretStore = if (WINDOWS) DpapiKeyring(DesktopStorage.file().resolveSibling("secrets")) else Keyring(),
     val apps: List<LinuxApp> = LinuxApps.installed,
     private val env: Map<String, String> = System.getenv(),
     private val database: Path = DesktopStorage.file(env),
-    val autostart: Autostart = Autostart(configHome(env)),
+    val autostart: Autostart = if (WINDOWS) RunKeyAutostart else SystemdAutostart(configHome(env)),
 ) : Platform {
     override val device: Device = Device.DESKTOP
     override val debug: Boolean = System.getProperty("organiza.debug") == "true"
@@ -125,7 +125,7 @@ class DesktopPlatform(
         val now = ZonedDateTime.now(ZoneId.systemDefault())
         scheduled += reminders.schedule(
             {
-                output("notify-send", "--app-name=Organiza", reminder.name, "Time for this habit")
+                notify(reminder.name, "Time for this habit")
                 remind(reminder, round)
             },
             Duration.between(now, nextReminder(reminder.minute, now)).toMillis(),
@@ -145,7 +145,13 @@ class DesktopPlatform(
                 "DTSTAMP:${stamp.format(java.time.Instant.now())}\r\nDTSTART:${stamp.format(event.start)}\r\nDTEND:${stamp.format(end)}\r\n" +
                 "SUMMARY:$title\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
         )
-        return if (output("xdg-open", file.toString()) != null) "Opened your calendar. Save the event there" else "No calendar app could take the event"
+        val opened = if (WINDOWS) runCatching { java.awt.Desktop.getDesktop().open(file.toFile()) }.isSuccess else output("xdg-open", file.toString()) != null
+        return if (opened) "Opened your calendar. Save the event there" else "No calendar app could take the event"
+    }
+
+    // Windows shows notifications from a notification area icon.
+    private fun notify(title: String, text: String) {
+        if (WINDOWS) onMain { TrayNotices.show(title, text) } else output("notify-send", "--app-name=Organiza", title, text)
     }
 
     override fun onMain(work: () -> Unit) = SwingUtilities.invokeLater(work)
@@ -193,7 +199,13 @@ class FilePrefs(private val file: Path) : Prefs {
 
     private fun save(props: Properties) {
         Files.createDirectories(file.parent)
-        if (!file.exists()) Files.createFile(file, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))
+        // Windows has no POSIX modes; the profile folder's access list already keeps others out.
+        val private = if ("posix" in file.fileSystem.supportedFileAttributeViews()) {
+            arrayOf(PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))
+        } else {
+            emptyArray()
+        }
+        if (!file.exists()) Files.createFile(file, *private)
         file.outputStream().use { props.store(it, null) }
     }
 }

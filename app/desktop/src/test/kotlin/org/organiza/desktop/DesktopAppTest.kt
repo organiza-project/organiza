@@ -44,7 +44,7 @@ class DesktopAppTest {
         apps = listOf(files, LinuxApp("google-chrome", "Chrome", null, "Internet", null)),
         env = env,
         database = home.resolve("data/organiza/organiza.db"),
-        autostart = Autostart(home.resolve("config")),
+        autostart = SystemdAutostart(home.resolve("config")),
     )
     private val core = OrganizaCore(platform).also { it.start() }
     private val focus = FakeFocus()

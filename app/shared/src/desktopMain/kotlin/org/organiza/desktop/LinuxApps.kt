@@ -10,7 +10,10 @@ import kotlin.io.path.relativeTo
 import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
 
-/** An app a person can launch, from its desktop entry (ADR-0024). */
+/** True on Windows, where apps, focus, freezing and secrets go through Windows instead (ADR-0027). */
+val WINDOWS: Boolean = System.getProperty("os.name").orEmpty().startsWith("Windows")
+
+/** An app a person can launch, from its desktop entry (ADR-0024) or, on Windows, its Start menu shortcut. */
 data class LinuxApp(val id: String, val name: String, val icon: String?, val category: String, val wmClass: String?) {
     val pkg: PackageName? get() = LinuxApps.packageName(id)
 }
@@ -18,21 +21,21 @@ data class LinuxApp(val id: String, val name: String, val icon: String?, val cat
 /** Desktop entries and their icons, read from the XDG data directories. */
 object LinuxApps {
     /** Every launchable app on this computer, read once. */
-    val installed: List<LinuxApp> by lazy { scan(dataDirs()) }
+    val installed: List<LinuxApp> by lazy { if (WINDOWS) WindowsApps.scan(WindowsApps.startMenus()) else scan(dataDirs()) }
 
     private val byPackage by lazy { installed.associateBy { it.pkg?.value } }
 
     fun find(pkg: String): LinuxApp? = byPackage[pkg]
 
-    /** The app's identity in core: its ID when that fits, otherwise the same ID under `linux.`. */
-    fun packageName(desktopId: String): PackageName? {
+    /** The app's identity in core: its ID when that fits, otherwise the same ID under `linux.` or `windows.`. */
+    fun packageName(desktopId: String, prefix: String = if (WINDOWS) "windows" else "linux"): PackageName? {
         // The .deb installs Organiza's own entry as `organiza-<name>`; it is still Organiza.
-        if (desktopId.startsWith("organiza-")) return packageName("organiza")
+        if (desktopId.startsWith("organiza-")) return packageName("organiza", prefix)
         (PackageName.parse(desktopId) as? Parsed.Valid)?.let { return it.value }
         val segments = desktopId.replace(Regex("[^A-Za-z0-9_.]"), "_").split('.').filter(String::isNotEmpty)
             .map { if (it.first().isLetter()) it else "x$it" }
         if (segments.isEmpty()) return null
-        return (PackageName.parse((listOf("linux") + segments).joinToString(".")) as? Parsed.Valid)?.value
+        return (PackageName.parse((listOf(prefix) + segments).joinToString(".")) as? Parsed.Valid)?.value
     }
 
     /** The app an entry describes, or null when it is hidden or not an application. */

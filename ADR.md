@@ -1189,3 +1189,51 @@ Remove `:platform:linux`, its root installer in `packaging/linux` and its VM che
 ### Consequences
 About 1,300 fewer lines to build and test. Website blocking on the desktop still needs a root
 helper for `/etc/hosts`; the daemon's `HostsFile` stays in git history as a starting point.
+
+## ADR-0027: Windows 11 desktop on the shared core
+
+### Status
+Accepted, 2026-11-09. Windows is the third platform; the roadmap to v1.0 approves the phase that
+the mission statement held back.
+
+### Context
+The desktop app (ADR-0023, ADR-0025) is plain JVM Compose with a `Platform` of its own. Most of it
+already runs on any desktop. What is Linux-specific is how it learns the app in front, how it lists
+apps and their icons, how it stops a blocked app, where it keeps secrets and data, and how it starts
+at login.
+
+### Decision
+- **One desktop module.** `:app:desktop` serves Linux and Windows, choosing per OS at start
+  (`WINDOWS` in `LinuxApps.kt`). No new module: the windows, screens, pause and tray are the same.
+- **Apps** are the Start menu's shortcuts (all users and this user) that point at an `.exe`, read
+  through `FileSystemView.getLinkLocation`, which asks the Windows shell. An app's ID is its program
+  file name in lower case (`Discord.exe` is `discord`), the name its window's process carries; in
+  core it is `windows.discord`. Uninstallers are skipped.
+- **Icons** come from the shell with `FileSystemView.getSystemIcon(file, 96, 96)`, which returns
+  the program's own high-resolution icon.
+- **The app in front** is `GetForegroundWindow` and `GetWindowThreadProcessId` from `User32`
+  through JNA, polled twice a second; the process's program file names the app.
+- **The pause** is the same full-screen, always-on-top, undecorated window as on Linux. The blocked
+  app's processes are suspended with `NtSuspendProcess` and resumed with `NtResumeProcess`. Windows
+  counts suspensions, so a process is suspended only once while it is frozen. Explorer, the window
+  manager, `ApplicationFrameHost` and the other session processes are never suspended.
+- **Secrets** (the database key, the Groq key) are sealed with DPAPI, which only this Windows
+  login can open, one file each next to the database in `%LOCALAPPDATA%\Organiza`.
+- **Starting at sign-in** writes the per-user `Run` registry key with `--background`.
+- **Reminders** are tray notifications. The installer is an MSI from `jpackage`, built by a Windows
+  CI job, which also runs the tests that call Windows itself.
+- **JNA** (`jna-platform`) is the one new dependency, for `User32`, `ntdll`, DPAPI and the registry.
+
+### Consequences
+Windows gets usage tracking, limits, sessions, the pause, the tray, autostart and every shared
+screen. Store (UWP) apps show their frame host as the app in front, so they are neither tracked nor
+blocked by name. A suspended app's window turns into Windows' "Not responding" ghost behind the
+pause. Website blocking waits, as on Linux, for an elevated helper. A killed Organiza is not
+restarted until the next sign-in.
+
+### Alternatives Considered
+- `SetWinEventHook` for focus changes: no polling, but it needs a thread with a message loop. Worth
+  it if polling ever shows in battery use.
+- Killing blocked apps: loses unsaved work (ADR-0025).
+- Windows Credential Manager for secrets: limits each secret to 2.5 KB and adds no protection over
+  DPAPI for one user.

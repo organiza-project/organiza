@@ -1,5 +1,6 @@
 package org.organiza.desktop
 
+import com.sun.jna.platform.win32.Crypt32Util
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.SecureRandom
@@ -23,8 +24,12 @@ object DesktopStorage {
     private const val KEY_BYTES = 32
 
     fun file(env: Map<String, String> = System.getenv()): Path =
-        (env["XDG_DATA_HOME"]?.takeIf(String::isNotEmpty)?.let(Path::of) ?: Path.of(env["HOME"].orEmpty(), ".local/share"))
-            .resolve("organiza/organiza.db")
+        if (WINDOWS) {
+            Path.of(env["LOCALAPPDATA"].orEmpty(), "Organiza", "organiza.db")
+        } else {
+            (env["XDG_DATA_HOME"]?.takeIf(String::isNotEmpty)?.let(Path::of) ?: Path.of(env["HOME"].orEmpty(), ".local/share"))
+                .resolve("organiza/organiza.db")
+        }
 
     fun open(file: Path, keyring: SecretStore): EncryptedDatabase {
         val key = keyring.get(KEY) ?: run {
@@ -105,6 +110,37 @@ class Keyring(private val env: Map<String, String> = emptyMap()) : SecretStore {
                 Secret.password_clear_sync(schema, attributes, None)
         """.trimIndent()
     }
+}
+
+/**
+ * Secrets on Windows, sealed with DPAPI so only this Windows login can open them, one file each in
+ * [dir] (ADR-0027). [seal] and [open] are DPAPI's; a test passes its own.
+ */
+class DpapiKeyring(
+    private val dir: Path,
+    private val seal: (ByteArray) -> ByteArray = { Crypt32Util.cryptProtectData(it) },
+    private val open: (ByteArray) -> ByteArray = { Crypt32Util.cryptUnprotectData(it) },
+) : SecretStore {
+    override fun put(name: String, value: ByteArray) {
+        Files.createDirectories(dir)
+        Files.write(file(name), seal(value))
+    }
+
+    override fun get(name: String): ByteArray? {
+        val file = file(name).takeIf(Files::exists) ?: return null
+        return try {
+            open(Files.readAllBytes(file))
+        } catch (failure: RuntimeException) {
+            // Another login's file, or a damaged one; a new key here could only make the database unreadable.
+            throw StorageUnavailable("A key sealed by Windows could not be opened.", failure)
+        }
+    }
+
+    override fun remove(name: String) {
+        Files.deleteIfExists(file(name))
+    }
+
+    private fun file(name: String): Path = dir.resolve(name.replace(Regex("[^A-Za-z0-9._-]"), "_") + ".dpapi")
 }
 
 /** SQLCipher-format SQLite through the encrypting JDBC driver. A wrong key never writes. */

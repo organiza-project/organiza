@@ -10,6 +10,8 @@ dependencies {
     implementation(project(":app:shared"))
     implementation(compose.desktop.currentOs)
     implementation(libs.sqlite.jdbc.crypt)
+    // User32, ntdll, DPAPI and the registry on Windows (ADR-0027).
+    implementation(libs.jna.platform)
     testImplementation(libs.compose.mp.ui.test)
     // The fakes come with the plain xerial driver, which would clash with the encrypting one.
     testImplementation(project(":core:testing")) {
@@ -23,14 +25,15 @@ tasks.test {
     environment("XDG_CONFIG_HOME", layout.buildDirectory.dir("test-config").get().asFile.path)
 }
 
-// The Linux desktop app (ADR-0023). `run` opens the window; `packageDeb` builds an installer.
+// The desktop app for Linux and Windows (ADR-0023, ADR-0027). `run` opens the window; `packageDeb`
+// builds the Linux installer and `packageMsi`, run on Windows, the Windows one.
 compose.desktop {
     application {
         mainClass = "org.organiza.desktop.MainKt"
         // Lets Main name its windows after the launcher instead of the main class.
         jvmArgs += listOf("--add-opens", "java.desktop/sun.awt.X11=ALL-UNNAMED")
         nativeDistributions {
-            targetFormats(TargetFormat.Deb)
+            targetFormats(TargetFormat.Deb, TargetFormat.Msi)
             // The encrypted SQLite driver needs java.sql; TLS to Groq and Supabase needs the EC ciphers.
             modules("java.sql", "jdk.unsupported", "jdk.crypto.ec")
             // The name people see in the app grid; the Debian package itself stays lowercase.
@@ -39,6 +42,16 @@ compose.desktop {
             description = "Focus sessions, habits and app blocking that stay on your computer"
             vendor = "Organiza Project"
             licenseFile.set(rootProject.file("LICENSE"))
+            windows {
+                iconFile.set(file("packaging/organiza.ico"))
+                menuGroup = "Organiza"
+                // Installs for this user only, so no administrator is needed and the data stays in the profile.
+                perUserInstall = true
+                dirChooser = true
+                shortcut = true
+                // Fixed for good: Windows matches this to replace an older Organiza on upgrade.
+                upgradeUuid = "6f1d0b5e-4b7a-4c43-9a5e-0c2f4f3f7a21"
+            }
             linux {
                 iconFile.set(file("packaging/organiza.png"))
                 packageName = "organiza"

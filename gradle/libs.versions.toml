@@ -17,6 +17,7 @@ espresso = "3.7.0"
 tesseract = "4.8.0"
 postgresql = "42.7.7"
 compose-multiplatform = "1.11.1"
+jna = "5.17.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test-junit5", version.ref = "kotlin" }
@@ -42,6 +43,7 @@ embedded-postgres = { module = "io.zonky.test:embedded-postgres", version.ref = 
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
 sqlite-jdbc-crypt = { module = "io.github.willena:sqlite-jdbc", version.ref = "sqlite-jdbc-crypt" }
 compose-mp-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
+jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
 compose-mp-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose-multiplatform" }
 
 [plugins]

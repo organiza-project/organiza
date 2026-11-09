@@ -45,10 +45,7 @@ fun OrganizaTray(onOpen: () -> Unit, items: List<TrayItem>) {
     val open by rememberUpdatedState(onOpen)
     DisposableEffect(Unit) {
         val tray = SystemTray.getSystemTray()
-        val side = tray.trayIconSize
-        // A multi-resolution image: AWT asks for the size the screen's scale needs and the mark is drawn at it.
-        val image = Brand.mark.toAwtImage(Density(1f), LayoutDirection.Ltr, Size(side.width.toFloat(), side.height.toFloat()))
-        val icon = TrayIcon(image, "Organiza")
+        val icon = TrayIcon(trayImage(), "Organiza")
         icon.addActionListener { open() }
         icon.addMouseListener(object : MouseAdapter() {
             // X11 reports the popup trigger on press, Windows on release.
@@ -59,8 +56,35 @@ fun OrganizaTray(onOpen: () -> Unit, items: List<TrayItem>) {
             }
         })
         tray.add(icon)
-        onDispose { tray.remove(icon) }
+        TrayNotices.icon = icon
+        onDispose {
+            TrayNotices.icon = null
+            tray.remove(icon)
+        }
     }
+}
+
+/** Notifications through the tray, as Windows shows them; a short-lived icon when Organiza has none showing. */
+object TrayNotices {
+    @Volatile var icon: TrayIcon? = null
+
+    fun show(title: String, text: String) {
+        if (!SystemTray.isSupported()) return
+        icon?.let { return it.displayMessage(title, text, TrayIcon.MessageType.NONE) }
+        val tray = SystemTray.getSystemTray()
+        val temporary = TrayIcon(trayImage(), "Organiza")
+        tray.add(temporary)
+        temporary.displayMessage(title, text, TrayIcon.MessageType.NONE)
+        javax.swing.Timer(NOTICE_MS) { tray.remove(temporary) }.apply { isRepeats = false }.start()
+    }
+
+    private const val NOTICE_MS = 10_000
+}
+
+/** A multi-resolution image: AWT asks for the size the screen's scale needs and the mark is drawn at it. */
+private fun trayImage(): java.awt.Image {
+    val side = SystemTray.getSystemTray().trayIconSize
+    return Brand.mark.toAwtImage(Density(1f), LayoutDirection.Ltr, Size(side.width.toFloat(), side.height.toFloat()))
 }
 
 /** The menu itself: the palette's surface, its raised grey under the pointer, Geist type. */

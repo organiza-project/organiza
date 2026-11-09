@@ -1,5 +1,7 @@
 package org.organiza.desktop
 
+import com.sun.jna.platform.win32.Advapi32Util
+import com.sun.jna.platform.win32.WinReg
 import java.io.IOException
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
@@ -27,18 +29,44 @@ const val BACKGROUND = "--background"
 const val COPILOT = "--copilot"
 private val FLAGS = setOf(BACKGROUND, COPILOT)
 
+/** Starting Organiza in the background when the person logs in. */
+interface Autostart {
+    fun enabled(): Boolean
+
+    /** Sets it up and says what happens next. */
+    fun enable(command: List<String> = launcher()): String
+}
+
+/**
+ * Starting at sign-in on Windows: the per-user Run key starts Organiza in the background (ADR-0027).
+ * Windows does not restart it if it is killed; the next sign-in does.
+ */
+object RunKeyAutostart : Autostart {
+    private const val KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+    private const val VALUE = "Organiza"
+
+    override fun enabled(): Boolean =
+        runCatching { Advapi32Util.registryValueExists(WinReg.HKEY_CURRENT_USER, KEY, VALUE) }.getOrDefault(false)
+
+    override fun enable(command: List<String>): String {
+        val line = (command + BACKGROUND).joinToString(" ") { "\"" + it.replace("\"", "\\\"") + "\"" }
+        Advapi32Util.registrySetStringValue(WinReg.HKEY_CURRENT_USER, KEY, VALUE, line)
+        return "Organiza now starts in the background when you sign in"
+    }
+}
+
 /**
  * Starting at login as a systemd user service (ADR-0025). It starts with the graphical session, in
  * the background, and again if it is killed; quitting from the tray ends it until the next login.
  */
-class Autostart(private val configHome: Path) {
+class SystemdAutostart(configHome: Path) : Autostart {
     private val unit = configHome.resolve("systemd/user/organiza.service")
     private val wanted = configHome.resolve("systemd/user/graphical-session.target.wants/organiza.service")
 
-    fun enabled(): Boolean = wanted.exists()
+    override fun enabled(): Boolean = wanted.exists()
 
     /** Writes the unit and links it the way `systemctl --user enable` would; systemd reads both at the next login. */
-    fun enable(command: List<String> = launcher()): String {
+    override fun enable(command: List<String>): String {
         Files.createDirectories(wanted.parent)
         unit.writeText(unitText(command))
         Files.deleteIfExists(wanted)
