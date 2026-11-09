@@ -1,8 +1,8 @@
 package org.organiza.desktop
 
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
@@ -47,22 +47,20 @@ fun main(args: Array<String>) {
     application {
         val tray = platform.trayWanted && SystemTray.isSupported()
         if (tray) {
-            Tray(
-                icon = Brand.mark,
-                tooltip = "Organiza",
-                onAction = { visible.value = true },
-                menu = {
-                    Item("Open Organiza") { visible.value = true }
-                    Item("Copilot") {
+            OrganizaTray(
+                onOpen = { visible.value = true },
+                items = listOf(
+                    "Open Organiza" to { visible.value = true },
+                    "Copilot" to {
                         visible.value = true
                         request.value = Route.COPILOT to System.nanoTime()
-                    }
-                    Separator()
-                    Item("Quit") {
+                    },
+                    null,
+                    "Quit" to {
                         listener.close()
                         exitApplication()
-                    }
-                },
+                    },
+                ),
             )
         }
         Window(
@@ -75,6 +73,7 @@ fun main(args: Array<String>) {
             title = "Organiza",
             icon = Brand.icon,
         ) {
+            LaunchedEffect(window) { window.iconImages = Brand.iconImages }
             OrganizaTheme { OrganizaRoot(core.uiState.value, actions, request.value) }
         }
         app.pause.value?.let { flow ->
@@ -88,6 +87,7 @@ fun main(args: Array<String>) {
                 alwaysOnTop = true,
                 resizable = false,
             ) {
+                LaunchedEffect(window) { window.iconImages = Brand.iconImages }
                 OrganizaTheme { InterventionScreen(flow, core, onDone = { outcome -> app.choose(flow, outcome) }) }
             }
         }

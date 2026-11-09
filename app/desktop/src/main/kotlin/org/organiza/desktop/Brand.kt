@@ -3,11 +3,18 @@ package org.organiza.desktop
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.toAwtImage
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import java.awt.image.BufferedImage
 
 /**
  * The icon from docs/brand/icon.svg and the mark from docs/brand/mark.svg, drawn as shapes. Compose
@@ -19,6 +26,19 @@ object Brand {
 
     /** The mark alone, light, for the dark top bar. */
     val mark: Painter = BrandPainter(ground = false)
+
+    /**
+     * The icon drawn at each size the window manager may show it. Compose hands the window a single
+     * picture, which Mutter and KWin scale to the dock, Alt+Tab and title bar sizes and blur.
+     */
+    val iconImages: List<BufferedImage> by lazy { listOf(16, 24, 32, 48, 64, 128, 256).map { render(icon, it) } }
+
+    internal fun render(painter: Painter, side: Int): BufferedImage {
+        val bitmap = ImageBitmap(side, side)
+        val size = Size(side.toFloat(), side.toFloat())
+        CanvasDrawScope().draw(Density(1f), LayoutDirection.Ltr, Canvas(bitmap), size) { with(painter) { draw(size) } }
+        return bitmap.toAwtImage()
+    }
 }
 
 // The 108-unit grid of the SVGs. The mark alone is drawn larger, on a 60-unit grid, as LogoMark does.
