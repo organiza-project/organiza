@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -26,8 +28,10 @@ import org.organiza.presentation.FocusWeek
 fun MetricsScreen(ui: UiSnapshot, actions: Actions) {
     TitleBlock("Metrics", ui.week?.total)
     MessagePanel(ui.message)
-    UsageDashboard(ui, actions)
-    BlockerHub(ui, actions)
+    // One app card open at a time across both lists, so two drafts of one limit never race.
+    val openApp = rememberSaveable { mutableStateOf<String?>(null) }
+    UsageDashboard(ui, actions, openApp)
+    BlockerHub(ui, actions, openApp)
     ui.week?.let { FocusWeekPanel(it) }
     ui.choices?.let { ChoicesPanel(it) }
     CopilotPanel(ui, actions)

@@ -15,6 +15,16 @@ public object Format {
         return if (minutes < 60) "$minutes m" else "${minutes / 60} h %02d m".format(minutes % 60)
     }
 
+    /** Minutes used today against the limit, short enough for one line: "1h 46m / 2h". */
+    public fun usage(usedMinutes: Long, limitMinutes: Long?): String =
+        compact(usedMinutes) + (limitMinutes?.let { " / ${compact(it)}" } ?: "")
+
+    private fun compact(minutes: Long): String = when {
+        minutes < 60 -> "${minutes}m"
+        minutes % 60 == 0L -> "${minutes / 60}h"
+        else -> "${minutes / 60}h ${minutes % 60}m"
+    }
+
     public fun count(count: Int, one: String, many: String): String = "$count ${if (count == 1) one else many}"
 
     public fun dayMonth(date: LocalDate): String = date.format(DAY_MONTH)

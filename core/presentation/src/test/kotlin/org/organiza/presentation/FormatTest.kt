@@ -20,6 +20,14 @@ class FormatTest {
     }
 
     @Test
+    fun `usage reads compactly against its limit`() {
+        assertEquals("0m", Format.usage(0, null))
+        assertEquals("46m", Format.usage(46, null))
+        assertEquals("1h 46m / 2h", Format.usage(106, 120))
+        assertEquals("2h / 1h 30m", Format.usage(120, 90))
+    }
+
+    @Test
     fun `counts agree with their nouns`() {
         assertEquals("1 app", Format.count(1, "app", "apps"))
         assertEquals("0 apps", Format.count(0, "app", "apps"))

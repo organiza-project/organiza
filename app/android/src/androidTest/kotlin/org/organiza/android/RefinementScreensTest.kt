@@ -56,13 +56,18 @@ class RefinementScreensTest {
             screenTime = "1 h 47 m",
         )
         show { UsageDashboard(UiSnapshot(hub = hub), actions) }
-        compose.onNodeWithText("25 m left of 2 h 00 m").assertExists()
+        compose.onNodeWithText("1h 35m / 2h").assertExists()
         compose.onNodeWithText("Maps").assertDoesNotExist()
+        // A card stays one line until tapped; then it opens in place.
+        compose.onNodeWithText("Block Reels").assertDoesNotExist()
         compose.onNodeWithText("Instagram").performClick()
         compose.onNodeWithText("Block Reels").performClick()
-        // A typed or tapped limit is saved when the sheet closes, never on each digit.
+        // A typed or tapped limit is saved when the card closes, never on each digit.
         compose.onNodeWithText("1 h 30").performClick()
+        assertEquals(listOf("setFeed INSTAGRAM_REELS true"), actions.calls)
         compose.onNodeWithText("Done").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Block Reels").assertDoesNotExist()
         assertEquals(listOf("setFeed INSTAGRAM_REELS true", "setLimit com.instagram.android 90"), actions.calls)
     }
 

@@ -85,6 +85,7 @@ class WireframeScreensTest {
         )
         show { BlockerHub(UiSnapshot(hub = hub), actions) }
         compose.onNodeWithText("Block Reels tab only").performClick()
+        compose.onNodeWithText("Instagram").performScrollTo().performClick()
         compose.onNodeWithText("Daily limit").performScrollTo().performClick()
         assertEquals(listOf("setFeed INSTAGRAM_REELS true", "setLimit com.instagram.android 60"), actions.calls)
     }
@@ -101,11 +102,11 @@ class WireframeScreensTest {
             screenTime = "53 m",
         )
         show { BlockerHub(UiSnapshot(hub = hub), actions) }
-        compose.onNodeWithText("50/60 min today").performScrollTo().assertExists()
+        compose.onNodeWithText("50m / 1h").performScrollTo().assertExists()
         compose.onNodeWithText("Add apps").performScrollTo().performClick()
         compose.onNodeWithText("Search apps").performScrollTo()
-        // The search field comes after Instagram's minutes box and before the website field.
-        compose.onAllNodes(hasSetTextAction() and !hasContentDescription("Minutes a day"))[0].performTextInput("che")
+        // Instagram's card is closed, so the search field is the first text field, before the website field.
+        compose.onAllNodes(hasSetTextAction())[0].performTextInput("che")
         compose.onNodeWithText("Maps").assertDoesNotExist()
         compose.onNodeWithText("Games").performScrollTo().assertExists()
         compose.onNodeWithText("Block").performScrollTo().performClick()

@@ -1,11 +1,9 @@
 package org.organiza.feature.blocker
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -16,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.key
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -28,11 +27,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.organiza.ui.*
 import org.organiza.enforcement.ShortFormFeed
-import org.organiza.enforcement.UsageLimits
 
 /** The distraction blocker hub, inside Metrics (ADR-0021): the focus list, daily limits and short video switches. */
 @Composable
-fun BlockerHub(ui: UiSnapshot, actions: Actions) {
+fun BlockerHub(ui: UiSnapshot, actions: Actions, openApp: MutableState<String?> = rememberSaveable { mutableStateOf(null) }) {
     val colors = Theme.colors
     val hub = ui.hub
     var showAll by rememberSaveable { mutableStateOf(false) }
@@ -50,12 +48,15 @@ fun BlockerHub(ui: UiSnapshot, actions: Actions) {
         }
     }
     val mine = hub.apps.filter { it.onList || it.limitMinutes != null }
+    var open by openApp
     Panel {
         PanelHeader("Your apps") { Action(if (showAll) "Done" else "Add apps", ButtonKind.TEXT) { showAll = !showAll } }
         if (mine.isEmpty()) Txt("No apps yet. Choose Add apps to pick some.", Type.body, colors.muted)
         mine.forEachIndexed { index, app ->
             if (index > 0) Rule()
-            key(app.pkg) { HubAppRow(app, actions) }
+            key(app.pkg) {
+                AppLimitCard(app, hub, mine.maxOf { it.usedMinutes }, open == app.pkg, actions) { open = if (open == app.pkg) null else app.pkg }
+            }
         }
     }
     if (showAll) {
@@ -115,42 +116,3 @@ internal fun AppIcon(pkg: String, size: androidx.compose.ui.unit.Dp = 36.dp) {
 /** The launcher icon of an installed app, or null while it loads or when there is none. */
 @Composable
 internal expect fun rememberAppIcon(pkg: String): ImageBitmap?
-
-// A bar turns red once 80% of the day's limit is used.
-private const val WARN_AT = 0.8
-
-@Composable
-private fun HubAppRow(app: HubApp, actions: Actions) {
-    val colors = Theme.colors
-    val limit = app.limitMinutes
-    val share = if (limit != null) app.usedMinutes.toDouble() / limit else 0.0
-    val warn = app.locked || share >= WARN_AT
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AppIcon(app.pkg)
-            Column(Modifier.weight(1f).padding(start = 10.dp)) {
-                Txt(app.label, Type.bodyStrong, maxLines = 1)
-                val used = if (limit != null) "${app.usedMinutes}/$limit min today" else "${app.usedMinutes} min today"
-                Txt(used, Type.small, if (warn) colors.negative else colors.muted)
-            }
-            if (app.locked) Icon(Glyph.LOCK, colors.negative, modifier = Modifier.padding(end = 8.dp))
-        }
-        if (limit != null) {
-            Spacer(Modifier.height(6.dp))
-            ProgressPill(share, ink = if (warn) colors.negative else colors.text)
-        }
-        SwitchRow("Block in focus sessions", "On the focus list", app.onList) { actions.setFocusApp(app.pkg, it) }
-        SwitchRow("Daily limit", limit?.let { "Locks after $it minutes a day" } ?: "No limit", limit != null) {
-            actions.setLimit(app.pkg, if (it) 60 else null)
-        }
-        if (limit != null) {
-            var draft by rememberSaveable { mutableStateOf(limit.toInt()) }
-            MinutesField("Minutes a day", draft, UsageLimits.MINUTES, LIMIT_PRESETS) { draft = it }
-            if (draft.toLong() != limit) {
-                Action("Save limit", ButtonKind.SECONDARY, modifier = Modifier.padding(top = 8.dp)) { actions.setLimit(app.pkg, draft.toLong()) }
-            }
-        }
-    }
-}
-
-private val LIMIT_PRESETS = listOf(15, 30, 60, 120)
