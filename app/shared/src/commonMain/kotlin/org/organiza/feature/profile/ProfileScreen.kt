@@ -46,7 +46,7 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
         Panel {
             Row(Modifier.fillMaxWidth()) {
                 Txt("XP", Type.bodyStrong, modifier = Modifier.weight(1f))
-                Txt("${progression.xp} · ${progression.toNext} to the next level", Type.small, colors.muted)
+                Txt("${progression.xp} XP · ${progression.toNext} XP to the next level", Type.small, colors.muted)
             }
             Spacer(Modifier.height(8.dp))
             ProgressPill(progression.fraction, ink = colors.data)

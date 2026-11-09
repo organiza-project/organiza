@@ -50,7 +50,11 @@ fun BackendPanel(account: AccountView, actions: Actions, withAccount: Boolean = 
         )
         Spacer(Modifier.height(8.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ChoiceRow("Only this device", "No account. Challenges use a relay address you enter", kind == null) { kind = null }
+            ChoiceRow(
+                "Only this device",
+                "No account. To take on challenges with friends, enter a relay address when you start one: a small server that passes your encrypted results along and cannot read them",
+                kind == null,
+            ) { kind = null }
             ChoiceRow(
                 "Organiza hosted",
                 if (account.hostedAvailable) "A managed Supabase backend. Sign in with email" else "Not available in this build",
@@ -58,6 +62,11 @@ fun BackendPanel(account: AccountView, actions: Actions, withAccount: Boolean = 
                 enabled = account.hostedAvailable,
             ) { kind = BackendKind.HOSTED }
             ChoiceRow("My own Supabase", "Enter your project URL and its anon or publishable key", kind == BackendKind.SELF_HOSTED) {
+                // Coming from another backend, the fields start empty rather than carrying its address.
+                if (kind != BackendKind.SELF_HOSTED && account.kind != BackendKind.SELF_HOSTED) {
+                    url = ""
+                    key = ""
+                }
                 kind = BackendKind.SELF_HOSTED
             }
         }
@@ -74,7 +83,8 @@ fun BackendPanel(account: AccountView, actions: Actions, withAccount: Boolean = 
             key = ""
         }
     }
-    if (withAccount && account.kind != null) AccountPanel(account, actions)
+    // The account below belongs to the backend in use; while another is chosen but not saved, it would mislead.
+    if (withAccount && account.kind != null && kind == account.kind) AccountPanel(account, actions)
 }
 
 private enum class AuthMode(val label: String) { SIGN_IN("Sign in"), SIGN_UP("Create account") }

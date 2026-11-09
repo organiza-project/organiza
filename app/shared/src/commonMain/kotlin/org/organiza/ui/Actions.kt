@@ -94,4 +94,7 @@ interface Actions {
     fun linkDevices(code: String)
     fun unlinkDevices()
     fun shareDeviceCode()
+
+    /** Android's App info for Organiza, where "Allow restricted settings" lives. */
+    fun openAppInfo()
 }

@@ -44,6 +44,7 @@ class RecordingActions : Actions {
     override fun linkDevices(code: String) { calls += "linkDevices $code" }
     override fun unlinkDevices() { calls += "unlinkDevices" }
     override fun shareDeviceCode() { calls += "shareDeviceCode" }
+    override fun openAppInfo() { calls += "openAppInfo" }
     override fun createChallenge(habit: String, title: String, days: String, freezes: String, relay: String, name: String) {
         calls += "createChallenge"
     }

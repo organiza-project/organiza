@@ -32,18 +32,8 @@ reason, which the phone's own "App not installed" message hides.
 
 ## What the errors mean
 
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | An Organiza signed with another key is installed, for example one built on another computer | `adb uninstall org.organiza.app`, then install again. This deletes that copy's data |
-| `INSTALL_FAILED_VERSION_DOWNGRADE` | The installed copy has a higher version code | Add `-d`, as above |
-| `INSTALL_FAILED_OLDER_SDK` | The phone runs Android 7 or older | Not supported |
-| `INSTALL_PARSE_FAILED_NOT_APK`, or "package appears to be invalid" | The file was damaged or cut short in transfer | Compare `sha256sum android-release.apk` on both ends, and copy it again |
-| `INSTALL_FAILED_USER_RESTRICTED` | On Xiaomi and some others, installing over USB is a separate switch | Turn on **Install via USB** in Developer options |
-| Blocked by Play Protect | Play Protect does not know the app or its signer | Choose **More details** > **Install anyway**. In some countries Play Protect refuses sideloaded apps that ask for accessibility outright when they come from a browser or file manager; installing over adb is not affected |
-
-R8 cannot cause an install failure: it only changes the code inside the APK, and Android checks
-the manifest, the signature and the SDK level before any of that code runs. The release APK keeps
-every component the manifest names.
+The install errors, Play Protect and the Android 13 "Restricted setting" message are explained in
+[`TROUBLESHOOTING.md`](../TROUBLESHOOTING.md).
 
 ## After installing
 

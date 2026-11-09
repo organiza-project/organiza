@@ -83,8 +83,12 @@ object TrayNotices {
 
 /** A multi-resolution image: AWT asks for the size the screen's scale needs and the mark is drawn at it. */
 private fun trayImage(): java.awt.Image {
-    val side = SystemTray.getSystemTray().trayIconSize
-    return Brand.mark.toAwtImage(Density(1f), LayoutDirection.Ltr, Size(side.width.toFloat(), side.height.toFloat()))
+    // AWT's X11 tray says 24x24 whatever the panel gives; GNOME's AppIndicator host gives 16x16 and showed
+    // only the top-left corner of a larger picture.
+    // shortcut: 16 px is GNOME at 100% scale; read the embedded window's real size if a scaled panel shows a corner again.
+    val side = if ("GNOME" in System.getenv("XDG_CURRENT_DESKTOP").orEmpty()) 16f else SystemTray.getSystemTray().trayIconSize.width.toFloat()
+    // Windows trays draw transparency; Linux ones need the mark's own ground.
+    return (if (WINDOWS) Brand.mark else Brand.trayMark).toAwtImage(Density(1f), LayoutDirection.Ltr, Size(side, side))
 }
 
 /** The menu itself: the palette's surface, its raised grey under the pointer, Geist type. */

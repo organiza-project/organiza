@@ -87,6 +87,19 @@ class SanitizerTest {
     }
 
     @Test
+    fun `a timetable keeps its times, and its subjects can come back on the device`() {
+        val names = mutableListOf<String>()
+        val text = sanitizer.clean("Monday 08.00 09.30 11.00 Linear Algebra\nTuesday 10.00-11.30 Computer Science", names).value
+        assertEquals("Monday 08.00 09.30 11.00 [NAME1] Tuesday 10.00-11.30 [NAME2]", text)
+        assertEquals(listOf("Linear Algebra", "Computer Science"), names)
+        // Without a list to keep them, a pair is a name as before; a dotted phone number is still one.
+        assertEquals("[NAME] called twice", clean("Sarah Connor called twice"))
+        assertEquals("call [PHONE]", clean("call 0612.345.678"))
+        // A lone number that looks like a time, such as a room, stays what it was.
+        assertEquals("Room 2.14", clean("Room 2.14"))
+    }
+
+    @Test
     fun `calendar words are not names`() {
         assertEquals("plan for Monday", clean("plan for Monday"))
         assertEquals("Monday Morning review", clean("Monday Morning review"))

@@ -8,8 +8,10 @@ public enum class Permission(public val title: String, public val why: String, p
         "App blocking",
         "Lets Organiza see which app is open, so it can pause you before a blocked one. It reads web addresses only " +
             "in browsers, and screen text only on system settings pages during strict sessions. Nothing is stored or sent.",
-        "On Android 13 and later, an app installed outside a store may need \"Allow restricted settings\" first: open " +
-            "Organiza's App info, tap the menu in the corner, allow it, then come back.",
+        "If Android says \"Restricted setting\" (Android 13 and later, for apps installed outside a store):\n" +
+            "1. Tap Allow above and try to turn on Organiza once. Android greys it out; that unlocks the next step.\n" +
+            "2. Tap Open App info below, then the three dots in the top corner, then Allow restricted settings.\n" +
+            "3. Come back here and tap Allow again.",
     ),
     OVERLAY(
         "Pause screen",

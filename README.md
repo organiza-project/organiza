@@ -37,6 +37,26 @@ wall: a screen that says no until you find the toggle that says yes.
 | **Backend** | Theirs, required | None, the hosted one, or your own in five minutes with Docker |
 | **Source** | Closed | MIT, every line |
 
+### Why local-first matters
+
+What you open, when, and for how long is one of the most revealing records a person makes: it
+shows your sleep, your worries, your work and who you talk to. A focus app needs that record to do
+its job, which is exactly why it should never leave your hands. If the data is never collected
+anywhere, it cannot be sold, leaked, subpoenaed from a vendor or used to train someone's model.
+
+### How telemetry is kept out
+
+- **No collector to switch off.** No analytics, crash-reporting or ad SDK is in any module or
+  build type; the dependency list is in [`gradle/libs.versions.toml`](gradle/libs.versions.toml).
+- **Logs stay on the device** and never contain URLs, window titles or which apps you use.
+- **What may sync is fenced by tests.** Challenge results come only from the `challenge_log`
+  table, whose column allow-list a test enforces, and usage leaves only as sealed reports your own
+  devices can open ([ADR-0028](ADR.md)).
+- **AI sees no names.** Prompts pass an on-device sanitizer, use your own key, and describe the
+  hours you get distracted rather than the apps.
+- **No account by default.** Every feature but Arena, cross-device limits and the AI copilot works
+  offline, with no sign-up.
+
 Organiza never claims to be unbypassable: safe mode, revoking a permission or uninstalling all
 work, and losing a permission during a session is recorded. The point is friction you chose, set
 when your mind was clear ([ADR-0005](ADR.md), [ADR-0016](ADR.md)).
@@ -106,7 +126,8 @@ adb install -r organiza-release.apk
 Android 13 and later restrict accessibility for apps from outside a store. If **App blocking**
 cannot be turned on: **Settings** > **Apps** > **Organiza** > the menu in the corner > **Allow
 restricted settings**. Onboarding walks you through the rest. Install errors and what they mean
-are in [`docs/install.md`](docs/install.md).
+are in [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md), with what to do when Play Protect blocks the
+install.
 
 ### Linux (`.deb`)
 
@@ -211,7 +232,8 @@ ground rules; in short:
 - [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md): your own backend with Docker or Portainer
 - [`docs/supabase-setup.md`](docs/supabase-setup.md): the backend schema, authentication settings and keys
 - [`docs/schema.md`](docs/schema.md): the local database
-- [`docs/install.md`](docs/install.md): installing an APK and what install errors mean
+- [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md): Play Protect, restricted settings, install errors, tracking and self-hosting problems
+- [`docs/install.md`](docs/install.md): installing an APK over USB
 - [`docs/screenshots`](docs/screenshots): every screen
 
 ## License

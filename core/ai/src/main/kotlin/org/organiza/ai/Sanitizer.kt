@@ -24,7 +24,11 @@ public class Sanitizer(privateTerms: Set<String> = emptySet()) {
         ?.joinToString("|", "(?<![\\p{L}\\p{N}])(?:", ")(?![\\p{L}\\p{N}])") { Regex.escape(it.trim()) }
         ?.let { Regex(it, setOf(RegexOption.IGNORE_CASE)) }
 
-    public fun clean(raw: String): SanitizedText {
+    /**
+     * [names], when given, collects each capitalised pair it replaces and numbers its placeholder
+     * (`[NAME1]`), so a reply can be mended on the device: a timetable's "Linear Algebra" looks like a name.
+     */
+    public fun clean(raw: String, names: MutableList<String>? = null): SanitizedText {
         val flat = raw.take(MAX_INPUT_CHARS).replace(CONTROL, " ").replace(SPACES, " ")
         var text = privateRule?.replace(flat, PRIVATE) ?: flat
         text = SCHEME_URL.replace(text, URL)
@@ -35,6 +39,8 @@ public class Sanitizer(privateTerms: Set<String> = emptySet()) {
         text = LOWERCASE_DOMAIN.replace(text, URL)
         text = COMMON_TLD_DOMAIN.replace(text, URL)
         text = GROUPED_DIGITS.replace(text) { match ->
+            // A timetable row, "08.00 09.30 11.00", is times, not one long number.
+            if (TIMES.matches(match.value)) return@replace match.value
             when (match.value.count(Char::isDigit)) {
                 in 0 until MIN_PHONE_DIGITS -> match.value
                 in MIN_PHONE_DIGITS..MAX_PHONE_DIGITS -> PHONE
@@ -49,7 +55,11 @@ public class Sanitizer(privateTerms: Set<String> = emptySet()) {
         // Over-scrubs phrases like "New York", which is the safe way to be wrong here.
         text = NAME_PAIR.replace(text) { match ->
             val first = match.groupValues[1].lowercase(Locale.ROOT)
-            if (first in NOT_NAMES) match.value else NAME
+            when {
+                first in NOT_NAMES -> match.value
+                names == null -> NAME
+                else -> "[NAME${names.apply { add(match.value) }.size}]"
+            }
         }
         return SanitizedText(text.take(MAX_CHARS), text != flat)
     }
@@ -87,6 +97,8 @@ public class Sanitizer(privateTerms: Set<String> = emptySet()) {
             """\b[\w-]+(\.[\w-]+)*\.(com|org|net|io|co|app|dev|ai|edu|gov|tv|me|info)\b([/?#]\S*)?""",
             RegexOption.IGNORE_CASE,
         )
+        private val TIME = """([01]?\d|2[0-3])\.[0-5]\d"""
+        private val TIMES = Regex("""$TIME([ -]$TIME)+""")
         private val GROUPED_DIGITS = Regex("""(?<![\w])\+?\(?\d{1,4}\)?([ .-]\(?\d{1,4}\)?){2,}""")
         private val LONG_DIGITS = Regex("""\d{7,}""")
         private val HANDLE = Regex("""(?<![\w.])@\w{2,}""")

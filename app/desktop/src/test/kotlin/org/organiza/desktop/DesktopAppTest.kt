@@ -32,6 +32,10 @@ import org.organiza.storage.FocusLog
 import org.organiza.storage.FocusTier
 import org.organiza.testing.FakeSecretStore
 import org.organiza.ui.OrganizaRoot
+import org.organiza.ui.AccountView
+import org.organiza.sync.BackendKind
+import org.organiza.feature.sync.BackendPanel
+import androidx.compose.foundation.layout.Column
 import org.organiza.ui.OrganizaTheme
 
 @OptIn(ExperimentalTestApi::class)
@@ -67,6 +71,16 @@ class DesktopAppTest {
     }
 
     private fun state(pid: Long): Char = Files.readString(Path.of("/proc/$pid/stat")).substringAfterLast(')').trim().first()
+
+    @Test
+    fun `choosing my own supabase drops the hosted account and its address`() = runComposeUiTest {
+        val hosted = AccountView(kind = BackendKind.HOSTED, url = "https://hosted.example.org", signedInAs = "me@example.org", hostedAvailable = true)
+        setContent { OrganizaTheme { Column { BackendPanel(hosted, actions) } } }
+        onNodeWithText("Signed in as").assertExists()
+        onNodeWithText("My own Supabase").performClick()
+        onNodeWithText("Signed in as").assertDoesNotExist()
+        onNodeWithText("hosted.example.org", substring = true).assertDoesNotExist()
+    }
 
     @Test
     fun `the habits tab shows habits on the desktop`() = runComposeUiTest {

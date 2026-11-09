@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.Settings
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
@@ -119,6 +120,10 @@ class MainActivity : ComponentActivity() {
         override fun pickTimetablePhoto() = timetablePhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
 
         override fun importCalendar() = calendarPicker.launch(arrayOf("text/calendar", "*/*"))
+
+        override fun openAppInfo() {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+        }
 
         override fun shareDeviceCode() {
             val code = core.devices.code() ?: return core.showMessage("Start sharing usage first")

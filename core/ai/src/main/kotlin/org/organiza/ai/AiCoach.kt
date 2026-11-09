@@ -48,13 +48,23 @@ public class AiCoach(
     public fun monitorSummary(sessionMinutes: Long, facts: UsageFacts): AiResult<String> =
         ask(Prompts.monitorSummary(sessionMinutes, facts)) { it["summary"].text() }
 
-    /** Weekly blocks from a timetable's text. Nothing is scheduled until the person adds them. */
-    public fun extractSchedule(text: String): AiResult<List<SuggestedBlock>> =
-        ask(Prompts.scheduleExtraction(sanitizer.clean(text.take(MAX_SCHEDULE_TEXT)))) { reply ->
-            (reply["blocks"] as? JsonArray)?.take(MAX_ITEMS)?.map { element ->
-                parseBlock(element as? JsonObject ?: return@ask null) ?: return@ask null
+    /**
+     * Weekly blocks from a timetable's text. Nothing is scheduled until the person adds them. Subjects the
+     * sanitizer took for names come back into the labels here, on the device. A broken block is dropped;
+     * only a reply with no usable block at all fails.
+     */
+    public fun extractSchedule(text: String): AiResult<List<SuggestedBlock>> {
+        val names = mutableListOf<String>()
+        return ask(Prompts.scheduleExtraction(sanitizer.clean(text.take(MAX_SCHEDULE_TEXT), names))) { reply ->
+            val blocks = reply["blocks"] as? JsonArray ?: return@ask null
+            val parsed = blocks.take(MAX_ITEMS).mapNotNull { (it as? JsonObject)?.let(::parseBlock) }
+            if (parsed.isEmpty() && blocks.isNotEmpty()) return@ask null
+            parsed.map { block ->
+                // Highest first, so [NAME1] never eats the start of [NAME10].
+                block.copy(label = names.indices.reversed().fold(block.label) { label, i -> label.replace("[NAME${i + 1}]", names[i]) })
             }
         }
+    }
 
     private fun <T : Any> ask(prompt: Prompt, parse: (JsonObject) -> T?): AiResult<T> {
         val key = keys.load() ?: return AiResult.Failed(AiFailure.NO_KEY)

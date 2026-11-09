@@ -28,6 +28,13 @@ object Brand {
     val mark: Painter = BrandPainter(ground = false)
 
     /**
+     * The mark for the Linux tray: monochrome on a black square. AWT's X11 tray has no transparency and
+     * fills clear pixels grey, so the mark brings the ground of GNOME's top bar with it.
+     */
+    // shortcut: black suits GNOME's and most dark panels; a light KDE panel shows a black square, fixed only by a StatusNotifierItem tray.
+    val trayMark: Painter = BrandPainter(ground = false, tray = true)
+
+    /**
      * The icon drawn at each size the window manager may show it. Compose hands the window a single
      * picture, which Mutter and KWin scale to the dock, Alt+Tab and title bar sizes and blur.
      */
@@ -42,10 +49,11 @@ object Brand {
 }
 
 // The 108-unit grid of the SVGs. The mark alone is drawn larger, on a 60-unit grid, as LogoMark does.
-private class BrandPainter(private val ground: Boolean) : Painter() {
+private class BrandPainter(private val ground: Boolean, private val tray: Boolean = false) : Painter() {
     override val intrinsicSize: Size = Size(256f, 256f)
 
     override fun DrawScope.onDraw() {
+        if (tray) drawRect(Color.Black)
         val unit = size.minDimension / if (ground) 108f else 60f
         if (ground) drawRoundRect(Color(0xFF141414), cornerRadius = CornerRadius(24 * unit))
         val radius = 21 * unit
@@ -58,6 +66,6 @@ private class BrandPainter(private val ground: Boolean) : Painter() {
             size = Size(radius * 2, radius * 2),
             style = Stroke(width = 8.5f * unit, cap = StrokeCap.Round),
         )
-        drawCircle(Color(0xFF6EA2F2), radius = 5.75f * unit, center = center)
+        drawCircle(if (tray) Color(0xFFF2F4F7) else Color(0xFF6EA2F2), radius = 5.75f * unit, center = center)
     }
 }

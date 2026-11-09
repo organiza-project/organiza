@@ -39,6 +39,7 @@ import org.organiza.ui.Txt
 import org.organiza.ui.Type
 import org.organiza.ui.UiSnapshot
 import org.organiza.presentation.Onboarding
+import org.organiza.presentation.Permission
 import org.organiza.presentation.OnboardingStep
 import org.organiza.presentation.PermissionRow
 
@@ -116,7 +117,8 @@ private fun PermissionsStep(ui: UiSnapshot, actions: Actions) {
 @Composable
 private fun PermissionItem(row: PermissionRow, actions: Actions) {
     val colors = Theme.colors
-    var help by rememberSaveable { mutableStateOf(false) }
+    // App blocking's steps are open from the start: on Android 13 and later most people need them.
+    var help by rememberSaveable { mutableStateOf(row.permission == Permission.ACCESSIBILITY) }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(Modifier.fillMaxWidth().heightIn(min = Space.target), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).padding(end = 12.dp)) {
@@ -141,6 +143,9 @@ private fun PermissionItem(row: PermissionRow, actions: Actions) {
                     .wrapContentHeight(Alignment.CenterVertically),
             )
             if (help) Txt(row.permission.fallback, Type.small, colors.text)
+            if (help && row.permission == Permission.ACCESSIBILITY) {
+                Action("Open App info", ButtonKind.SECONDARY, modifier = Modifier.padding(top = 8.dp)) { actions.openAppInfo() }
+            }
         }
     }
 }

@@ -61,6 +61,16 @@ class OnboardingScreenTest {
     }
 
     @Test
+    fun appBlockingShowsTheRestrictedSettingsStepsAndOpensAppInfo() {
+        show(UiSnapshot(onboarding = true))
+        compose.onNodeWithText("Start").performClick()
+        // App blocking is off, so its steps are open without a tap; the other permissions keep theirs folded.
+        compose.onNodeWithText("Allow restricted settings", substring = true).performScrollTo().assertExists()
+        compose.onNodeWithText("Open App info").performScrollTo().performClick()
+        assertEquals(listOf("openAppInfo"), actions.calls)
+    }
+
+    @Test
     fun theHostedBackendIsOfferedOnlyWhenTheBuildHasOne() {
         show(UiSnapshot(onboarding = true, account = AccountView(hostedAvailable = false)))
         compose.onNodeWithText("Start").performClick()

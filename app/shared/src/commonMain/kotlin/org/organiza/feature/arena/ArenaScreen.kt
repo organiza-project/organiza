@@ -117,15 +117,25 @@ private fun NewChallengePanel(actions: Actions, account: AccountView, open: Bool
         Spacer(Modifier.height(8.dp))
         Field(habit, { habit = it }, "Your habit")
         Field(name, { name = it }, "Your name in the group")
+        Txt("Join a friend's challenge", Type.bodyStrong, modifier = Modifier.padding(top = 8.dp))
+        Txt("Paste the invite they sent you. It carries everything needed to connect, the relay included.", Type.small, Theme.colors.muted)
         Field(invite, { invite = it }, "Invite", secret = true)
         Action("Join with invite", ButtonKind.SECONDARY) { actions.joinChallenge(invite, habit, name); invite = "" }
         Rule()
+        Txt("Or start your own", Type.bodyStrong)
+        Txt("Create it, then tap Share invite above and send the invite to your friends. Share it like a password: anyone holding it can join.", Type.small, Theme.colors.muted)
         Field(title, { title = it }, "Challenge title")
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Field(days, { days = it }, "Days", Modifier.weight(1f), number = true)
             Field(freezes, { freezes = it }, "Freeze days", Modifier.weight(1f), number = true)
         }
         if (account.kind == null) {
+            Txt(
+                "With no account, results travel through a relay: a small server that passes encrypted messages and cannot read them. " +
+                    "Enter the https address of one you or a friend runs, or choose a backend in Profile and its relay is used for you.",
+                Type.small,
+                Theme.colors.muted,
+            )
             Field(relay, { relay = it }, "Relay address (https)")
         } else {
             Txt("Results sync through ${account.url}" + if (account.signedInAs == null) ". Sign in on the Profile screen first." else ".", Type.small, Theme.colors.muted)

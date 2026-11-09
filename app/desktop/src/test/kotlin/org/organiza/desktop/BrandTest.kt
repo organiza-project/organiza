@@ -23,6 +23,15 @@ class BrandTest {
     }
 
     @Test
+    fun `the linux tray mark is monochrome on a solid black square`() {
+        // AWT's X11 tray has no transparency and fills see-through pixels grey, so nothing here may be clear.
+        val tray = Brand.render(Brand.trayMark, 60)
+        assertEquals(0xFF000000.toInt(), tray.getRGB(0, 0))
+        assertEquals(0xF2, tray.at(0.15, 0.5).red, "the ring")
+        assertEquals(0xF2F4F7, tray.at(0.5, 0.5).rgb and 0xFFFFFF, "the dot is the ring's light ink, not blue")
+    }
+
+    @Test
     fun `the top bar mark is the open ring, light on a clear ground`() {
         val mark = Brand.render(Brand.mark, 22)
         assertEquals(0, mark.at(0.0, 0.0).alpha)

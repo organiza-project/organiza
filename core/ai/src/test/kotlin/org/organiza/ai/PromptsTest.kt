@@ -167,6 +167,19 @@ class PromptsTest {
     }
 
     @Test
+    fun `a noisy timetable keeps its subjects on the device, and one broken block loses only itself`() {
+        transport.respond(
+            200,
+            reply("""{"blocks":[{"day":"MONDAY","start":"08:00","minutes":90,"label":"[NAME1] lecture"},{"day":"MONDAY","start":"9am","minutes":60,"label":"x"}]}"""),
+        )
+        val result = coach.extractSchedule("Monday ~|# 08.00 09.30 11.00 Linear Algebra")
+        assertEquals(AiResult.Ok(listOf(SuggestedBlock(DayOfWeek.MONDAY, 480, 90, "Linear Algebra lecture"))), result)
+        assertFalse("Linear Algebra" in sentBody())
+        assertTrue("08.00 09.30 11.00" in sentBody())
+        assertTrue("noisy" in sentBody().lowercase())
+    }
+
+    @Test
     fun `an empty extraction is a valid answer, and a broken one is not`() {
         transport.respond(200, reply("""{"blocks":[]}"""))
         assertEquals(AiResult.Ok(emptyList()), coach.extractSchedule("nothing here"))

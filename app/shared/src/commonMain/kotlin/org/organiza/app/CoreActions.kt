@@ -100,6 +100,9 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
 
     override fun unlinkDevices() = core.devices.unlink()
 
+    // Only Android has App info and restricted settings.
+    override fun openAppInfo() = Unit
+
     override fun runCopilot() = core.copilot.run()
 
     override fun sendChat(text: String) = core.chat.send(text)
