@@ -50,6 +50,8 @@ object RunKeyAutostart : Autostart {
 
     override fun enable(command: List<String>): String {
         val line = (command + BACKGROUND).joinToString(" ") { "\"" + it.replace("\"", "\\\"") + "\"" }
+        // A fresh profile may have no Run key yet; creating one that exists does nothing.
+        Advapi32Util.registryCreateKey(WinReg.HKEY_CURRENT_USER, KEY)
         Advapi32Util.registrySetStringValue(WinReg.HKEY_CURRENT_USER, KEY, VALUE, line)
         return "Organiza now starts in the background when you sign in"
     }

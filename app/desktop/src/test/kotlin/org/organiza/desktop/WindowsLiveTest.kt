@@ -62,7 +62,11 @@ class WindowsLiveTest {
             RunKeyAutostart.enable(listOf("""C:\Users\a\AppData\Local\Organiza\Organiza.exe"""))
             assertTrue(RunKeyAutostart.enabled())
         } finally {
-            Advapi32Util.registryDeleteValue(WinReg.HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Run", "Organiza")
+            // Only what the test wrote is removed, so a failure above is the one reported.
+            val run = "Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+            if (Advapi32Util.registryKeyExists(WinReg.HKEY_CURRENT_USER, run) && Advapi32Util.registryValueExists(WinReg.HKEY_CURRENT_USER, run, "Organiza")) {
+                Advapi32Util.registryDeleteValue(WinReg.HKEY_CURRENT_USER, run, "Organiza")
+            }
         }
     }
 
