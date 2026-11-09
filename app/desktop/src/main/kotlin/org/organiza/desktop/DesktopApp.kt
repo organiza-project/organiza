@@ -161,7 +161,8 @@ class DesktopApp(
         core.onStores {
             val now = core.clock.now()
             val zone = ZoneId.systemDefault()
-            val used = platform.usage.foregroundTime(app, now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant(), now)
+            // Other devices' time counts against the same limit (ADR-0028).
+            val used = platform.usage.foregroundTime(app, now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant(), now) + core.devices.elsewhere(app)
             platform.onMain {
                 if (currentApp() != app) return@onMain
                 if (UsageLimits.over(limit, used)) {
@@ -242,6 +243,12 @@ class DesktopActions(core: OrganizaCore, private val app: DesktopApp, private va
             Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(invite), null)
             core.showMessage("Invite copied. Share it like a password")
         }
+    }
+
+    override fun shareDeviceCode() {
+        val code = core.devices.code() ?: return core.showMessage("Start sharing usage first")
+        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(code), null)
+        core.showMessage("Device code copied. Paste it on your other device, and share it like a password")
     }
 
     override fun deleteAccount() {

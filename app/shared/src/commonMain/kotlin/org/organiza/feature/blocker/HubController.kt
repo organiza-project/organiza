@@ -83,7 +83,7 @@ class HubController(private val app: OrganizaCore) {
         val start = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
         // One pass over today's events covers every app, rather than one query per row.
         val today = if (allowed) usage.perApp(start, now).mapKeys { it.key.value } else emptyMap()
-        return hubView(app.platform.launchable(), today, stores.rules.all(), limits, feeds, allowed)
+        return hubView(app.platform.launchable(), today, stores.rules.all(), limits, feeds, allowed, app.devices::elsewhere)
     }
 
     /** The category each launchable app declares, by package. Usage is only ever sent to the AI this way. */

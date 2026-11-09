@@ -35,6 +35,8 @@ data class AccountView(
     val signedInAs: String? = null,
     val hostedAvailable: Boolean = false,
     val busy: Boolean = false,
+    val devicesLinked: Boolean = false,
+    val otherDevices: Int = 0,
 )
 
 /** One app on the distraction hub: on the focus list or not, today's use and its daily limit. */

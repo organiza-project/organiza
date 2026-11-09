@@ -1237,3 +1237,41 @@ restarted until the next sign-in.
 - Killing blocked apps: loses unsaved work (ADR-0025).
 - Windows Credential Manager for secrets: limits each secret to 2.5 KB and adds no protection over
   DPAPI for one user.
+
+## ADR-0028: Daily limits count every device, through sealed reports
+
+### Status
+Accepted, 2026-11-09. Amends ADR-0015 and the privacy rule that only `challenge_log` feeds sync;
+the person chose end-to-end encryption over plain rows when the roadmap asked for this.
+
+### Context
+People use Organiza on a phone, a Linux laptop and a Windows PC. A two-hour limit on Discord meant
+two hours on each. Counting all of them needs each device's minutes per app to reach the others,
+and the backend, hosted or self-hosted, must not be able to read them.
+
+### Decision
+- **A device link** is a random 32-byte secret, shown as an `organiza-devices:` code that the
+  person copies to their other devices, like an Arena invite. HKDF derives a mailbox ID and an
+  AES-GCM key from it, with a salt of its own (`organiza-devices-v1`).
+- **Reports** carry one device's minutes per app for the day, apps named by their label in lower
+  case so "Discord" agrees across Android, Linux and Windows. A random device ID names the sender
+  inside the sealed report only. Reports are padded to whole kilobytes and at most 7 KB, so the
+  relay learns neither the apps nor how many there are.
+- **Transport** is the Arena relay already in the schema (`arena_append`, `arena_fetch`): no new
+  table, function or column. Each device posts every 20 minutes while signed in to a Supabase
+  backend, then reads the others; each report holds the whole day, so a missed one is mended by
+  the next. Local only shares nothing.
+- **Use.** A daily limit's check, and its card, add today's minutes of the same app on the other
+  devices. Screen time and charts stay this device's own.
+
+### Consequences
+A limit holds across devices, about 20 minutes behind at worst. The backend stores padded
+ciphertext under an opaque mailbox, the same shape as Arena traffic. Reports stay readable to
+anyone holding the code, so the app tells people to share it like a password. Limits by category
+(all browsers) are not covered: apps match by name only.
+
+### Alternatives Considered
+- Plain usage rows behind row-level security: the operator could read every person's habits.
+- A key derived from the account password: the backend sees the password at sign-in, so it could
+  derive the key too.
+- Syncing totals per category: needs category limits, which do not exist yet.

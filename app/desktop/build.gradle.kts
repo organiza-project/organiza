@@ -32,6 +32,10 @@ compose.desktop {
         mainClass = "org.organiza.desktop.MainKt"
         // Lets Main name its windows after the launcher instead of the main class.
         jvmArgs += listOf("--add-opens", "java.desktop/sun.awt.X11=ALL-UNNAMED")
+        // The hosted project, as for Android: -Porganiza.supabaseUrl=... -Porganiza.supabaseAnonKey=... at build time.
+        listOf("organiza.supabaseUrl", "organiza.supabaseAnonKey").forEach { name ->
+            providers.gradleProperty(name).orNull?.let { jvmArgs += "-D$name=$it" }
+        }
         nativeDistributions {
             targetFormats(TargetFormat.Deb, TargetFormat.Msi)
             // The encrypted SQLite driver needs java.sql; TLS to Groq and Supabase needs the EC ciphers.

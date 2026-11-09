@@ -88,4 +88,10 @@ interface Actions {
     fun signUp(email: String, password: String)
     fun signOut()
     fun deleteAccount()
+
+    // Usage across this person's devices (ADR-0028)
+    /** Joins the devices behind [code], or starts a new set when it is blank. */
+    fun linkDevices(code: String)
+    fun unlinkDevices()
+    fun shareDeviceCode()
 }

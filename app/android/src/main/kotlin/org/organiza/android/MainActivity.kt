@@ -120,6 +120,12 @@ class MainActivity : ComponentActivity() {
 
         override fun importCalendar() = calendarPicker.launch(arrayOf("text/calendar", "*/*"))
 
+        override fun shareDeviceCode() {
+            val code = core.devices.code() ?: return core.showMessage("Start sharing usage first")
+            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, code)
+            startActivity(Intent.createChooser(send, "Send the device code to yourself"))
+        }
+
         override fun shareInvite() = core.inviteToShare { invite ->
             if (invite == null) {
                 core.showMessage("Create or join a challenge first")

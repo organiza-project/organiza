@@ -45,9 +45,9 @@ class DesktopPlatform(
     override val device: Device = Device.DESKTOP
     override val debug: Boolean = System.getProperty("organiza.debug") == "true"
     override val selfPackage: String = SELF.value
-    // The desktop build has no hosted project; people choose local only or their own Supabase.
-    override val hostedUrl: String = ""
-    override val hostedKey: String = ""
+    // Baked in by a hosted build (build.gradle.kts); empty, people choose local only or their own Supabase.
+    override val hostedUrl: String = System.getProperty("organiza.supabaseUrl").orEmpty()
+    override val hostedKey: String = System.getProperty("organiza.supabaseAnonKey").orEmpty()
     override val secrets: SecretStore = keyring
     override val apiKeys: ApiKeyStore = KeyringApiKeyStore(keyring)
 

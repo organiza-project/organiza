@@ -1,0 +1,119 @@
+# Organiza's backend on your own machine (docs/SELF_HOSTING.md, ADR-0015).
+# Only what the app uses: Postgres, Supabase Auth (GoTrue) for accounts and PostgREST for the
+# relay functions, behind Caddy at one address. No files beside this one are needed, so the
+# stack can be pasted into Portainer as it is. Values come from .env (make-keys.sh writes it).
+name: organiza
+
+services:
+  db:
+    image: supabase/postgres:17.6.1.136
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run make-keys.sh first}
+      POSTGRES_DB: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      JWT_EXP: 3600
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - db-config:/etc/postgresql-custom
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Once per start: gives the roles Auth and PostgREST log in as the database password.
+  db-init:
+    image: supabase/postgres:17.6.1.136
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    entrypoint:
+      - psql
+      - "postgresql://supabase_admin@db:5432/postgres"
+      - -v
+      - ON_ERROR_STOP=1
+      - -c
+      - ALTER USER authenticator WITH PASSWORD '${POSTGRES_PASSWORD}'
+      - -c
+      - ALTER USER supabase_auth_admin WITH PASSWORD '${POSTGRES_PASSWORD}'
+
+  auth:
+    image: supabase/gotrue:v2.197.0
+    restart: unless-stopped
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${PUBLIC_URL}/auth/v1
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      # Only the landing page after an email confirmation link; the app uses no redirects.
+      GOTRUE_SITE_URL: ${PUBLIC_URL}
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-false}
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:?run make-keys.sh first}
+      GOTRUE_JWT_ISSUER: ${PUBLIC_URL}/auth/v1
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
+      # No mail server here, so sign-up signs straight in. Add SMTP and set this false to confirm addresses.
+      GOTRUE_MAILER_AUTOCONFIRM: ${AUTOCONFIRM:-true}
+      GOTRUE_PASSWORD_MIN_LENGTH: 8
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  rest:
+    image: postgrest/postgrest:v14.18
+    restart: unless-stopped
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+
+  # One address for the app: /auth/v1 and /rest/v1, as on supabase.com. With a domain in
+  # SITE_ADDRESS, Caddy gets its certificate from Let's Encrypt; with :80 it serves plain HTTP
+  # for a reverse proxy you already run.
+  gateway:
+    image: caddy:2.11
+    restart: unless-stopped
+    depends_on: [auth, rest]
+    ports:
+      - "${HTTP_PORT:-8000}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      CADDYFILE: |
+        {$$SITE_ADDRESS} {
+        	handle_path /auth/v1/* {
+        		reverse_proxy auth:9999
+        	}
+        	handle_path /rest/v1/* {
+        		reverse_proxy rest:3000
+        	}
+        	respond 404
+        }
+    entrypoint: ["sh", "-c", "printf '%s' \"$$CADDYFILE\" > /etc/caddy/Caddyfile && exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile"]
+    volumes:
+      - caddy-data:/data
+
+volumes:
+  db-data:
+  db-config:
+  caddy-data:

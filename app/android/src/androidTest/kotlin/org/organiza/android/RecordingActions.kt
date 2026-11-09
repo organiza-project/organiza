@@ -41,6 +41,9 @@ class RecordingActions : Actions {
     override fun weeklyReview() { calls += "weeklyReview" }
     override fun syncArena() { calls += "syncArena" }
     override fun shareInvite() { calls += "shareInvite" }
+    override fun linkDevices(code: String) { calls += "linkDevices $code" }
+    override fun unlinkDevices() { calls += "unlinkDevices" }
+    override fun shareDeviceCode() { calls += "shareDeviceCode" }
     override fun createChallenge(habit: String, title: String, days: String, freezes: String, relay: String, name: String) {
         calls += "createChallenge"
     }

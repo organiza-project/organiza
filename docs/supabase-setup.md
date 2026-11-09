@@ -1,8 +1,9 @@
 # Setting up a Supabase backend
 
-Organiza works fully offline. A backend is only for Arena challenges with friends: it holds
-accounts and the encrypted, padded challenge messages, and nothing else (ADR-0015). The same steps
-work for the Organiza hosted project and for a self-hosted one.
+Organiza works fully offline. A backend is for Arena challenges with friends and for daily limits
+that count all your devices: it holds accounts and encrypted, padded messages, and nothing else
+(ADR-0015, ADR-0028). These steps set up a project on supabase.com; to run the backend on your own
+machine with Docker or Portainer, see [SELF_HOSTING.md](SELF_HOSTING.md).
 
 ## 1. Run the schema
 

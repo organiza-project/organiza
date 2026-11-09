@@ -6,12 +6,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.organiza.ui.AccountView
@@ -29,6 +31,7 @@ import org.organiza.ui.Theme
 import org.organiza.ui.Txt
 import org.organiza.ui.Type
 import org.organiza.sync.BackendKind
+import org.organiza.presentation.Format
 
 /** Chooses where Arena results and the account live (ADR-0015). Blocking never depends on it. */
 @Composable
@@ -76,6 +79,42 @@ fun BackendPanel(account: AccountView, actions: Actions, withAccount: Boolean = 
 
 private enum class AuthMode(val label: String) { SIGN_IN("Sign in"), SIGN_UP("Create account") }
 
+/** Limits that count every device, through reports only this person's devices can open (ADR-0028). */
+@Composable
+private fun DevicesBlock(account: AccountView, actions: Actions) {
+    val colors = Theme.colors
+    // The code is a secret, so it is never saved with the screen's state.
+    var code by remember { mutableStateOf("") }
+    Txt("Usage across devices", Type.bodyStrong)
+    if (account.devicesLinked) {
+        Txt(
+            if (account.otherDevices == 0) "On. No other device has reported today yet."
+            else "On. Daily limits count ${Format.count(account.otherDevices, "other device", "other devices")} today.",
+            Type.small,
+            colors.muted,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Action("Copy device code", ButtonKind.SECONDARY) { actions.shareDeviceCode() }
+            Spacer(Modifier.width(8.dp))
+            Action("Stop sharing", ButtonKind.TEXT) { actions.unlinkDevices() }
+        }
+        return
+    }
+    Txt(
+        "Daily limits can count your time on your other devices. Each one seals today's minutes per app so only your devices can open them; the backend sees padded ciphertext.",
+        Type.small,
+        colors.muted,
+    )
+    Spacer(Modifier.height(8.dp))
+    Action("Start sharing on this device", ButtonKind.SECONDARY) { actions.linkDevices("") }
+    Field(code, { code = it.trim() }, "Or paste a code from your other device", secret = true)
+    Action("Join", ButtonKind.SECONDARY, enabled = code.isNotEmpty()) {
+        actions.linkDevices(code)
+        code = ""
+    }
+}
+
 /** Email sign-in and sign-up for the chosen backend, then the account and its deletion (ADR-0015, ADR-0020). */
 @Composable
 fun AccountPanel(account: AccountView, actions: Actions) {
@@ -91,6 +130,8 @@ fun AccountPanel(account: AccountView, actions: Actions) {
             Txt("Challenge results sync through this account, encrypted so the backend cannot read them.", Type.small, colors.muted)
             Spacer(Modifier.height(8.dp))
             Action("Sign out", ButtonKind.SECONDARY, enabled = !account.busy) { actions.signOut() }
+            Rule()
+            DevicesBlock(account, actions)
             Rule()
             Txt("Deleting removes your account and every challenge result the backend holds, at once. Nothing on this device changes.", Type.small, colors.muted)
             Spacer(Modifier.height(8.dp))

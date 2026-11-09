@@ -43,6 +43,8 @@ class SyncController(private val app: OrganizaCore) {
             signedInAs = (backend.auth.state() as? AuthState.SignedIn)?.email,
             hostedAvailable = hosted != null,
             busy = busy,
+            devicesLinked = app.devices.linked,
+            otherDevices = app.devices.others(),
         )
     }
 

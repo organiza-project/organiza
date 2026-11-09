@@ -155,7 +155,8 @@ class OrganizaAccessibilityService : AccessibilityService() {
         limitWorker.execute {
             val now = app.core.clock.now()
             val zone = ZoneId.systemDefault()
-            val used = usage.foregroundTime(source, now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant(), now)
+            // Other devices' time counts against the same limit (ADR-0028).
+            val used = usage.foregroundTime(source, now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant(), now) + app.core.devices.elsewhere(source)
             main.post {
                 if (current != source) return@post
                 if (UsageLimits.over(limit, used)) {

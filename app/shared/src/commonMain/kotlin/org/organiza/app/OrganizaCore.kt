@@ -24,6 +24,7 @@ import org.organiza.feature.schedule.ScheduleController
 import org.organiza.feature.schedule.CalendarController
 import org.organiza.feature.rpg.RpgController
 import org.organiza.feature.blocker.InterventionHost
+import org.organiza.feature.sync.DevicesController
 import org.organiza.feature.sync.SyncController
 import org.organiza.arena.ArenaEngine
 import org.organiza.arena.ChallengeRules
@@ -114,6 +115,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     @Volatile private var keySaved = false
 
     val sync by lazy { SyncController(this) }
+    val devices by lazy { DevicesController(this) }
     val copilot by lazy { CopilotController(this) }
     val chat by lazy { ChatController(this) }
 
@@ -504,9 +506,12 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     private val UPCOMING_DAY = java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", java.util.Locale.UK)
 
     /** Opens storage and puts the schedule in force. Call once, when the app process starts. */
-    fun start() = onStorageThread {
-        openStorage()
-        reconcile()
+    fun start() {
+        onStorageThread {
+            openStorage()
+            reconcile()
+        }
+        devices.start()
     }
 
     /** Runs [work] with the stores on the storage thread, if storage opened. */

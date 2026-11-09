@@ -96,6 +96,10 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
 
     override fun signOut() = core.sync.signOut()
 
+    override fun linkDevices(code: String) = core.devices.link(code)
+
+    override fun unlinkDevices() = core.devices.unlink()
+
     override fun runCopilot() = core.copilot.run()
 
     override fun sendChat(text: String) = core.chat.send(text)

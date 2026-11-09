@@ -25,13 +25,15 @@ fun hubView(
     limits: Map<PackageName, Duration>,
     feeds: Set<ShortFormFeed>,
     allowed: Boolean,
+    elsewhere: (PackageName) -> Duration = { Duration.ZERO },
 ): HubView {
     val rule = rules.firstOrNull { it.calendarTag == FOCUS_TAG }
     val listed = rule?.packages.orEmpty()
     val rows = launchable.map { (pkg, label, category) ->
         val parsed = (PackageName.parse(pkg) as? Parsed.Valid)?.value
-        val used = today[pkg] ?: Duration.ZERO
         val limit = parsed?.let(limits::get)
+        // A limit counts this person's other devices too (ADR-0028); screen time stays this device's.
+        val used = (today[pkg] ?: Duration.ZERO) + if (limit != null && parsed != null) elsewhere(parsed) else Duration.ZERO
         HubApp(pkg, label, parsed in listed, used.toMinutes(), limit?.toMinutes(), limit != null && UsageLimits.over(limit, used), category)
     }.sortedWith(compareByDescending<HubApp> { it.onList || it.limitMinutes != null }.thenBy { it.label.lowercase() })
     val screenTime = if (allowed) Format.duration(rows.fold(Duration.ZERO) { sum, row -> sum + (today[row.pkg] ?: Duration.ZERO) }) else null
