@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Organiza: focus that stays on your devices</title>
+<meta name="description" content="Organiza blocks distracting apps with a mindful pause, on Android, Linux and Windows. Open source, encrypted on your device, with your own database and your own AI key.">
+<link rel="icon" href="img/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#mission">Skip to the content</a>
+
+<header class="bar">
+  <nav aria-label="Main">
+    <a href="#mission">Why</a>
+    <a href="#features">Features</a>
+    <a href="#pause">The pause</a>
+    <a href="https://github.com/organiza-project/organiza">Source</a>
+    <a class="bar-action" href="#download">Download</a>
+  </nav>
+</header>
+
+<div class="split">
+  <!-- The half that holds still: the app's own screens, one at a time. -->
+  <figure class="stage">
+    <img class="shot is-on" data-shot="breath" src="img/06-pause-breathing.webp" width="540" height="1200" alt="Organiza's pause: reddit.com is blocked, and a circle grows and shrinks for a ten second breath">
+    <img class="shot" aria-hidden="true" data-shot="choice" src="img/05-pause-choice.webp" width="540" height="1200" alt="The pause's first screen: Stay focused, or open it anyway" loading="lazy">
+    <img class="shot" aria-hidden="true" data-shot="reason" src="img/07-pause-reason.webp" width="540" height="1200" alt="The pause asks what you need it for: work, a message, an errand, boredom, habit" loading="lazy">
+    <img class="shot" aria-hidden="true" data-shot="phrase" src="img/08-pause-typing.webp" width="540" height="1200" alt="The pause asks you to type a phrase, word by word" loading="lazy">
+    <img class="shot" aria-hidden="true" data-shot="length" src="img/09-pause-length.webp" width="540" height="1200" alt="The last step: choose how long to open the app for" loading="lazy">
+    <img class="shot" aria-hidden="true" data-shot="home" src="img/10-home.webp" width="540" height="1200" alt="Organiza's home: the daily goal, today's focus session and what it blocks" loading="lazy">
+    <img class="shot" aria-hidden="true" data-shot="metrics" src="img/16-metrics.webp" width="540" height="1200" alt="Metrics: focus over the last seven days, today's choices and the copilot" loading="lazy">
+    <img class="shot" aria-hidden="true" data-shot="arena" src="img/15-arena.webp" width="540" height="1200" alt="Arena: a thirty day challenge with a friend, ranked by days met" loading="lazy">
+  </figure>
+
+  <main class="read">
+    <section class="hero" data-shot="breath">
+      <p class="hero-line">Blocks distracting apps with a pause, not a wall. Every minute stays on your own devices.</p>
+      <h1 class="wordmark">organiza</h1>
+    </section>
+
+    <section id="mission" class="mission" data-shot="choice" aria-labelledby="mission-title">
+      <h2 id="mission-title">Your attention is not a dataset</h2>
+      <p class="first">Most screen-time trackers are surveillance sold as productivity. They log every app you open and every site you visit, and send it to servers you will never see, to be analysed, profiled or sold.</p>
+      <p>Organiza is built the other way round. It is open source under the MIT licence. What you do lives in an encrypted database on your device, under a key the system keystore holds. There is no analytics, no tracking and no ad SDK in any build.</p>
+      <p>Bring your own database: run the backend yourself, or use none at all. Bring your own AI key: the copilot talks to Groq on your account, after names and links are stripped on the device.</p>
+      <p>You own your dopamine, and you own your data. <a href="https://github.com/organiza-project/organiza">Read every line of it</a>.</p>
+    </section>
+
+    <section id="features" class="features" aria-labelledby="features-title">
+      <h2 id="features-title">Built to be hard to skip</h2>
+
+      <article class="module" data-shot="home">
+        <div class="proof proof-ui" data-ui>
+          <p class="ui-head">Usage today</p>
+          <div class="ui-row">
+            <span class="ui-dot" aria-hidden="true"></span>
+            <span class="ui-name">LibreWolf</span>
+            <span class="ui-time">1h 46m / 2h</span>
+            <span class="ui-bar" aria-hidden="true"><span style="width:88%"></span></span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-dot ui-dot-2" aria-hidden="true"></span>
+            <span class="ui-name">Discord</span>
+            <span class="ui-time">38m / 1h</span>
+            <span class="ui-bar ui-bar-calm" aria-hidden="true"><span style="width:63%"></span></span>
+          </div>
+        </div>
+        <div class="module-text">
+          <h3>One limit, every device</h3>
+          <p>Android, Linux and Windows run the same core. A two hour limit counts your phone, your laptop and your PC together.</p>
+          <p>Each device seals its minutes so only your devices can read them; the server sees padded ciphertext.</p>
+        </div>
+      </article>
+
+      <article class="module" data-shot="phrase">
+        <div class="proof"><img src="img/08-pause-typing.webp" width="540" height="1200" alt="The phrase box of the pause, half typed" loading="lazy" style="object-position:50% 9%"></div>
+        <div class="module-text">
+          <h3>The Stoic Pause</h3>
+          <p>A blocked app gets no wall to click past. It gets ten seconds of breathing, a question about what you need it for, and a phrase to type word by word.</p>
+          <p>The app stays frozen behind the pause, its work kept, until you choose.</p>
+        </div>
+      </article>
+
+      <article class="module" data-shot="metrics">
+        <div class="proof"><img src="img/16-metrics.webp" width="540" height="1200" alt="The copilot panel on the metrics screen" loading="lazy" style="object-position:50% 50%"></div>
+        <div class="module-text">
+          <h3>A copilot on your own key</h3>
+          <p>Paste a free Groq key and the copilot suggests weekly focus blocks and habit tips. Your hardest hours are worked out on the device, with or without it.</p>
+          <p>The key stays in the keystore, and every prompt passes a sanitizer on the device first, so names and links never leave it.</p>
+        </div>
+      </article>
+
+      <article class="module" data-shot="arena">
+        <div class="proof"><img src="img/12-habits.webp" width="540" height="1200" alt="Habits with thirty day streaks, marked done and missed" loading="lazy" style="object-position:50% 27%"></div>
+        <div class="module-text">
+          <h3>Habits that level you up</h3>
+          <p>Habits, dailies and to-dos earn experience and keep streaks, in the spirit of a role-playing game.</p>
+          <p>Thirty day challenges with friends sync only signed, encrypted results: nobody's usage, not even yours.</p>
+        </div>
+      </article>
+    </section>
+
+    <section id="pause" class="pause" data-shot="pause" aria-labelledby="pause-title">
+      <h2 id="pause-title" class="pause-clause">First, a breath</h2>
+      <figure class="pause-shot">
+        <img src="img/06-pause-breathing.webp" width="540" height="1200" alt="The stage of the pause chosen below" loading="lazy">
+      </figure>
+      <p class="pause-text" aria-live="polite">Ten seconds. A circle grows as you breathe in and shrinks as you breathe out. The urge usually fades within a minute.</p>
+      <div class="try" hidden>
+        <label for="phrase-input">Type this, word by word: <span class="try-phrase">What I do right now is what my whole day becomes.</span></label>
+        <input id="phrase-input" type="text" autocomplete="off" spellcheck="false">
+        <p class="try-count" aria-live="polite">0 of 11 words</p>
+      </div>
+      <div class="stages">
+        <div class="track"><span class="track-passed"></span>
+        <input id="stage" type="range" min="0" max="3" step="1" value="0" aria-label="Stage of the pause" aria-valuetext="First, a breath">
+        </div>
+        <ol class="stage-names" aria-hidden="true">
+          <li class="is-on">Breathe</li>
+          <li>Reason</li>
+          <li>Phrase</li>
+          <li>Length</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="runs" data-shot="metrics" aria-labelledby="runs-title">
+      <h2 id="runs-title">Where it runs</h2>
+      <ul class="rows">
+        <li><span class="dot dot-android" aria-hidden="true"></span><span class="row-name">Android 8 and later</span><span class="row-value">.apk</span></li>
+        <li><span class="dot dot-linux" aria-hidden="true"></span><span class="row-name">Ubuntu and Debian: GNOME, Hyprland, Sway, X11</span><span class="row-value">.deb</span></li>
+        <li><span class="dot dot-windows" aria-hidden="true"></span><span class="row-name">Windows 11</span><span class="row-value">.msi</span></li>
+        <li><span class="dot dot-source" aria-hidden="true"></span><span class="row-name">Source code, MIT licence</span><span class="row-value">GitHub</span></li>
+      </ul>
+      <p class="rows-group">Stays on the device</p>
+      <ul class="rows">
+        <li><span class="dot" aria-hidden="true"></span><span class="row-name">Sessions, habits, apps, sites and calendar titles</span><span class="row-value">AES-256</span></li>
+        <li><span class="dot" aria-hidden="true"></span><span class="row-name">The database key and your Groq key</span><span class="row-value">Keystore</span></li>
+        <li><span class="dot" aria-hidden="true"></span><span class="row-name">Blocking and scheduling, with no network</span><span class="row-value">Offline</span></li>
+      </ul>
+      <p class="rows-group">Leaves it, sealed</p>
+      <ul class="rows">
+        <li><span class="dot" aria-hidden="true"></span><span class="row-name">Challenge results, signed and encrypted</span><span class="row-value">Opt-in</span></li>
+        <li><span class="dot" aria-hidden="true"></span><span class="row-name">Minutes per app, to your other devices only</span><span class="row-value">Opt-in</span></li>
+        <li><span class="dot" aria-hidden="true"></span><span class="row-name">Copilot prompts, names and links removed</span><span class="row-value">Your key</span></li>
+      </ul>
+      <p class="runs-note">The backend is optional: use the hosted one, or <a href="https://github.com/organiza-project/organiza/blob/main/docs/SELF_HOSTING.md">run your own in five minutes</a> with Docker or Portainer.</p>
+    </section>
+  </main>
+</div>
+
+<section id="download" class="cta" aria-labelledby="cta-title">
+  <div class="cta-words">
+    <h2 id="cta-title">Start on purpose</h2>
+    <p>Free, with no account needed. The button opens the releases on GitHub, with an installer for each platform.</p>
+  </div>
+  <div class="dialog" data-ui>
+    <img src="img/mark.svg" width="56" height="56" alt="">
+    <p class="dialog-title">Organiza</p>
+    <p class="dialog-sub">Focus on purpose, on your own terms.</p>
+    <fieldset class="segmented">
+      <legend>Your device</legend>
+      <label><input type="radio" name="os" value="Android" checked><span>Android</span></label>
+      <label><input type="radio" name="os" value="Linux"><span>Linux</span></label>
+      <label><input type="radio" name="os" value="Windows"><span>Windows</span></label>
+    </fieldset>
+    <p class="dialog-file">Get <strong class="dialog-kind">the .apk</strong> for Android 8 and later.</p>
+    <a class="dialog-go" href="https://github.com/organiza-project/organiza/releases">Download for <span class="dialog-os">Android</span></a>
+  </div>
+</section>
+
+<footer class="foot">
+  <p>Open-source focus app</p>
+  <p class="foot-links">
+    <a href="https://github.com/organiza-project/organiza">GitHub</a>
+    <a href="https://github.com/organiza-project/organiza/blob/main/docs/SELF_HOSTING.md">Self-hosting</a>
+    <a href="https://github.com/organiza-project/organiza/blob/main/LICENSE">MIT licence</a>
+  </p>
+  <p class="foot-end">2026 · No cookies, no analytics, no trackers on this page</p>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>

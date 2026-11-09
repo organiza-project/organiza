@@ -128,3 +128,6 @@ CLAUDE.local.md
 
 # Sideload copies made by :app:android:dogfoodApks
 dist/
+
+# Screenshots the taste-skill inspector writes while reviewing a page.
+.taste-skill/**/inspect/
