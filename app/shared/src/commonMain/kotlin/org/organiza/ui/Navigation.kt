@@ -94,7 +94,7 @@ fun SideBar(selected: Tab?, onSelect: (Tab) -> Unit, onCopilot: () -> Unit) {
             LogoMark(28.dp)
             Txt("Organiza", Type.bodyStrong, modifier = Modifier.padding(start = 10.dp))
         }
-        Tab.entries.forEach { tab -> SideItem(tab.glyph, tab.label, tab == selected, Role.Tab) { onSelect(tab) } }
+        SIDE_TABS.forEach { tab -> SideItem(tab.glyph, tab.label, tab == selected, Role.Tab) { onSelect(tab) } }
         Spacer(Modifier.weight(1f))
         SideItem(Glyph.CHAT, "Copilot", false, Role.Button, onCopilot)
     }
@@ -121,6 +121,9 @@ private fun SideItem(glyph: Glyph, label: String, active: Boolean, role: Role, o
         Txt(label, Type.body, if (active) colors.text else colors.muted, Modifier.padding(start = 12.dp))
     }
 }
+
+/** A sidebar reads top-down, so Home leads and Profile ends it; the bottom bar keeps Home in the middle. */
+private val SIDE_TABS = listOf(Tab.HOME, Tab.HABITS, Tab.METRICS, Tab.ARENA, Tab.PROFILE)
 
 /** At this width and above the tabs move from the bottom bar to [SideBar]. */
 val WIDE = 840.dp

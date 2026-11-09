@@ -27,6 +27,8 @@ tasks.test {
 compose.desktop {
     application {
         mainClass = "org.organiza.desktop.MainKt"
+        // Lets Main name its windows after the launcher instead of the main class.
+        jvmArgs += listOf("--add-opens", "java.desktop/sun.awt.X11=ALL-UNNAMED")
         nativeDistributions {
             targetFormats(TargetFormat.Deb)
             // The encrypted SQLite driver needs java.sql; TLS to Groq and Supabase needs the EC ciphers.
@@ -34,14 +36,25 @@ compose.desktop {
             // The name people see in the app grid; the Debian package itself stays lowercase.
             packageName = "Organiza"
             packageVersion = "0.3.0"
-            description = "Focus sessions, habits and app blocking"
-            vendor = "Organiza"
+            description = "Focus sessions, habits and app blocking that stay on your computer"
+            vendor = "Organiza Project"
+            licenseFile.set(rootProject.file("LICENSE"))
             linux {
+                iconFile.set(file("src/main/resources/organiza.png"))
                 packageName = "organiza"
                 appCategory = "Utility"
                 menuGroup = "Utility"
                 shortcut = true
             }
         }
+    }
+}
+
+// jpackage has no option for the homepage or AppStream metadata, so they are added to the finished .deb.
+tasks.matching { it.name == "packageDeb" }.configureEach {
+    doLast {
+        val deb = outputs.files.asFileTree.matching { include("*.deb") }.singleFile
+        val finish = ProcessBuilder(file("packaging/finish-deb.sh").path, deb.path).inheritIO().start()
+        check(finish.waitFor() == 0) { "finish-deb.sh failed" }
     }
 }

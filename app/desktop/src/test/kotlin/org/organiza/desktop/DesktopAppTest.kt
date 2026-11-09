@@ -101,7 +101,18 @@ class DesktopAppTest {
     }
 
     @Test
-    fun `onboarding asks for the desktop's own permissions`() = runComposeUiTest {
+    fun `the sidebar runs from Home down to Profile`() = runComposeUiTest {
+        core.onboarded = true
+        core.requestUiRefresh()
+        setContent { Box(Modifier.size(1200.dp, 800.dp)) { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } } }
+        waitUntilExactlyOneExists(hasContentDescription("Copilot"), 5_000)
+        val order = listOf("Home", "Habits", "Metrics", "Arena", "Profile")
+        val tops = order.map { onNodeWithContentDescription(it).fetchSemanticsNode().boundsInRoot.top }
+        assertEquals(order, order.sortedBy { tops[order.indexOf(it)] })
+    }
+
+    @Test
+    fun `onboarding asks for the desktop's own permissions`()= runComposeUiTest {
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
         waitUntilExactlyOneExists(hasText("Start"), 5_000)
         onNodeWithText("Start").performClick()

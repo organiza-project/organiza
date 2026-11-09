@@ -11,8 +11,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import java.awt.SystemTray
+import java.awt.Toolkit
 import org.organiza.app.OrganizaCore
 import org.organiza.feature.blocker.InterventionScreen
 import org.organiza.ui.OrganizaRoot
@@ -31,6 +34,7 @@ fun main(args: Array<String>) {
         repeat(HANDOFF_TRIES) { if (Instance.handOff(socket, command)) return else Thread.sleep(100) }
         return
     }
+    nameWindows()
     val platform = DesktopPlatform()
     val core = OrganizaCore(platform)
     core.start()
@@ -76,7 +80,7 @@ fun main(args: Array<String>) {
             state = rememberWindowState(width = 1120.dp, height = 800.dp),
             visible = visible.value,
             title = "Organiza",
-            icon = trayIcon(),
+            icon = appIcon,
         ) {
             OrganizaTheme { OrganizaRoot(core.uiState.value, actions, request.value) }
         }
@@ -98,7 +102,24 @@ fun main(args: Array<String>) {
 
 private const val HANDOFF_TRIES = 50
 
-/** The ring of the logo mark, for the window and the top bar, where an image file would add nothing. */
+/** The app icon from docs/brand/icon.svg, which the installer also uses. */
+private val appIcon: Painter by lazy {
+    val bytes = checkNotNull(object {}.javaClass.getResourceAsStream("/organiza.png")) { "organiza.png is missing" }.use { it.readAllBytes() }
+    BitmapPainter(org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap())
+}
+
+/**
+ * GNOME matches a window to its launcher by WM_CLASS, which AWT otherwise takes from the main class
+ * (`org-organiza-desktop-MainKt`). The installed launcher is organiza-Organiza.desktop.
+ */
+private fun nameWindows() {
+    val toolkit = Toolkit.getDefaultToolkit()
+    // Only the X11 toolkit has the field; it needs `--add-opens java.desktop/sun.awt.X11` (build.gradle.kts).
+    runCatching { toolkit.javaClass.getDeclaredField("awtAppClassName").apply { isAccessible = true }.set(toolkit, "organiza-Organiza") }
+        .onFailure { System.err.println("organiza: window class not set: ${it.javaClass.simpleName}") }
+}
+
+/** The ring of the logo mark for the top bar, where a full-colour icon would not read at its size. */
 private fun trayIcon(): Painter = object : Painter() {
     override val intrinsicSize: Size = Size(64f, 64f)
 

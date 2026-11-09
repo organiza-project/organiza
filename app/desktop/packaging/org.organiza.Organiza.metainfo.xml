@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- What app stores such as GNOME Software show for the installed .deb. finish-deb.sh adds it. -->
+<component type="desktop-application">
+  <id>org.organiza.Organiza</id>
+  <name>Organiza</name>
+  <summary>Focus sessions, habits and app blocking that stay on your computer</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="org.organiza">
+    <name>Organiza Project</name>
+  </developer>
+  <description>
+    <p>
+      Organiza pauses distracting apps during focus sessions and once their daily limit is used, and asks
+      you to choose on purpose before going back. It tracks screen time, habits and your schedule.
+    </p>
+    <p>
+      Everything stays in an encrypted database on this computer. There is no telemetry, and blocking and
+      scheduling work offline. AI coaching is optional and uses your own Groq key.
+    </p>
+  </description>
+  <launchable type="desktop-id">organiza-Organiza.desktop</launchable>
+  <url type="homepage">https://github.com/organiza-project/organiza</url>
+  <url type="bugtracker">https://github.com/organiza-project/organiza/issues</url>
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+</component>
