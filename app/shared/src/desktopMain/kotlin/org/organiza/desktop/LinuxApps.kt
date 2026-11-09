@@ -26,6 +26,8 @@ object LinuxApps {
 
     /** The app's identity in core: its ID when that fits, otherwise the same ID under `linux.`. */
     fun packageName(desktopId: String): PackageName? {
+        // The .deb installs Organiza's own entry as `organiza-<name>`; it is still Organiza.
+        if (desktopId.startsWith("organiza-")) return packageName("organiza")
         (PackageName.parse(desktopId) as? Parsed.Valid)?.let { return it.value }
         val segments = desktopId.replace(Regex("[^A-Za-z0-9_.]"), "_").split('.').filter(String::isNotEmpty)
             .map { if (it.first().isLetter()) it else "x$it" }

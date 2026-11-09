@@ -14,8 +14,11 @@ import org.organiza.storage.Database
 import org.organiza.storage.HabitReminder
 import org.organiza.voice.VoiceCommand
 
-/** Storage that could not be opened. The database is never deleted or recreated (ADR-0008). */
-class StorageUnavailable(message: String, cause: Throwable? = null) : Exception(message, cause)
+/**
+ * Storage that could not be opened. The database is never deleted or recreated (ADR-0008).
+ * Unchecked, so a keyring that fails later still reaches the storage thread's error handler.
+ */
+class StorageUnavailable(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
 /** Foreground time per app, and whether the OS lets this app read it. */
 interface AppUsage : UsageHistory {

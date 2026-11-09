@@ -1,10 +1,12 @@
 package org.organiza.desktop
 
+import androidx.compose.runtime.mutableStateOf
 import java.awt.SystemTray
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermissions
 import java.time.Duration
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -57,18 +59,19 @@ class DesktopPlatform(
 
     @Volatile private var db: Database? = null
 
-    override val usage: AppUsage = object : AppUsage {
-        override fun permitted(): Boolean = tracking
-
-        override fun perApp(from: java.time.Instant, to: java.time.Instant): Map<PackageName, Duration> =
-            db?.let { LoggedUsage(FocusLog(it)).perApp(from, to) } ?: emptyMap()
-    }
+    override val usage: AppUsage = LoggedUsage({ db?.let(::FocusLog) }, { tracking })
 
     val dataDir: Path get() = database.parent
 
+    // Compose state, so the window starts hiding to the top bar as soon as this is allowed.
+    private val tray = mutableStateOf(prefs(PREFS).flag(TRAY))
+
     var trayWanted: Boolean
-        get() = prefs(PREFS).flag(TRAY)
-        set(value) = prefs(PREFS).put(mapOf(TRAY to value.toString()))
+        get() = tray.value
+        set(value) {
+            prefs(PREFS).put(mapOf(TRAY to value.toString()))
+            tray.value = value
+        }
 
     override fun prefs(name: String): Prefs = FilePrefs(dataDir.resolve("$name.properties"))
 
@@ -102,23 +105,32 @@ class DesktopPlatform(
     override fun applyPolicy(policy: SessionPolicy) = Unit
 
     private val reminders = Executors.newSingleThreadScheduledExecutor { Thread(it, "organiza-reminders").apply { isDaemon = true } }
-    private var scheduled: List<ScheduledFuture<*>> = emptyList()
+    private val scheduled = mutableListOf<ScheduledFuture<*>>()
+    private var round = 0
 
     /** Each reminder shows as a desktop notification at its minute of the day, every day. */
     @Synchronized
     override fun scheduleReminders(reminders: List<HabitReminder>, previous: Set<String>) {
         scheduled.forEach { it.cancel(false) }
+        scheduled.clear()
+        round++
+        reminders.forEach { remind(it, round) }
+    }
+
+    // Each run books the next one, so a reminder keeps its clock time when daylight saving changes the day's length.
+    @Synchronized
+    private fun remind(reminder: HabitReminder, round: Int) {
+        if (round != this.round) return
+        scheduled.removeAll { it.isDone }
         val now = ZonedDateTime.now(ZoneId.systemDefault())
-        scheduled = reminders.map { reminder ->
-            var at = now.toLocalDate().atStartOfDay(now.zone).plusMinutes(reminder.minute.toLong())
-            if (!at.isAfter(now)) at = at.plusDays(1)
-            this.reminders.scheduleAtFixedRate(
-                { output("notify-send", "--app-name=Organiza", reminder.name, "Time for this habit") },
-                Duration.between(now, at).toMillis(),
-                TimeUnit.DAYS.toMillis(1),
-                TimeUnit.MILLISECONDS,
-            )
-        }
+        scheduled += reminders.schedule(
+            {
+                output("notify-send", "--app-name=Organiza", reminder.name, "Time for this habit")
+                remind(reminder, round)
+            },
+            Duration.between(now, nextReminder(reminder.minute, now)).toMillis(),
+            TimeUnit.MILLISECONDS,
+        )
     }
 
     /** Hands the meeting to the person's calendar app as a one-event file, which it offers to save. */
@@ -145,6 +157,13 @@ class DesktopPlatform(
     }
 
     companion object {
+        /** The next time after [now] that the clock shows [minute] of the day. */
+        fun nextReminder(minute: Int, now: ZonedDateTime): ZonedDateTime {
+            val time = LocalTime.of(minute / 60, minute % 60)
+            val today = now.toLocalDate().atTime(time).atZone(now.zone)
+            return if (today.isAfter(now)) today else now.toLocalDate().plusDays(1).atTime(time).atZone(now.zone)
+        }
+
         /** Organiza's own identity among desktop apps; its windows never count or get blocked. */
         val SELF: PackageName = checkNotNull(LinuxApps.packageName("organiza"))
         private const val PREFS = "desktop"

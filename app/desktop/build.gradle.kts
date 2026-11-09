@@ -17,6 +17,12 @@ dependencies {
     }
 }
 
+tasks.test {
+    // gsettings writes from tests land in a file under build/, never in the person's dconf.
+    environment("GSETTINGS_BACKEND", "keyfile")
+    environment("XDG_CONFIG_HOME", layout.buildDirectory.dir("test-config").get().asFile.path)
+}
+
 // The Linux desktop app (ADR-0023). `run` opens the window; `packageDeb` builds an installer.
 compose.desktop {
     application {
@@ -25,8 +31,17 @@ compose.desktop {
             targetFormats(TargetFormat.Deb)
             // The encrypted SQLite driver needs java.sql; TLS to Groq and Supabase needs the EC ciphers.
             modules("java.sql", "jdk.unsupported", "jdk.crypto.ec")
-            packageName = "organiza"
+            // The name people see in the app grid; the Debian package itself stays lowercase.
+            packageName = "Organiza"
             packageVersion = "0.3.0"
+            description = "Focus sessions, habits and app blocking"
+            vendor = "Organiza"
+            linux {
+                packageName = "organiza"
+                appCategory = "Utility"
+                menuGroup = "Utility"
+                shortcut = true
+            }
         }
     }
 }

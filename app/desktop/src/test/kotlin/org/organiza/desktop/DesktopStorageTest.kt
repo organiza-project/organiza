@@ -9,7 +9,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import org.organiza.app.OrganizaCore
 import org.organiza.app.StorageUnavailable
+import org.organiza.arena.SecretStore
 import org.organiza.storage.Migrations
 import org.organiza.testing.FakeSecretStore
 
@@ -52,5 +56,42 @@ class DesktopStorageTest {
         DesktopStorage.open(file, keyring).use { Migrations.migrate(it) }
         assertFalse(String(file.readBytes().copyOf(16)).startsWith("SQLite format 3"))
         assert(file.exists())
+    }
+
+    private fun core(secrets: SecretStore): OrganizaCore {
+        val home = file.parent
+        val env = mapOf("HOME" to home.toString(), "XDG_DATA_HOME" to "$home/data", "XDG_CONFIG_HOME" to "$home/config")
+        return OrganizaCore(DesktopPlatform(secrets, emptyList(), env, file, Autostart(home.resolve("config")))).also { it.start() }
+    }
+
+    /** Waits for the work queued on the storage thread so far, and the snapshot it published. */
+    private fun settle(core: OrganizaCore) {
+        val done = CountDownLatch(1)
+        core.onStorageThread { done.countDown() }
+        done.await(5, TimeUnit.SECONDS)
+        javax.swing.SwingUtilities.invokeAndWait {}
+    }
+
+    @Test
+    fun `a keyring that cannot be reached shows a storage problem`() {
+        val core = core(object : SecretStore {
+            override fun put(name: String, value: ByteArray) = throw StorageUnavailable("python3 is needed to reach the keyring.")
+            override fun get(name: String): ByteArray? = throw StorageUnavailable("python3 is needed to reach the keyring.")
+            override fun remove(name: String) = throw StorageUnavailable("python3 is needed to reach the keyring.")
+        })
+        core.requestUiRefresh()
+        settle(core)
+        assertNotNull(core.uiState.value.storageProblem)
+    }
+
+    @Test
+    fun `the Groq key is read from the keyring once, not on every refresh`() {
+        val reads = mutableListOf<String>()
+        val core = core(object : SecretStore by keyring {
+            override fun get(name: String): ByteArray? = keyring.get(name).also { reads += name }
+        })
+        repeat(3) { core.requestUiRefresh() }
+        settle(core)
+        assertEquals(1, reads.count { it == "groq-key" })
     }
 }

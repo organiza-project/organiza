@@ -19,10 +19,18 @@ import org.organiza.ui.OrganizaRoot
 import org.organiza.ui.OrganizaTheme
 import org.organiza.ui.Route
 
+/** Kept in a static field so the lock lives as long as the process. */
+private var instance: AutoCloseable? = null
+
 fun main(args: Array<String>) {
     val socket = Instance.socket()
-    // A second start shows the running Organiza, or its copilot, and ends.
-    if (Instance.handOff(socket, if (COPILOT in args) "copilot" else "show")) return
+    instance = Instance.lock(socket.resolveSibling("organiza.lock"))
+    if (instance == null) {
+        // A later start shows the running Organiza, or its copilot, and ends. The first may still be starting.
+        val command = if (COPILOT in args) "copilot" else "show"
+        repeat(HANDOFF_TRIES) { if (Instance.handOff(socket, command)) return else Thread.sleep(100) }
+        return
+    }
     val platform = DesktopPlatform()
     val core = OrganizaCore(platform)
     core.start()
@@ -87,6 +95,8 @@ fun main(args: Array<String>) {
         }
     }
 }
+
+private const val HANDOFF_TRIES = 50
 
 /** The ring of the logo mark, for the window and the top bar, where an image file would add nothing. */
 private fun trayIcon(): Painter = object : Painter() {

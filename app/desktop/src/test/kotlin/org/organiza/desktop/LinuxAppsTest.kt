@@ -20,6 +20,8 @@ class LinuxAppsTest {
         assertEquals("linux.display_im6.q16", LinuxApps.packageName("display-im6.q16")?.value)
         assertEquals("linux.x7zip.app", LinuxApps.packageName("7zip.app")?.value)
         assertNull(LinuxApps.packageName(""))
+        // The .deb names Organiza's own entry after its package.
+        assertEquals(DesktopPlatform.SELF, LinuxApps.packageName("organiza-Organiza"))
     }
 
     @Test

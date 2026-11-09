@@ -46,6 +46,7 @@ class DesktopApp(
     private val ticker = Executors.newSingleThreadScheduledExecutor { Thread(it, "organiza-blocker").apply { isDaemon = true } }
     private var limitTick: ScheduledFuture<*>? = null
     private var passEnd: ScheduledFuture<*>? = null
+    private var dayEnd: ScheduledFuture<*>? = null
     @Volatile private var tracking: AutoCloseable? = null
     @Volatile private var current: Focus? = null
     @Volatile private var closed = false
@@ -57,6 +58,7 @@ class DesktopApp(
             if (shown != null && shown.target == target) return
             if (shown != null) log(shown, InterventionOutcome.Stayed)
             current?.takeIf { packages[it.app] == target.app }?.pid?.let(freezer::freeze)
+            if (target is BlockTarget.Limit) thawAtMidnight()
             val strict = core.session.current.strict
             pause.value = InterventionFlow(target, strict, core.overridesToday, Friction.phrase(strict), reflects = strict && core.hasApiKey(), core.clock)
             logged = false
@@ -137,6 +139,15 @@ class DesktopApp(
             Duration.between(core.clock.now(), until).toMillis() + GRACE_MS,
             TimeUnit.MILLISECONDS,
         )
+    }
+
+    /** Limits start again at midnight, so whatever one stopped runs again then. */
+    private fun thawAtMidnight() {
+        if (dayEnd?.isDone == false) return
+        val zone = ZoneId.systemDefault()
+        val now = core.clock.now()
+        val midnight = now.atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant()
+        dayEnd = ticker.schedule({ platform.onMain { freezer.thawAll() } }, Duration.between(now, midnight).toMillis() + GRACE_MS, TimeUnit.MILLISECONDS)
     }
 
     private fun currentApp(): PackageName? = current?.app?.let(packages::get)

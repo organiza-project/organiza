@@ -50,8 +50,11 @@ class KeyringApiKeyStore(private val keyring: SecretStore) : ApiKeyStore {
     }
 }
 
-/** The login keyring through libsecret (ADR-0024). Secrets pass over stdin and stdout, never argv. */
-class Keyring : SecretStore {
+/**
+ * The login keyring through libsecret (ADR-0024). Secrets pass over stdin and stdout, never argv.
+ * [env] is added to the helper's environment, so a test can point it at a keyring of its own.
+ */
+class Keyring(private val env: Map<String, String> = emptyMap()) : SecretStore {
     override fun put(name: String, value: ByteArray) {
         run("store", name, value.toHex()) ?: throw StorageUnavailable("The keyring did not store the key.")
     }
@@ -65,7 +68,8 @@ class Keyring : SecretStore {
     /** Returns stdout, or null when the helper failed. */
     private fun run(command: String, name: String, input: String): String? {
         val process = try {
-            ProcessBuilder("python3", "-c", HELPER, command, name).redirectError(ProcessBuilder.Redirect.DISCARD).start()
+            ProcessBuilder("python3", "-c", HELPER, command, name).redirectError(ProcessBuilder.Redirect.DISCARD)
+                .apply { environment().putAll(env) }.start()
         } catch (failure: java.io.IOException) {
             throw StorageUnavailable("python3 is needed to reach the keyring.", failure)
         }

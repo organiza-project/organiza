@@ -13,6 +13,7 @@ class FreezerTest {
     private val record: Path = Files.createTempDirectory("organiza").resolve("frozen")
     private val child = ProcessBuilder("sleep", "60").start()
     private val pid = child.pid()
+    private val started = child.info().startInstant().get().toEpochMilli()
 
     @AfterTest
     fun end() {
@@ -28,7 +29,7 @@ class FreezerTest {
         val freezer = Freezer(record)
         freezer.freeze(pid)
         assertEquals('T', state())
-        assertEquals(listOf(pid.toString()), Files.readAllLines(record))
+        assertEquals(listOf("$pid $started"), Files.readAllLines(record))
         freezer.thawAll()
         assertEquals('S', state())
         assertFalse(record.exists())
@@ -37,9 +38,18 @@ class FreezerTest {
     @Test
     fun `apps left frozen by a crash are thawed at the next start`() {
         ProcessBuilder("kill", "-STOP", pid.toString()).start().waitFor()
-        record.writeText("$pid\n")
+        record.writeText("$pid $started\n")
         Freezer(record).recover()
         assertEquals('S', state())
+        assertFalse(record.exists())
+    }
+
+    @Test
+    fun `a recorded process id now used by another process is left alone`() {
+        ProcessBuilder("kill", "-STOP", pid.toString()).start().waitFor()
+        record.writeText("$pid ${started - 60_000}\n")
+        Freezer(record).recover()
+        assertEquals('T', state())
         assertFalse(record.exists())
     }
 

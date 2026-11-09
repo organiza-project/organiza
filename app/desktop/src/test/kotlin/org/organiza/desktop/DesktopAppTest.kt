@@ -15,6 +15,9 @@ import androidx.compose.ui.unit.dp
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,6 +27,7 @@ import kotlin.test.assertTrue
 import org.organiza.app.OrganizaCore
 import org.organiza.domain.OverrideReason
 import org.organiza.enforcement.InterventionOutcome
+import org.organiza.enforcement.UsageLimits
 import org.organiza.storage.FocusLog
 import org.organiza.storage.FocusTier
 import org.organiza.testing.FakeSecretStore
@@ -108,6 +112,14 @@ class DesktopAppTest {
     }
 
     @Test
+    fun `allowing the top bar icon takes effect without a restart`() = runComposeUiTest {
+        setContent { androidx.compose.foundation.text.BasicText(if (platform.trayWanted) "tray on" else "tray off") }
+        waitUntilExactlyOneExists(hasText("tray off"), 5_000)
+        platform.trayWanted = true
+        waitUntilExactlyOneExists(hasText("tray on"), 5_000)
+    }
+
+    @Test
     fun `a blocked app is paused and stopped until the person overrides`() {
         actions.setFocusApp(checkNotNull(files.pkg).value, true)
         actions.startFocus(25, strict = false, shortForm = false, tier = FocusTier.STANDARD)
@@ -123,6 +135,23 @@ class DesktopAppTest {
         assertNull(app.pause.value)
         assertEquals('S', state(child.pid()))
         assertTrue(core.passes.allows(flow.target))
+    }
+
+    @Test
+    fun `an app stopped at its daily limit runs again at midnight`() {
+        actions.setLimit(checkNotNull(files.pkg).value, UsageLimits.MINUTES.first.toLong())
+        eventually("the limit") { core.hub.limits.isNotEmpty() }
+        val zone = ZoneId.systemDefault()
+        val midnight = LocalDate.now(zone).plusDays(1).atStartOfDay(zone).toInstant()
+        core.clockOffsetForTesting = Duration.between(Instant.now(), midnight.minus(Duration.ofMinutes(UsageLimits.MINUTES.first + 2L)))
+        focus.report(Focus("org.gnome.Nautilus", child.pid()))
+        core.clockOffsetForTesting = Duration.between(Instant.now(), midnight.minusSeconds(2))
+        focus.report(Focus("org.gnome.Nautilus", child.pid()))
+        eventually("the pause") { app.pause.value != null }
+        assertEquals('T', state(child.pid()))
+        val flow = assertNotNull(app.pause.value)
+        javax.swing.SwingUtilities.invokeAndWait { app.choose(flow, InterventionOutcome.Stayed) }
+        eventually("midnight") { state(child.pid()) == 'S' }
     }
 
     @Test

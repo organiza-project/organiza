@@ -530,6 +530,8 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
             val db = platform.openDatabase()
             if (Migrations.migrate(db) is MigrationResult.TooNew) throw StorageUnavailable(DATABASE_TOO_NEW)
             storage = Storage(db, clock).also { hub.load(it) }
+            // Read once: on the desktop each read starts a keyring helper. Saving and removing keep it current.
+            keySaved = apiKeys.load() != null
             rescheduleReminders()
         } catch (failure: StorageUnavailable) {
             // Never delete or recreate the database here (ADR-0008).
@@ -581,7 +583,6 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
         val zone = ZoneId.systemDefault()
         val now = clock.now()
         val today = now.atZone(zone).toLocalDate()
-        keySaved = apiKeys.load() != null
         val onboarding = !onboarded
         val permissions = platform.permissions()
         val snapshot = if (active == null) {

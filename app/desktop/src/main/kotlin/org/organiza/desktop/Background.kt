@@ -5,10 +5,13 @@ import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.Channels
+import java.nio.channels.FileChannel
+import java.nio.channels.OverlappingFileLockException
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 import kotlin.concurrent.thread
 import kotlin.io.path.exists
 import kotlin.io.path.writeText
@@ -34,15 +37,13 @@ class Autostart(private val configHome: Path) {
 
     fun enabled(): Boolean = wanted.exists()
 
+    /** Writes the unit and links it the way `systemctl --user enable` would; systemd reads both at the next login. */
     fun enable(command: List<String> = launcher()): String {
-        Files.createDirectories(unit.parent)
+        Files.createDirectories(wanted.parent)
         unit.writeText(unitText(command))
-        output("systemctl", "--user", "daemon-reload")
-        return if (output("systemctl", "--user", "enable", "organiza.service") != null || enabled()) {
-            "Organiza now starts in the background when you log in"
-        } else {
-            "The service file is in place, but systemd did not enable it. Run: systemctl --user enable organiza.service"
-        }
+        Files.deleteIfExists(wanted)
+        Files.createSymbolicLink(wanted, unit)
+        return "Organiza now starts in the background when you log in"
     }
 
     companion object {
@@ -69,6 +70,26 @@ class Autostart(private val configHome: Path) {
 
 /** One Organiza per login: a second start hands its request to the first over a private socket. */
 object Instance {
+    /** Held while this Organiza runs, so two starts at once cannot both listen. Null when another holds it. */
+    fun lock(file: Path): AutoCloseable? {
+        val channel = try {
+            Files.createDirectories(file.parent)
+            FileChannel.open(file, StandardOpenOption.CREATE, StandardOpenOption.WRITE)
+        } catch (failure: IOException) {
+            // With no lock file Organiza still runs, as it does with no socket.
+            System.err.println("organiza: no single-instance lock: ${failure.javaClass.simpleName}")
+            return AutoCloseable {}
+        }
+        val lock = try {
+            channel.tryLock()
+        } catch (_: OverlappingFileLockException) {
+            null
+        }
+        if (lock == null) channel.close()
+        // Closing the channel releases the lock; so does the process ending.
+        return channel.takeIf { lock != null }
+    }
+
     /** Sends [command] to a running Organiza. False when none is running. */
     fun handOff(socket: Path, command: String): Boolean = try {
         SocketChannel.open(UnixDomainSocketAddress.of(socket)).use { it.write(ByteBuffer.wrap("$command\n".toByteArray())) }
@@ -79,7 +100,7 @@ object Instance {
 
     /** Takes requests from later starts. Only [COMMANDS] are passed on. */
     fun listen(socket: Path, onCommand: (String) -> Unit): AutoCloseable {
-        // Nobody answered handOff, so a file left here is from a crash.
+        // This process holds the lock, so a file left here is from a crash.
         Files.deleteIfExists(socket)
         Files.createDirectories(socket.parent)
         val server = try {

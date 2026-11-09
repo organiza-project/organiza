@@ -22,7 +22,7 @@ class LoggedUsageTest {
         log.record(at("09:10"), files)
         log.record(at("09:40"), null)
         log.record(at("10:00"), chrome)
-        val usage = LoggedUsage(log)
+        val usage = LoggedUsage({ log }, { true })
         assertEquals(
             mapOf(chrome to Duration.ofMinutes(10 + 15), files to Duration.ofMinutes(30)),
             usage.perApp(at("09:00"), at("10:15")),
