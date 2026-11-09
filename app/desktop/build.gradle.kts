@@ -42,6 +42,7 @@ compose.desktop {
             linux {
                 iconFile.set(file("src/main/resources/organiza.png"))
                 packageName = "organiza"
+                debMaintainer = "radwandoufan@gmail.com"
                 appCategory = "Utility"
                 menuGroup = "Utility"
                 shortcut = true
