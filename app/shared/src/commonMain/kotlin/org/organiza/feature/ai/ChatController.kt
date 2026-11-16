@@ -6,6 +6,7 @@ import org.organiza.ai.AiResult
 import org.organiza.ai.ChatTurn
 import org.organiza.ai.GroqClient
 import org.organiza.app.OrganizaCore
+import org.organiza.storage.Setting
 import org.organiza.ui.ChatView
 import org.organiza.voice.CommandParser
 
@@ -13,16 +14,36 @@ import org.organiza.voice.CommandParser
  * The copilot chat (ADR-0020). A message the local grammar understands becomes a command waiting
  * for Confirm, with no AI call. Anything else goes to Groq with usage by category, and any change
  * it suggests is parsed by the same grammar, so the model can never act on its own (ADR-0010).
- * Turns live in memory only.
+ * The last turns are kept in the encrypted database, so a conversation continues after a restart, and the
+ * person's own About me goes with each question as the copilot's memory of them (ADR-0033).
  */
 class ChatController(private val app: OrganizaCore) {
     @Volatile private var turns: List<ChatTurn> = emptyList()
     @Volatile private var busy = false
 
+    @Volatile private var loaded = false
+
     fun view() = ChatView(turns, busy)
+
+    /** Storage thread: reads the kept turns once. */
+    fun load(stores: OrganizaCore.Storage) {
+        if (loaded) return
+        loaded = true
+        turns = stores.settings.text(Setting.CHAT_MEMORY)?.lines()?.filter { it.length > 2 }?.map {
+            ChatTurn(fromUser = it.startsWith("P "), text = it.drop(2).replace("\\n", "\n"))
+        }.orEmpty()
+    }
+
+    private fun keep() = app.onStores { stores ->
+        stores.settings.setText(
+            Setting.CHAT_MEMORY,
+            turns.takeLast(KEPT).joinToString("\n") { (if (it.fromUser) "P " else "C ") + it.text.replace("\n", "\\n") },
+        )
+    }
 
     fun clear() {
         turns = emptyList()
+        keep()
         app.requestUiRefresh()
     }
 
@@ -43,7 +64,7 @@ class ChatController(private val app: OrganizaCore) {
             val facts = app.usageFacts(stores)
             app.onAi {
                 val result = try {
-                    app.coach(GroqClient.CHAT_MODEL).chat(text, history, facts)
+                    app.coach(GroqClient.CHAT_MODEL).chat(text, history, facts, stores.settings.text(Setting.ABOUT_ME).orEmpty())
                 } catch (failure: RuntimeException) {
                     answer("The copilot could not answer: ${failure.javaClass.simpleName}")
                     return@onAi
@@ -70,11 +91,13 @@ class ChatController(private val app: OrganizaCore) {
     private fun answer(text: String) {
         turns = turns + ChatTurn(fromUser = false, text = text.take(MAX_REPLY))
         busy = false
+        keep()
         app.requestUiRefresh()
     }
 
     private companion object {
         const val MAX_MESSAGE = 500
+        const val KEPT = 10
         const val MAX_REPLY = 2000
     }
 }

@@ -43,6 +43,7 @@ class RecordingActions : Actions {
     override fun unlinkDevices() { calls += "unlinkDevices" }
     override fun shareDeviceCode() { calls += "shareDeviceCode" }
     override fun openAppInfo() { calls += "openAppInfo" }
+    override fun saveAboutMe(text: String) { calls += "saveAboutMe $text" }
     override fun setLockout(on: Boolean) { calls += "setLockout $on" }
     override fun unlock(typed: String) { calls += "unlock" }
     override fun cancelUnlock() { calls += "cancelUnlock" }

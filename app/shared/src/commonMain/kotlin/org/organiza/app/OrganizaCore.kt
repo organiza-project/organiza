@@ -139,6 +139,12 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
         requestUiRefresh()
     }
 
+    /** The person's own profile, the copilot's memory of them (ADR-0033). */
+    fun saveAboutMe(text: String) = onStores { stores ->
+        stores.settings.setText(Setting.ABOUT_ME, text.trim().take(ABOUT_ME_CHARS))
+        showMessage(if (text.isBlank()) "About me cleared" else "Saved. The copilot will use it")
+    }
+
     fun cancelUnlock() {
         pendingUnlock = null
         showMessage("Nothing was changed")
@@ -643,6 +649,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
                 hub = hub.view(active, zone),
                 notes = journal.view(active, today, zone),
                 usage = usageReport.view(active, today, zone),
+                aboutMe = active.settings.text(Setting.ABOUT_ME).orEmpty().also { chat.load(active) },
                 lockout = active.settings.flag(Setting.LOCKOUT).also { lockout = it },
                 unlockReason = pendingUnlock?.first,
                 calendar = calendar.view(now, zone, views),
@@ -908,6 +915,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
         private const val PREFERENCES = "organiza"
         private const val VOICE_CONSENT = "voice_consent"
         private const val ONBOARDED = "onboarded"
+        private const val ABOUT_ME_CHARS = 1000
         private const val STORAGE_RETRY_MS = 30_000L
         private const val MIN_TICK_MS = 500L
         private const val MAX_TICK_MS = 30_000L

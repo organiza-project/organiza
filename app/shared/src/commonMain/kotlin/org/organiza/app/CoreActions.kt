@@ -154,6 +154,8 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
 
     override fun setLockout(on: Boolean) = core.setLockout(on)
 
+    override fun saveAboutMe(text: String) = core.saveAboutMe(text)
+
     override fun unlock(typed: String) = core.unlock(typed)
 
     override fun cancelUnlock() = core.cancelUnlock()

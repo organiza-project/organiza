@@ -199,6 +199,17 @@ class PromptsTest {
         assertEquals(AiResult.Failed(AiFailure.MALFORMED), coach.extractSchedule("x"))
     }
 
+    @Test
+    fun `the copilot gets the person's about me, sanitized, as its memory`() {
+        transport.respond(200, reply("""{"reply":"Start with one study block before lunch","command":null}"""))
+        val result = coach.chat("Where do I start?", emptyList(), usage, "Studying for the bar exam in March. $leaky")
+        assertEquals(AiResult.Ok(ChatReply("Start with one study block before lunch", null)), result)
+        assertTrue("bar exam in March" in sentBody())
+        assertTrue("aboutMe" in sentBody())
+        assertNothingLeaked()
+        assertTrue("goals" in sentBody().lowercase())
+    }
+
     private val usage = UsageFacts(
         screenMinutes = 240,
         minutesByCategory = mapOf("Social" to 90L, "Video" to 60L),

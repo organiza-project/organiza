@@ -176,6 +176,7 @@ data class UiSnapshot(
     val notes: NotesView = NotesView(),
     val usage: UsageView = UsageView(),
     val lockout: Boolean = false,
+    val aboutMe: String = "",
     val unlockReason: String? = null,
     val blockedApps: List<String> = emptyList(),
     val blockedSites: List<String> = emptyList(),

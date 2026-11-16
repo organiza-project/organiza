@@ -134,7 +134,7 @@ class WireframeScreensTest {
             rankLine = "Initiate at level 10 · 2,100 XP to go",
             tasks = listOf(RpgTaskView("d", RpgKind.DAILY, "Drink water", done = false), RpgTaskView("h", RpgKind.HABIT, "Stretch", done = false)),
         )
-        show { QuestsPanel(rpg, actions) }
+        show { QuestsPanel(rpg, actions, {}) }
         compose.onNodeWithContentDescription("HP 42 / 50").assertExists()
         compose.onNodeWithText("Novice").assertExists()
         compose.onNodeWithContentDescription("Level 3").assertExists()

@@ -46,10 +46,12 @@ fun CopilotScreen(ui: UiSnapshot, actions: Actions, back: () -> Unit) {
     var draft by rememberSaveable { mutableStateOf("") }
     TopBar("Copilot", back)
     Txt(
-        "Ask about your time, or tell it what to do. Usage is sent by category only, never by app or site, and the chat is forgotten when Organiza closes.",
+        "Your guide to organizing your days and reaching your goals. Usage is sent by category only, never by app or site. " +
+            "The last few messages are kept on this device so the conversation can continue.",
         Type.small,
         colors.muted,
     )
+    AboutMePanel(ui.aboutMe, actions)
     if (chat.turns.isEmpty()) {
         Panel {
             PanelHeader("Try")
@@ -132,4 +134,22 @@ private fun MicButton(actions: Actions) {
             },
         contentAlignment = Alignment.Center,
     ) { Icon(Glyph.MIC, if (held) colors.onPrimary else colors.text) }
+}
+
+/** The copilot's memory of the person, written by them (ADR-0033): sent with each question, names and links removed. */
+@Composable
+private fun AboutMePanel(saved: String, actions: Actions) {
+    val colors = Theme.colors
+    var text by rememberSaveable(saved) { mutableStateOf(saved) }
+    Panel {
+        PanelHeader("About me")
+        Txt(
+            "Your goals, routines and what you are working on, so the copilot can tailor its advice. Sent with each " +
+                "question with names, links and numbers removed. It stays on this device otherwise.",
+            Type.small,
+            colors.muted,
+        )
+        Field(text, { text = it.take(1000) }, "For example: studying for exams in March, best focus in the mornings")
+        Action("Save", ButtonKind.SECONDARY, enabled = text != saved) { actions.saveAboutMe(text) }
+    }
 }

@@ -195,15 +195,18 @@ public object Prompts {
     )
 
     /** The copilot chat (ADR-0020). Its command is only ever fed back through the local grammar (ADR-0010). */
-    public fun copilotChat(question: SanitizedText, history: List<ChatTurn>, facts: UsageFacts, sanitizer: Sanitizer): Prompt = Prompt(
-        system = "You are Organiza's focus and time-management copilot. Answer briefly and kindly, from the person's " +
-            "own usage and habits when they help, and suggest small concrete goals. If the question asks to change " +
+    public fun copilotChat(question: SanitizedText, history: List<ChatTurn>, facts: UsageFacts, sanitizer: Sanitizer, aboutMe: SanitizedText? = null): Prompt = Prompt(
+        system = "You are Organiza's copilot: a calm, practical guide who helps one person organize their life and reach " +
+            "their goals, and leave bad habits and too much screen time behind. Use what they wrote about themselves in " +
+            "aboutMe, their goals, routines and situation, to tailor every answer, along with their own usage and habits. " +
+            "Answer briefly and kindly, and end with one small, concrete next step they can do today. If the question asks to change " +
             "something, also restate it as one command in this grammar: add habit NAME; mark NAME as done; " +
             "log 30 minutes of NAME; schedule meeting with PERSON tomorrow at 2 pm; schedule TAG tomorrow at 9 for 1 hour. " +
             "Use null when no command fits or a name is a placeholder in square brackets. " + DATA_ONLY +
             """Reply only with JSON: {"reply": string, "command": string or null}.""",
         user = buildJsonObject {
             put("question", question.value)
+            aboutMe?.takeIf { it.value.isNotBlank() }?.let { put("aboutMe", it.value) }
             putJsonArray("history") {
                 history.takeLast(MAX_TURNS).forEach { turn ->
                     addJsonObject {

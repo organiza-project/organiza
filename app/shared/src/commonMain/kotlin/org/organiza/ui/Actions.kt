@@ -83,6 +83,9 @@ interface Actions {
     fun signOut()
     fun deleteAccount()
 
+    /** The copilot's memory of the person, in their own words (ADR-0033). */
+    fun saveAboutMe(text: String)
+
     // The lockout (ADR-0032)
     fun setLockout(on: Boolean)
     fun unlock(typed: String)

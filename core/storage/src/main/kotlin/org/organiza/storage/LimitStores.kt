@@ -28,6 +28,8 @@ public enum class Setting(internal val key: String) {
     BLOCK_SHORTS("block_shorts"),
     RPG_SETTLED("rpg_settled"),
     LOCKOUT("lockout"),
+    ABOUT_ME("about_me"),
+    CHAT_MEMORY("chat_memory"),
 }
 
 public class SettingsStore(private val db: Database) {

@@ -1377,3 +1377,25 @@ turned off in two taps, which is exactly what an urge does.
 ### Consequences
 Loosening a rule takes a few minutes of deliberate typing. The setting lives in the encrypted database
 like the others; reinstalling the app, which clears it, remains possible, as ADR-0005 accepts.
+
+## ADR-0033: The copilot as a guide, with a memory the person writes
+
+### Status
+Accepted, 2026-11-16. Extends ADR-0017 and ADR-0020.
+
+### Context
+The copilot answered each question cold. People want a guide that knows their goals and situation,
+without Organiza reading their journal or usage on its own.
+
+### Decision
+- **About me** is a short profile, up to 1,000 characters, that the person writes on the copilot screen.
+  It is kept in the encrypted database and sent with each question, sanitized like the question.
+- **The last ten turns** of the chat are kept in the encrypted database, so a conversation continues
+  after a restart; clearing the chat clears them.
+- The system prompt makes the copilot a guide to organizing one's life and reaching goals, tailored by
+  About me, ending each answer with one concrete next step. Commands still go through the local grammar.
+- Notes are not part of the memory: the AI reads a note only when asked about that note (ADR-0030).
+
+### Consequences
+Advice can be personal without any automatic sharing. What the copilot knows is exactly what the person
+wrote, and they can read and change it in one place.

@@ -43,8 +43,9 @@ public class AiCoach(
 
     public fun copilot(facts: CopilotFacts): AiResult<CopilotAdvice> = ask(Prompts.copilot(facts, sanitizer), ::parseAdvice)
 
-    public fun chat(question: String, history: List<ChatTurn>, facts: UsageFacts): AiResult<ChatReply> =
-        ask(Prompts.copilotChat(sanitizer.clean(question), history, facts, sanitizer)) { reply ->
+    /** [aboutMe] is the person's own profile, the copilot's memory of them (ADR-0033); it is sanitized like the question. */
+    public fun chat(question: String, history: List<ChatTurn>, facts: UsageFacts, aboutMe: String = ""): AiResult<ChatReply> =
+        ask(Prompts.copilotChat(sanitizer.clean(question), history, facts, sanitizer, sanitizer.clean(aboutMe.take(MAX_ABOUT_ME)))) { reply ->
             reply["reply"].text()?.let { ChatReply(it, reply["command"].text()) }
         }
 
@@ -125,6 +126,7 @@ public class AiCoach(
     public companion object {
         public const val MAX_REPLY_TEXT: Int = 1000
         private const val MAX_ITEMS = 50
+        private const val MAX_ABOUT_ME = 1000
         private const val MAX_SUBJECT = 40
         private const val MAX_SCHEDULE_TEXT = 4000
         private const val MAX_ADVICE_BLOCKS = 5
