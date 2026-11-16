@@ -8,6 +8,7 @@ import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.organiza.app.OrganizaCore
+import org.organiza.storage.DeviceAppMinutes
 import org.organiza.domain.PackageName
 import org.organiza.sync.AuthState
 import org.organiza.sync.DeviceLink
@@ -48,7 +49,7 @@ class DevicesController(private val app: OrganizaCore) {
         secrets.put(SECRET, link.code.toByteArray())
         current = link
         loaded = true
-        prefs.put(mapOf(CURSOR to null))
+        prefs.put(mapOf(CURSOR to null, POSTED to null))
         exchange = null
         app.showMessage(if (code.isBlank()) "Usage sharing is on. Copy the code to your other devices" else "This device now shares usage with your others")
         network.execute(::run)
@@ -91,18 +92,34 @@ class DevicesController(private val app: OrganizaCore) {
         val usage = exchange?.takeIf { it.first == key }?.second
             ?: DeviceUsage(link, device, relay, prefs.string(CURSOR)?.toLongOrNull() ?: 0).also { exchange = key to it }
         // Usage is read where storage lives, then sent from here.
-        app.onStores {
-            val day = today()
-            val minutes = todayByName(day)
-            network.execute { trade(usage, day, minutes) }
+        app.onStores { stores ->
+            val today = today()
+            // Right after linking, two weeks of history go out once; each new day, yesterday's final count.
+            val days = when {
+                prefs.string(POSTED) == null -> (0L until BACKFILL_DAYS).map { today.minusDays(it) }
+                prefs.string(POSTED) != today.toString() -> listOf(today.minusDays(1), today)
+                else -> listOf(today)
+            }
+            val reports = days.associateWith { byName(it) }.filterValues { it.isNotEmpty() }
+            network.execute { trade(usage, today, reports, stores) }
         }
     }
 
-    private fun trade(usage: DeviceUsage, day: LocalDate, minutes: Map<String, Long>) {
+    private fun trade(usage: DeviceUsage, today: LocalDate, reports: Map<LocalDate, List<DeviceAppMinutes>>, stores: OrganizaCore.Storage) {
         try {
-            if (minutes.isNotEmpty()) usage.post(day, minutes)
-            usage.pull()
+            reports.forEach { (day, apps) -> usage.post(day, apps.associate { it.app to it.minutes }, apps.associate { it.app to it.category }) }
+            prefs.put(mapOf(POSTED to today.toString()))
+            val received = usage.pull()
             prefs.put(mapOf(CURSOR to usage.cursor.toString()))
+            // Kept in the encrypted database, so Metrics can show every device's history (ADR-0031).
+            if (received.isNotEmpty()) {
+                app.onStores {
+                    received.forEach { report ->
+                        stores.deviceUsage.put(report.device, report.day, report.minutes.map { (name, minutes) -> DeviceAppMinutes(name, report.categories[name] ?: OTHER, minutes) })
+                    }
+                    app.requestUiRefresh()
+                }
+            }
             app.requestUiRefresh()
         } catch (failure: IOException) {
             app.platform.log("device usage exchange failed: ${failure.javaClass.simpleName}")
@@ -112,17 +129,18 @@ class DevicesController(private val app: OrganizaCore) {
     }
 
     // Storage thread: the desktop reads its own focus log. [day] is read once, so minutes and their day agree at midnight.
-    private fun todayByName(day: LocalDate): Map<String, Long> {
+    private fun byName(day: LocalDate): List<DeviceAppMinutes> {
         val usage = app.platform.usage
-        if (!usage.permitted()) return emptyMap()
+        if (!usage.permitted()) return emptyList()
         val zone = ZoneId.systemDefault()
         val start = day.atStartOfDay(zone).toInstant()
-        val now = maxOf(app.clock.now(), start)
-        return usage.perApp(start, minOf(now, day.plusDays(1).atStartOfDay(zone).toInstant()))
+        val end = minOf(maxOf(app.clock.now(), start), day.plusDays(1).atStartOfDay(zone).toInstant())
+        val categories = app.platform.launchable().associate { it.pkg to it.category }
+        return usage.perApp(start, end)
             .filterKeys { it.value != app.platform.selfPackage }
-            .entries.groupBy({ app.platform.appLabel(it.key) }, { it.value.toMinutes() })
-            .mapValues { it.value.sum() }
-            .filterValues { it > 0 }
+            .entries.groupBy({ app.platform.appLabel(it.key) to (categories[it.key.value] ?: OTHER) }, { it.value.toMinutes() })
+            .map { (key, minutes) -> DeviceAppMinutes(key.first, key.second, minutes.sum()) }
+            .filter { it.minutes > 0 }
     }
 
     private fun link(): DeviceLink? {
@@ -140,6 +158,9 @@ class DevicesController(private val app: OrganizaCore) {
         const val PREFERENCES = "organiza_devices"
         const val DEVICE = "device"
         const val CURSOR = "cursor"
+        const val POSTED = "posted"
+        const val BACKFILL_DAYS = 14L
+        const val OTHER = "Other"
         const val SECRET = "devices-secret"
         const val FIRST_S = 30L
         const val INTERVAL_S = 20 * 60L

@@ -1328,3 +1328,30 @@ focus, with the AI helping to sort them. A journal is the most private thing the
 Notes stay in the encrypted database and are deleted only by the person. The copilot does not read
 notes on its own (the person chose this); its memory of them is whatever the person writes into its
 profile.
+
+## ADR-0031: A StayFree-style report over any range, from every device
+
+### Status
+Accepted, 2026-11-16. Builds on ADR-0028.
+
+### Context
+Metrics showed only today. People want to see where their time went over a day, a week, a month or
+any range, by category, and to check one device for all of them.
+
+### Decision
+- **`UsageReport`** (`core/presentation`) builds a bar a day over the range (at most 62 days), the total,
+  categories by time and apps by time. `UsageController` holds the span (Day, Week, Month, Range), the
+  range ends and whether other devices count, and caches the report for a minute, since building a
+  month reads usage a day at a time.
+- **Every device's history.** Device usage reports now carry each app's name and category. Each device
+  posts today every 20 minutes, yesterday's final count once a day, and two weeks of history once after
+  linking. Received reports are kept in `device_usage` (schema v12), in the encrypted database, so any
+  range can show every device. The relay still sees only padded ciphertext.
+- **Inside apps.** The Reels and Shorts switches show the apps' own icons, or a plain glyph where the
+  app is not installed.
+
+### Consequences
+On Android, the system keeps detailed usage events for only about a week, so older days of this phone
+can read as less than they were; other devices' history comes from their reports. Category names are
+the ones each platform declares, so the same app can sit under slightly different categories on two
+systems.

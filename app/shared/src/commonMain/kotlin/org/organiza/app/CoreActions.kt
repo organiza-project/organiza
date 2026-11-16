@@ -14,6 +14,7 @@ import org.organiza.storage.HabitPlan
 import org.organiza.storage.RpgKind
 import org.organiza.sync.BackendKind
 import org.organiza.ui.Actions
+import org.organiza.ui.UsageSpan
 import org.organiza.ui.CalendarMode
 
 /** Audio held in memory while a talk button is down (ADR-0010). */
@@ -166,6 +167,14 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
     override fun addScheduleBlocks() = core.schedule.add()
 
     override fun clearImport() = core.schedule.clear()
+
+    override fun setUsageSpan(span: UsageSpan) = core.usageReport.setSpan(span)
+
+    override fun shiftUsage(step: Int) = core.usageReport.shift(step)
+
+    override fun shiftUsageEdge(start: Boolean, days: Int) = core.usageReport.shiftEdge(start, days)
+
+    override fun setUsageAllDevices(on: Boolean) = core.usageReport.setAllDevices(on)
 
     override fun addNote(body: String, subject: String, remindDay: Int?, minute: Int) = core.journal.add(body, subject, remindDay, minute)
 

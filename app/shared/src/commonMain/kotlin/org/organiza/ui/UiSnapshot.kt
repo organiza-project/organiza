@@ -35,6 +35,20 @@ data class AccountView(
     val otherDevices: Int = 0,
 )
 
+enum class UsageSpan(val label: String) { DAY("Day"), WEEK("Week"), MONTH("Month"), RANGE("Range") }
+
+/** The Metrics usage report (ADR-0031): the range shown, and whether other devices count. */
+@Immutable
+data class UsageView(
+    val report: org.organiza.presentation.UsageReport = org.organiza.presentation.UsageReport("Today", "0m", emptyList(), emptyList(), emptyList()),
+    val span: UsageSpan = UsageSpan.WEEK,
+    val from: String = "",
+    val to: String = "",
+    val allDevices: Boolean = true,
+    val linked: Boolean = false,
+    val canGoForward: Boolean = false,
+)
+
 /** The Notes tab (ADR-0030): notes by day, the subject shown, and a fresh transcript for the composer. */
 @Immutable
 data class NotesView(
@@ -159,6 +173,7 @@ data class UiSnapshot(
     val message: String? = null,
     val storageProblem: String? = null,
     val notes: NotesView = NotesView(),
+    val usage: UsageView = UsageView(),
     val blockedApps: List<String> = emptyList(),
     val blockedSites: List<String> = emptyList(),
     val stored: List<Pair<String, String>> = emptyList(),

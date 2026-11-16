@@ -83,6 +83,12 @@ interface Actions {
     fun signOut()
     fun deleteAccount()
 
+    // The usage report (ADR-0031)
+    fun setUsageSpan(span: UsageSpan)
+    fun shiftUsage(step: Int)
+    fun shiftUsageEdge(start: Boolean, days: Int)
+    fun setUsageAllDevices(on: Boolean)
+
     // Notes (ADR-0030)
     /** [remindDay]: 0 today, 1 tomorrow, null for no reminder; [minute] of that day. */
     fun addNote(body: String, subject: String, remindDay: Int?, minute: Int)

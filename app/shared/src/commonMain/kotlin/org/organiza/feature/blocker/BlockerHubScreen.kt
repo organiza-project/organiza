@@ -39,12 +39,22 @@ fun BlockerHub(ui: UiSnapshot, actions: Actions, openApp: MutableState<String?> 
     Txt("Distraction blocker", Type.section, modifier = Modifier.padding(top = 8.dp).semantics { heading() })
     Panel {
         PanelHeader("Inside apps")
-        SwitchRow("Block Reels tab only", "Instagram stays open; its Reels feed is paused all day", hub.blockReels) {
-            actions.setFeed(ShortFormFeed.INSTAGRAM_REELS, it)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AppIcon("com.instagram.android", 36.dp, Glyph.CAMERA)
+            Box(Modifier.weight(1f).padding(start = 12.dp)) {
+                SwitchRow("Block Reels tab only", "Instagram stays open; its Reels feed is paused all day", hub.blockReels) {
+                    actions.setFeed(ShortFormFeed.INSTAGRAM_REELS, it)
+                }
+            }
         }
         Rule()
-        SwitchRow("Block YT Shorts", "YouTube stays open; Shorts are paused all day", hub.blockShorts) {
-            actions.setFeed(ShortFormFeed.YOUTUBE_SHORTS, it)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AppIcon("com.google.android.youtube", 36.dp, Glyph.PLAY)
+            Box(Modifier.weight(1f).padding(start = 12.dp)) {
+                SwitchRow("Block YT Shorts", "YouTube stays open; Shorts are paused all day", hub.blockShorts) {
+                    actions.setFeed(ShortFormFeed.YOUTUBE_SHORTS, it)
+                }
+            }
         }
     }
     val mine = hub.apps.filter { it.onList || it.limitMinutes != null }
@@ -105,11 +115,12 @@ private fun PickRow(app: HubApp, actions: Actions) {
 
 /** The app's launcher icon, loaded off the main thread. */
 @Composable
-internal fun AppIcon(pkg: String, size: androidx.compose.ui.unit.Dp = 36.dp) {
+internal fun AppIcon(pkg: String, size: androidx.compose.ui.unit.Dp = 36.dp, fallback: Glyph? = null) {
     val icon = rememberAppIcon(pkg)
     val shape = RoundedCornerShape(10.dp)
-    Box(Modifier.size(size).clip(shape).background(Theme.colors.raised, shape)) {
-        icon?.let { Image(it, contentDescription = null, modifier = Modifier.size(size)) }
+    Box(Modifier.size(size).clip(shape).background(Theme.colors.raised, shape), contentAlignment = Alignment.Center) {
+        // Where the app is not installed, as on a computer, a plain glyph says what it is.
+        if (icon != null) Image(icon, contentDescription = null, modifier = Modifier.size(size)) else fallback?.let { Icon(it, Theme.colors.text, size * 0.6f) }
     }
 }
 

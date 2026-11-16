@@ -28,6 +28,7 @@ import org.organiza.presentation.FocusWeek
 fun MetricsScreen(ui: UiSnapshot, actions: Actions) {
     TitleBlock("Metrics", ui.week?.total)
     MessagePanel(ui.message)
+    ScreenTimePanel(ui.usage, actions)
     // One app card open at a time across both lists, so two drafts of one limit never race.
     val openApp = rememberSaveable { mutableStateOf<String?>(null) }
     UsageDashboard(ui, actions, openApp)

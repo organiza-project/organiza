@@ -44,6 +44,8 @@ public class DeviceLink private constructor(private val secret: ByteArray) {
                 (root["device"] as JsonPrimitive).content,
                 LocalDate.parse((root["day"] as JsonPrimitive).content),
                 (root["minutes"] as JsonObject).mapValues { (_, value) -> (value as JsonPrimitive).longOrNull ?: 0 },
+                // Reports from before categories were sent have none.
+                (root["categories"] as? JsonObject)?.mapValues { (_, value) -> (value as JsonPrimitive).content }.orEmpty(),
             )
         } catch (_: IllegalArgumentException) {
             null
@@ -60,6 +62,7 @@ public class DeviceLink private constructor(private val secret: ByteArray) {
         put("device", report.device)
         put("day", report.day.toString())
         putJsonObject("minutes") { entries.forEach { (app, minutes) -> put(app, minutes) } }
+        putJsonObject("categories") { entries.forEach { (app, _) -> report.categories[app]?.let { put(app, it) } } }
     }.toString().toByteArray()
 
     public companion object {
@@ -84,7 +87,12 @@ public class DeviceLink private constructor(private val secret: ByteArray) {
 }
 
 /** One device's minutes per app for one day, apps named in lower case so every OS agrees. */
-public data class DeviceReport(val device: String, val day: LocalDate, val minutes: Map<String, Long>)
+public data class DeviceReport(
+    val device: String,
+    val day: LocalDate,
+    val minutes: Map<String, Long>,
+    val categories: Map<String, String> = emptyMap(),
+)
 
 /**
  * The exchange through a relay (ADR-0028): this device posts its day, and keeps the latest day of
@@ -105,22 +113,27 @@ public class DeviceUsage(
 
     /** Throws [java.io.IOException] when the relay cannot be reached. */
     @Synchronized
-    public fun post(day: LocalDate, minutes: Map<String, Long>) {
-        val report = DeviceReport(self, day, minutes.entries.groupBy({ key(it.key) }, { it.value }).mapValues { it.value.sum() })
+    public fun post(day: LocalDate, minutes: Map<String, Long>, categories: Map<String, String> = emptyMap()) {
+        val report = DeviceReport(self, day, minutes, categories)
         relay.append(link.mailboxId, link.seal(report))
     }
 
-    /** Reads every report after [cursor]. Throws [java.io.IOException] when the relay cannot be reached. */
+    /**
+     * Reads every report after [cursor], and returns the other devices' reports that arrived, oldest first.
+     * Throws [java.io.IOException] when the relay cannot be reached.
+     */
     @Synchronized
-    public fun pull() {
+    public fun pull(): List<DeviceReport> {
+        val received = mutableListOf<DeviceReport>()
         while (true) {
             val messages = relay.fetch(link.mailboxId, cursor)
-            if (messages.isEmpty()) return
+            if (messages.isEmpty()) return received
             for (message in messages) {
                 cursor = maxOf(cursor, message.cursor)
                 val report = link.open(message.data)?.takeIf { it.device != self } ?: continue
                 // Messages come in the order they were sent, so each replaces the last of its device and day.
                 latest[report.device to report.day] = report
+                received += report
             }
             // Devices in other time zones may still be on yesterday; anything older is done with.
             val oldest = latest.keys.maxOfOrNull { it.second }?.minusDays(1)
@@ -130,7 +143,8 @@ public class DeviceUsage(
 
     /** Minutes of [app], by its name, on the other devices on [day]. */
     @Synchronized
-    public fun minutes(app: String, day: LocalDate): Long = latest.values.filter { it.day == day }.sumOf { it.minutes[key(app)] ?: 0 }
+    public fun minutes(app: String, day: LocalDate): Long =
+        latest.values.filter { it.day == day }.sumOf { report -> report.minutes.entries.filter { key(it.key) == key(app) }.sumOf { it.value } }
 
     /** How many other devices reported [day]. */
     @Synchronized

@@ -26,7 +26,9 @@ import org.organiza.feature.rpg.RpgController
 import org.organiza.feature.blocker.InterventionHost
 import org.organiza.feature.sync.DevicesController
 import org.organiza.feature.notes.NotesController
+import org.organiza.feature.metrics.UsageController
 import org.organiza.storage.NoteStore
+import org.organiza.storage.DeviceUsageStore
 import org.organiza.storage.Reminder
 import org.organiza.feature.sync.SyncController
 import org.organiza.calendar.IcsCalendar
@@ -112,6 +114,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     val sync by lazy { SyncController(this) }
     val devices by lazy { DevicesController(this) }
     val journal by lazy { NotesController(this) }
+    val usageReport by lazy { UsageController(this) }
     val copilot by lazy { CopilotController(this) }
     val chat by lazy { ChatController(this) }
 
@@ -180,6 +183,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
         val voice = VoiceExecutor(db, clock, scheduler)
         val rules = RuleStore(db)
         val notes = NoteStore(db)
+        val deviceUsage = DeviceUsageStore(db)
     }
 
     private val usageHistory: AppUsage get() = platform.usage
@@ -596,6 +600,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
                 week = FocusWeek.build(today, zone, allSessions),
                 hub = hub.view(active, zone),
                 notes = journal.view(active, today, zone),
+                usage = usageReport.view(active, today, zone),
                 calendar = calendar.view(now, zone, views),
                 rpg = game.view(active, today, hero),
                 schedule = schedule.view,

@@ -44,6 +44,14 @@ class DeviceUsageTest {
     }
 
     @Test
+    fun `reports keep each app's name and category, and pull hands over what arrived`() {
+        val link = DeviceLink.create()
+        DeviceUsage(link, "phone", relay).post(today, mapOf("Instagram" to 40L), mapOf("Instagram" to "Social"))
+        val received = DeviceUsage(link, "laptop", relay).pull()
+        assertEquals(listOf(DeviceReport("phone", today, mapOf("Instagram" to 40L), mapOf("Instagram" to "Social"))), received)
+    }
+
+    @Test
     fun `the relay sees one padded size and no app names`() {
         val link = DeviceLink.create()
         val device = DeviceUsage(link, "phone", relay)
