@@ -102,6 +102,17 @@ class DesktopAppTest {
     }
 
     @Test
+    fun `a focus session starts on the desktop and home shows it running`() = runComposeUiTest {
+        core.onboarded = true
+        actions.setFocusApp("linux.google_chrome", true)
+        setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
+        waitUntilExactlyOneExists(hasText("Start a focus session"), 5_000)
+        // What the start form's button calls: the focus list, 25 minutes, not strict.
+        actions.startSession("", "", "25", false, false)
+        waitUntilExactlyOneExists(hasText("Stop session"), 5_000)
+    }
+
+    @Test
     fun `a note is written, saved and shown under today`() = runComposeUiTest {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
