@@ -35,6 +35,17 @@ data class AccountView(
     val otherDevices: Int = 0,
 )
 
+/** The Notes tab (ADR-0030): notes by day, the subject shown, and a fresh transcript for the composer. */
+@Immutable
+data class NotesView(
+    val model: org.organiza.presentation.NotesModel = org.organiza.presentation.NotesModel(emptyList(), emptyList()),
+    val subject: String? = null,
+    val status: String? = null,
+    val busy: Boolean = false,
+    val dictated: String? = null,
+    val dictatedAt: Long = 0,
+)
+
 /** One app on the distraction hub: on the focus list or not, today's use and its daily limit. */
 @Immutable
 data class HubApp(
@@ -147,6 +158,7 @@ data class UiSnapshot(
     val pendingCommand: String? = null,
     val message: String? = null,
     val storageProblem: String? = null,
+    val notes: NotesView = NotesView(),
     val blockedApps: List<String> = emptyList(),
     val blockedSites: List<String> = emptyList(),
     val stored: List<Pair<String, String>> = emptyList(),

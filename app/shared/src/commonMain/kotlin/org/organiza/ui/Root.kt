@@ -39,6 +39,7 @@ import org.organiza.feature.habits.HabitsScreen
 import org.organiza.feature.habits.NewHabitScreen
 import org.organiza.feature.home.HomeScreen
 import org.organiza.feature.metrics.MetricsScreen
+import org.organiza.feature.notes.NotesScreen
 import org.organiza.feature.onboarding.OnboardingScreen
 import org.organiza.feature.profile.ProfileScreen
 import org.organiza.feature.schedule.CalendarScreen
@@ -93,6 +94,7 @@ fun OrganizaRoot(ui: UiSnapshot, actions: Actions, request: Pair<Route, Long>? =
                         route == Route.COPILOT -> CopilotScreen(ui, actions, back)
                         tab == Tab.HOME -> HomeScreen(ui, actions, open) { tab = it }
                         tab == Tab.HABITS -> HabitsScreen(ui, actions, open)
+                        tab == Tab.NOTES -> NotesScreen(ui, actions)
                         tab == Tab.METRICS -> MetricsScreen(ui, actions)
                         else -> ProfileScreen(ui, actions)
                     }

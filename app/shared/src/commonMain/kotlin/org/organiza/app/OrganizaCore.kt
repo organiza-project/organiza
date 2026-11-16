@@ -25,6 +25,9 @@ import org.organiza.feature.schedule.CalendarController
 import org.organiza.feature.rpg.RpgController
 import org.organiza.feature.blocker.InterventionHost
 import org.organiza.feature.sync.DevicesController
+import org.organiza.feature.notes.NotesController
+import org.organiza.storage.NoteStore
+import org.organiza.storage.Reminder
 import org.organiza.feature.sync.SyncController
 import org.organiza.calendar.IcsCalendar
 import org.organiza.domain.PackageName
@@ -108,6 +111,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
 
     val sync by lazy { SyncController(this) }
     val devices by lazy { DevicesController(this) }
+    val journal by lazy { NotesController(this) }
     val copilot by lazy { CopilotController(this) }
     val chat by lazy { ChatController(this) }
 
@@ -175,6 +179,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
         val rpg = RpgStore(db)
         val voice = VoiceExecutor(db, clock, scheduler)
         val rules = RuleStore(db)
+        val notes = NoteStore(db)
     }
 
     private val usageHistory: AppUsage get() = platform.usage
@@ -188,7 +193,9 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     /** Sets every habit reminder again, after a change, a reminder firing or a reboot. */
     fun rescheduleReminders() = onStorageThread {
         val active = storage ?: return@onStorageThread
-        val reminders = active.habits.reminders()
+        // A note's reminder has its own time; ids keep it apart from a habit's.
+        val reminders = active.habits.reminders() +
+            active.notes.upcoming(clock.now()).map { Reminder("note-${it.id}", it.body.take(80), 0, it.remindAt) }
         platform.scheduleReminders(reminders, reminderIds)
         reminderIds = reminders.map { it.id }.toSet()
     }
@@ -588,6 +595,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
                 progression = progression,
                 week = FocusWeek.build(today, zone, allSessions),
                 hub = hub.view(active, zone),
+                notes = journal.view(active, today, zone),
                 calendar = calendar.view(now, zone, views),
                 rpg = game.view(active, today, hero),
                 schedule = schedule.view,

@@ -83,6 +83,15 @@ interface Actions {
     fun signOut()
     fun deleteAccount()
 
+    // Notes (ADR-0030)
+    /** [remindDay]: 0 today, 1 tomorrow, null for no reminder; [minute] of that day. */
+    fun addNote(body: String, subject: String, remindDay: Int?, minute: Int)
+    fun deleteNote(id: String)
+    fun organizeNote(id: String)
+    fun filterNotes(subject: String?)
+    fun startNoteDictation()
+    fun stopNoteDictation()
+
     // Usage across this person's devices (ADR-0028)
     /** Joins the devices behind [code], or starts a new set when it is blank. */
     fun linkDevices(code: String)

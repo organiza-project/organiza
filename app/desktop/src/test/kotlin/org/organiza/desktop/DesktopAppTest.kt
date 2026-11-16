@@ -6,6 +6,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -83,6 +86,19 @@ class DesktopAppTest {
     }
 
     @Test
+    fun `a note is written, saved and shown under today`() = runComposeUiTest {
+        core.onboarded = true
+        setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
+        onNodeWithContentDescription("Notes").performClick()
+        // The composer's fields: the note, then its subject.
+        onAllNodes(hasSetTextAction())[0].performTextInput("Walk before work felt good")
+        onAllNodes(hasSetTextAction())[1].performTextInput("Journal")
+        onNodeWithText("Save note").performClick()
+        waitUntilExactlyOneExists(hasText("Walk before work felt good"), 5_000)
+        onNodeWithText(" · Journal", substring = true).assertExists()
+    }
+
+    @Test
     fun `the habits tab shows habits on the desktop`() = runComposeUiTest {
         core.onboarded = true
         actions.addHabit("Read twenty pages")
@@ -120,7 +136,7 @@ class DesktopAppTest {
         core.requestUiRefresh()
         setContent { Box(Modifier.size(1200.dp, 800.dp)) { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } } }
         waitUntilExactlyOneExists(hasContentDescription("Copilot"), 5_000)
-        val order = listOf("Home", "Habits", "Metrics", "Profile")
+        val order = listOf("Home", "Habits", "Notes", "Metrics", "Profile")
         val tops = order.map { onNodeWithContentDescription(it).fetchSemanticsNode().boundsInRoot.top }
         assertEquals(order, order.sortedBy { tops[order.indexOf(it)] })
     }

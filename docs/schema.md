@@ -13,6 +13,7 @@ version is 9. Decisions are in ADR-0004, ADR-0006, ADR-0008, ADR-0011, ADR-0013,
 | `habit` | A criterion and its plan | `manual`, `screen_time_under` or `zero_launches`; daily, weekly or monthly with a target of met days and an optional reminder time; from v8 an optional minute goal and linked app |
 | `habit_log` | One result per habit per local day | Holds the result only, never the underlying usage |
 | `habit_minutes` | Minutes logged by hand per habit and day (v8) | App minutes from a linked app are read live and never stored |
+| `note` | A journal entry or reminder (v11) | Typed or dictated; leaves the device only when the person asks the AI about it |
 | `tamper_event` | A capability lost during a session | Capability and time only; columns are pinned by a test |
 | `usage_limit` | A daily foreground limit per app | 5 to 720 minutes; applies all day |
 | `setting` | Switches and small values outside sessions | Reels and Shorts blocking, the last day RPG damage was settled |

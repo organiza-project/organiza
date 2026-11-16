@@ -14,7 +14,7 @@ import java.time.ZonedDateTime
 import org.organiza.android.MainActivity
 import org.organiza.android.OrganizaApp
 import org.organiza.android.R
-import org.organiza.storage.HabitReminder
+import org.organiza.storage.Reminder
 
 /**
  * Local habit reminders (ADR-0018). An inexact daily alarm per habit posts a notification. The
@@ -26,14 +26,18 @@ object Reminders {
     private const val EXTRA_NAME = "habit_name"
     private const val WINDOW_MS = 10 * 60 * 1000L
 
+    /** The id prefix of a note's reminder, set by the core. */
+    const val NOTE = "note-"
+
     /** Replaces every scheduled reminder with [reminders]. */
-    fun schedule(context: Context, reminders: List<HabitReminder>, previous: Set<String>) {
+    fun schedule(context: Context, reminders: List<Reminder>, previous: Set<String>) {
         val alarms = context.getSystemService(AlarmManager::class.java)
         (previous - reminders.map { it.id }.toSet()).forEach { alarms.cancel(intent(context, it, "")) }
         val now = ZonedDateTime.now(ZoneId.systemDefault())
         reminders.forEach { reminder ->
-            var at = now.toLocalDate().atStartOfDay(now.zone).plusMinutes(reminder.minute.toLong())
-            if (!at.isAfter(now)) at = at.plusDays(1)
+            // A note's reminder is one moment; a habit's comes back at its minute every day.
+            var at = reminder.at?.atZone(now.zone) ?: now.toLocalDate().atStartOfDay(now.zone).plusMinutes(reminder.minute.toLong())
+            if (!at.isAfter(now)) if (reminder.at != null) return@forEach else at = at.plusDays(1)
             alarms.setWindow(AlarmManager.RTC_WAKEUP, at.toInstant().toEpochMilli(), WINDOW_MS, intent(context, reminder.id, reminder.name))
         }
     }
@@ -55,7 +59,7 @@ object Reminders {
         val notification = android.app.Notification.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setContentTitle(name)
-            .setContentText("Time for this habit. Mark it done in Organiza.")
+            .setContentText(if (id.startsWith(NOTE)) "A reminder from your notes" else "Time for this habit. Mark it done in Organiza.")
             .setContentIntent(open)
             .setAutoCancel(true)
             .build()

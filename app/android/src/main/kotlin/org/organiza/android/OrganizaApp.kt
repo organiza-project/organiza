@@ -41,7 +41,7 @@ import org.organiza.enforcement.SessionPolicy
 import org.organiza.presentation.Device
 import org.organiza.presentation.Permission
 import org.organiza.storage.Database
-import org.organiza.storage.HabitReminder
+import org.organiza.storage.Reminder
 import org.organiza.voice.VoiceCommand
 
 /** The Android process: it holds the shared [core] and is its [Platform] (ADR-0025). */
@@ -168,7 +168,7 @@ class OrganizaApp : Application(), Platform {
         }
     }
 
-    override fun scheduleReminders(reminders: List<HabitReminder>, previous: Set<String>) = Reminders.schedule(this, reminders, previous)
+    override fun scheduleReminders(reminders: List<Reminder>, previous: Set<String>) = Reminders.schedule(this, reminders, previous)
 
     /** Hands a meeting to the phone's calendar app, which shows it for saving. Nothing is stored here. */
     override fun openCalendar(event: VoiceCommand.AddEvent): String {

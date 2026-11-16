@@ -13,6 +13,9 @@ public data class WeeklyReview(val summary: String, val suggestions: List<String
 
 public data class SuggestedBlock(val day: DayOfWeek, val startMinute: Int, val minutes: Int, val label: String)
 
+/** What the AI suggests for one note: a subject, and a reminder time when the note asks for one. */
+public data class NoteSuggestion(val subject: String, val remindAt: java.time.LocalDateTime?)
+
 public data class ScheduleSuggestion(val blocks: List<SuggestedBlock>, val note: String)
 
 /** A chat answer, with a grammar line for the local parser when the person asked for a change. */
@@ -66,6 +69,14 @@ public class AiCoach(
         }
     }
 
+    /** Only the sanitized note and today's date are sent, and only when the person asks (ADR-0030). */
+    public fun organizeNote(text: String, today: java.time.LocalDate): AiResult<NoteSuggestion> =
+        ask(Prompts.noteOrganize(sanitizer.clean(text.take(MAX_SCHEDULE_TEXT)), today)) { reply ->
+            val subject = reply["subject"].text()?.trim()?.take(MAX_SUBJECT)?.takeIf(String::isNotEmpty) ?: return@ask null
+            val at = reply["remindAt"].text()?.let { runCatching { java.time.LocalDateTime.parse(it) }.getOrNull() }
+            NoteSuggestion(subject, at)
+        }
+
     private fun <T : Any> ask(prompt: Prompt, parse: (JsonObject) -> T?): AiResult<T> {
         val key = keys.load() ?: return AiResult.Failed(AiFailure.NO_KEY)
         return when (val reply = client.complete(key, prompt)) {
@@ -114,6 +125,7 @@ public class AiCoach(
     public companion object {
         public const val MAX_REPLY_TEXT: Int = 1000
         private const val MAX_ITEMS = 50
+        private const val MAX_SUBJECT = 40
         private const val MAX_SCHEDULE_TEXT = 4000
         private const val MAX_ADVICE_BLOCKS = 5
         private const val MAX_ADVICE_TEXTS = 3

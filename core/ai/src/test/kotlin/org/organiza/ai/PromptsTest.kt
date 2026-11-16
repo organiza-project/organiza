@@ -180,6 +180,18 @@ class PromptsTest {
     }
 
     @Test
+    fun `a note gets a subject and a reminder, and only the sanitized note is sent`() {
+        transport.respond(200, reply("""{"subject":"Errands","remindAt":"2026-11-17T09:30"}"""))
+        val result = coach.organizeNote("Remind me tomorrow at 9:30 to $leaky", java.time.LocalDate.parse("2026-11-16"))
+        assertEquals(AiResult.Ok(NoteSuggestion("Errands", java.time.LocalDateTime.parse("2026-11-17T09:30"))), result)
+        assertNothingLeaked()
+        assertTrue("2026-11-16" in sentBody())
+        // A reply without a usable time still gives its subject.
+        transport.respond(200, reply("""{"subject":"Journal","remindAt":"soon"}"""))
+        assertEquals(AiResult.Ok(NoteSuggestion("Journal", null)), coach.organizeNote("Felt good today", java.time.LocalDate.parse("2026-11-16")))
+    }
+
+    @Test
     fun `an empty extraction is a valid answer, and a broken one is not`() {
         transport.respond(200, reply("""{"blocks":[]}"""))
         assertEquals(AiResult.Ok(emptyList()), coach.extractSchedule("nothing here"))

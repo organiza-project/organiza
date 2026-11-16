@@ -170,6 +170,18 @@ public object Prompts {
         maxTokens = LONG_REPLY_TOKENS,
     )
 
+    /** One note the person asked about (ADR-0030): a short subject, and a reminder time if the note asks for one. */
+    public fun noteOrganize(note: SanitizedText, today: java.time.LocalDate): Prompt = Prompt(
+        system = "You sort one personal note. Give it a subject of one or two words, such as Journal, Errands, Work, " +
+            "Health or Ideas. If the note asks to be reminded at a time, give that time; otherwise null. " + DATA_ONLY +
+            """Reply only with JSON: {"subject": string, "remindAt": "YYYY-MM-DDTHH:mm" or null}.""",
+        user = buildJsonObject {
+            put("today", today.toString())
+            put("note", note.value)
+        }.toString(),
+        maxTokens = SHORT_REPLY_TOKENS,
+    )
+
     /** A timetable read from a photo, a dictation or pasted text, already sanitized (ADR-0018). */
     public fun scheduleExtraction(text: SanitizedText): Prompt = Prompt(
         system = "You turn a weekly timetable or a spoken plan into time blocks. The text may be noisy OCR of a photo: " +

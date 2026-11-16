@@ -11,7 +11,7 @@ import org.organiza.enforcement.SessionPolicy
 import org.organiza.presentation.Device
 import org.organiza.presentation.Permission
 import org.organiza.storage.Database
-import org.organiza.storage.HabitReminder
+import org.organiza.storage.Reminder
 import org.organiza.voice.VoiceCommand
 
 /**
@@ -93,7 +93,7 @@ interface Platform {
     /** Puts the policy in force outside the app's own process, such as the DNS layer. */
     fun applyPolicy(policy: SessionPolicy)
 
-    fun scheduleReminders(reminders: List<HabitReminder>, previous: Set<String>)
+    fun scheduleReminders(reminders: List<Reminder>, previous: Set<String>)
 
     /** Hands a meeting to the person's calendar app and says what happened. */
     fun openCalendar(event: VoiceCommand.AddEvent): String

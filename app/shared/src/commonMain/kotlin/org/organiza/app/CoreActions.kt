@@ -40,6 +40,7 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
     private var talk: Recorder? = null
     private var dictation: Recorder? = null
     private var chatVoice: Recorder? = null
+    private var noteVoice: Recorder? = null
 
     private fun startRecording(): Recorder? {
         if (!core.voiceConsent) {
@@ -165,6 +166,24 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
     override fun addScheduleBlocks() = core.schedule.add()
 
     override fun clearImport() = core.schedule.clear()
+
+    override fun addNote(body: String, subject: String, remindDay: Int?, minute: Int) = core.journal.add(body, subject, remindDay, minute)
+
+    override fun deleteNote(id: String) = core.journal.delete(id)
+
+    override fun organizeNote(id: String) = core.journal.organize(id)
+
+    override fun filterNotes(subject: String?) = core.journal.filter(subject)
+
+    override fun startNoteDictation() {
+        noteVoice = startRecording()
+    }
+
+    override fun stopNoteDictation() {
+        val active = noteVoice ?: return
+        noteVoice = null
+        core.journal.dictated(active.stop(), active.sampleRate)
+    }
 
     override fun startDictation() {
         dictation = startRecording()

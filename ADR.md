@@ -1301,3 +1301,30 @@ people's data, and cost a tab, an engine, seven tables and the most complex test
 ### Consequences
 Nothing in the apps mentions or depends on challenges. Arena could return later from git history,
 but its tables would need a new migration.
+
+## ADR-0030: Notes replace Arena
+
+### Status
+Accepted, 2026-11-16.
+
+### Context
+People asked for one place for thoughts, a journal and small reminders next to their habits and
+focus, with the AI helping to sort them. A journal is the most private thing the app will hold.
+
+### Decision
+- **Schema v11** adds `note`: the text, an optional subject (1 to 40 characters), when it was
+  written, and an optional one-off reminder time. The Notes tab takes Arena's place.
+- **Typed or dictated.** Dictation is the existing pipeline: the voice goes to Groq on the person's
+  key, behind the same consent as other voice features, and the transcript lands in the composer for
+  checking before it is saved.
+- **By day and subject.** `NotesModel` groups notes by day (Today, Yesterday, then the date) and can
+  show one subject.
+- **Reminders** reuse the habit reminder path: `Reminder` gains an optional one-off time, and the core
+  schedules each note reminder still ahead with a `note-` id.
+- **AI only on request.** "Organize with AI" sends that one note, sanitized, with today's date, and
+  gets back a subject and a reminder time if the note asks for one. Nothing else about notes is sent.
+
+### Consequences
+Notes stay in the encrypted database and are deleted only by the person. The copilot does not read
+notes on its own (the person chose this); its memory of them is whatever the person writes into its
+profile.

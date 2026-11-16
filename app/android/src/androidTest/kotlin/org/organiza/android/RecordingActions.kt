@@ -43,6 +43,12 @@ class RecordingActions : Actions {
     override fun unlinkDevices() { calls += "unlinkDevices" }
     override fun shareDeviceCode() { calls += "shareDeviceCode" }
     override fun openAppInfo() { calls += "openAppInfo" }
+    override fun addNote(body: String, subject: String, remindDay: Int?, minute: Int) { calls += "addNote $body $subject $remindDay $minute" }
+    override fun deleteNote(id: String) { calls += "deleteNote $id" }
+    override fun organizeNote(id: String) { calls += "organizeNote $id" }
+    override fun filterNotes(subject: String?) { calls += "filterNotes $subject" }
+    override fun startNoteDictation() { calls += "startNoteDictation" }
+    override fun stopNoteDictation() { calls += "stopNoteDictation" }
     override fun saveKey(key: String) { calls += "saveKey" }
     override fun removeKey() { calls += "removeKey" }
     override fun setVoiceConsent(on: Boolean) { calls += "setVoiceConsent $on" }

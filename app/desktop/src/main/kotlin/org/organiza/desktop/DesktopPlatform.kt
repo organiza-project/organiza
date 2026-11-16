@@ -31,7 +31,7 @@ import org.organiza.presentation.Device
 import org.organiza.presentation.Permission
 import org.organiza.storage.Database
 import org.organiza.storage.FocusLog
-import org.organiza.storage.HabitReminder
+import org.organiza.storage.Reminder
 import org.organiza.voice.VoiceCommand
 
 /** The Linux or Windows desktop as the shared core sees it (ADR-0025, ADR-0027). Nothing here leaves the computer. */
@@ -108,9 +108,9 @@ class DesktopPlatform(
     private val scheduled = mutableListOf<ScheduledFuture<*>>()
     private var round = 0
 
-    /** Each reminder shows as a desktop notification at its minute of the day, every day. */
+    /** Each habit reminder shows as a desktop notification at its minute every day; a note's once, at its time. */
     @Synchronized
-    override fun scheduleReminders(reminders: List<HabitReminder>, previous: Set<String>) {
+    override fun scheduleReminders(reminders: List<Reminder>, previous: Set<String>) {
         scheduled.forEach { it.cancel(false) }
         scheduled.clear()
         round++
@@ -119,16 +119,22 @@ class DesktopPlatform(
 
     // Each run books the next one, so a reminder keeps its clock time when daylight saving changes the day's length.
     @Synchronized
-    private fun remind(reminder: HabitReminder, round: Int) {
+    private fun remind(reminder: Reminder, round: Int) {
         if (round != this.round) return
         scheduled.removeAll { it.isDone }
         val now = ZonedDateTime.now(ZoneId.systemDefault())
+        val once = reminder.at
+        if (once != null && !once.isAfter(now.toInstant())) return
         scheduled += reminders.schedule(
             {
-                notify(reminder.name, "Time for this habit")
-                remind(reminder, round)
+                if (once == null) {
+                    notify(reminder.name, "Time for this habit")
+                    remind(reminder, round)
+                } else {
+                    notify(reminder.name, "A reminder from your notes")
+                }
             },
-            Duration.between(now, nextReminder(reminder.minute, now)).toMillis(),
+            Duration.between(now.toInstant(), once ?: nextReminder(reminder.minute, now).toInstant()).toMillis(),
             TimeUnit.MILLISECONDS,
         )
     }

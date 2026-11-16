@@ -30,7 +30,8 @@ public data class HabitPlan(
     }
 }
 
-public data class HabitReminder(val id: String, val name: String, val minute: Int)
+/** A habit's daily reminder at [minute] of the day, or, when [at] is set, a note's one-off reminder (ADR-0030). */
+public data class Reminder(val id: String, val name: String, val minute: Int, val at: java.time.Instant? = null)
 
 /** How a habit is judged. [target] is a package name, and [limitMillis] a daily limit. */
 public data class HabitCriterion(val kind: HabitKind, val target: String?, val limitMillis: Long?)
@@ -84,9 +85,9 @@ public class HabitStore(private val db: Database) {
     }
 
     /** Active habits with a reminder, for the alarm scheduler. */
-    public fun reminders(): List<HabitReminder> = db.query(
+    public fun reminders(): List<Reminder> = db.query(
         "SELECT id, name, reminder_minute FROM habit WHERE archived_at_ms IS NULL AND reminder_minute IS NOT NULL ORDER BY reminder_minute",
-    ) { row -> HabitReminder(row.string(0).orEmpty(), row.string(1).orEmpty(), row.long(2)?.toInt() ?: 0) }
+    ) { row -> Reminder(row.string(0).orEmpty(), row.string(1).orEmpty(), row.long(2)?.toInt() ?: 0) }
 
     public fun criterion(id: String): HabitCriterion? =
         db.query("SELECT criterion_kind, criterion_target, criterion_limit_ms FROM habit WHERE id = ?", listOf(id)) { row ->
