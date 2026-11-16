@@ -2,7 +2,6 @@ package org.organiza.app
 
 import java.time.Duration
 import java.time.LocalDate
-import org.organiza.arena.ChallengeRules
 import org.organiza.enforcement.ShortFormFeed
 import org.organiza.feature.focus.SessionInput
 import org.organiza.presentation.Permission
@@ -140,7 +139,6 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
 
     override fun setFeed(feed: ShortFormFeed, on: Boolean) = core.hub.setFeed(feed, on)
 
-    override fun nudge(challengeId: String, memberId: String) = core.nudge(challengeId, memberId)
 
     override fun selectDay(day: LocalDate, then: CalendarMode?) = core.calendar.select(day, then)
 
@@ -198,15 +196,6 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
 
     override fun weeklyReview() = core.requestWeeklyReview()
 
-    override fun syncArena() = core.arenaNow()
-
-    override fun createChallenge(habit: String, title: String, days: String, freezes: String, relay: String, name: String) {
-        val rules = ChallengeRules(days.toIntOrNull() ?: 0, freezes.toIntOrNull() ?: 0)
-        core.createChallenge(habit, title, rules, relay.trim(), name)
-    }
-
-    override fun joinChallenge(invite: String, habit: String, name: String) = core.joinChallenge(invite, habit, name)
-
     override fun saveKey(key: String) = core.saveApiKey(key)
 
     override fun removeKey() = core.clearApiKey()
@@ -220,7 +209,7 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
         const val VOICE_NOTICE = "While you hold the button, your voice is recorded and sent to Groq using your own " +
             "key, so they can turn it into text. Unlike typed text, a recording cannot have names removed first. " +
             "Organiza keeps no recordings or transcripts, and silence is never sent."
-        const val DELETE_NOTICE = "This deletes your account on the backend and every challenge result it holds for you, " +
-            "right away. It cannot be undone. Habits, sessions and usage on this device are not touched."
+        const val DELETE_NOTICE = "This deletes your account on the backend and every encrypted usage report it holds for " +
+            "you, right away. It cannot be undone. Habits, sessions and usage on this device are not touched."
     }
 }

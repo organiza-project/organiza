@@ -376,19 +376,8 @@ check_not "control: it is not reported as missing" "NO_KEY" "$(debug_state)"
 broadcast clearkey; sleep 1
 check_not "removing the key deletes the file" "groq.key" "$(in_app "ls no_backup")"
 
-echo "--- arena challenges"
-RELAY_DUMP=$(mktemp)
-relay_url=http://10.0.2.2:18081
 : "${JAVA_HOME:=/usr/lib/jvm/java-17-openjdk-amd64}"; export JAVA_HOME
 session stop
-arena_state() { debug_state; }
-get_invite() {
-  "$ADB" logcat -c
-  broadcast arenainvite
-  sleep 1
-  "$ADB" logcat -d -s OrganizaDebug:I | tr -d '\r' | grep -o 'invite=.*' | tail -1 | cut -d= -f2-
-}
-peer() { ./gradlew -q :core:arena:arenaPeer "-Ppeer=$1,http://127.0.0.1:18081,$2" --console=plain 2>&1 | grep -E '^peer'; }
 shell appops set "$APP" GET_USAGE_STATS allow >/dev/null
 check "usage access is detected" "USAGE_STATS" "$(debug_state)"
 usage_seconds() {
@@ -407,68 +396,6 @@ after=$(usage_seconds com.android.settings)
 check_between "time in front is counted to the second" 17 26 "$((after - before))"
 sleep 10
 check_eq "time in the background is not counted" "$after" "$(usage_seconds com.android.settings)"
-# The relay is not running yet, so this also tests an outage.
-broadcast arenacreate --es habit Reading --es title 'SecretTitleText' --es relay "$relay_url" --es name AppUser --ei days 1
-sleep 4
-check "a relay outage is reported, not fatal" "Relay unavailable" "$(debug_state)"
-invite=$(get_invite)
-check "the invite is produced" "organiza-arena:1:" "$invite"
-python3 scripts/arena-relay.py 18081 "$RELAY_DUMP" &
-relay_pid=$!
-trap 'kill "$fake_pid" "$relay_pid" 2>/dev/null' EXIT
-sleep 1
-broadcast arenamark --es name Reading; sleep 1
-broadcast arenasync; sleep 3
-state=$(debug_state)
-check_not "queued results go out when the relay returns" "Relay unavailable" "$state"
-check "the leaderboard lists this member" "AppUser 0 days" "$state"
-check_eq "secrets are not stored in the clear" "0" "$(in_app "cat databases/* no_backup/arena/* | grep -c ${invite: -20}")"
-check "the challenge secrets exist" "group" "$(in_app "ls no_backup/arena")"
-peer_out=$(peer honest "$invite")
-check "the second member joins from another process" "Joined" "$peer_out"
-broadcast clockdays --el days 1; sleep 1
-broadcast arenasync; sleep 4
-peer_out=$(peer honest "$invite")
-broadcast arenasync; sleep 4
-state=$(debug_state)
-check "the app sees the second member" "Peer " "$state"
-check "the app's own day was closed and met" "AppUser 1 days" "$state"
-check "this member is confirmed by reveal" "AppUser 1 days, streak 1, completed, confirmed" "$state"
-check "the other member is confirmed by reveal" "Peer 1 days, streak 1, completed, confirmed" "$state"
-check "the second member sees the app's result" "peer-board: AppUser status=COMPLETED successes=1 verification=CONFIRMED" "$peer_out"
-printf 'ZZSEARCHCONTROL success' > "$RELAY_DUMP.control"
-check_eq "control: the relay search can find text" "1" "$(LC_ALL=C grep -a -c -E 'ZZSEARCHCONTROL|success' "$RELAY_DUMP.control")"
-echo "INFO  board: $(echo "$state" | grep -o 'arena=.*message' | cut -c1-300)"
-echo "INFO  peer: $(echo "$peer_out" | grep board | tr '\n' ';' | cut -c1-300)"
-dump=$(cat "$RELAY_DUMP" | tr -d '\0' | LC_ALL=C grep -a -c -E 'SecretTitleText|AppUser|Reading|Peer|success|commitment')
-check_eq "the relay saw nothing readable" "0" "$dump"
-sizes=$(LC_ALL=C grep -a '^MSG ' "$RELAY_DUMP" | awk '{print $3}' | sort -u | wc -l)
-check "control: the relay did receive messages" "MSG" "$(LC_ALL=C grep -a -m1 '^MSG ' "$RELAY_DUMP" | cut -c1-3)"
-check_eq "every message the relay saw was the same size" "1" "$sizes"
-peer cheat "$invite" >/dev/null
-broadcast arenasync; sleep 4
-check "a cheating member is marked invalid" "Cheater 0 days, streak 0, active, invalid" "$(debug_state)"
-pid_before=$(app_pid)
-kill_now; sleep 4
-broadcast arenasync; sleep 4
-check "the challenge survives a process kill" "Cheater" "$(debug_state)"
-broadcast clockdays --el days 0; sleep 1
-
-echo "--- usage based habits"
-broadcast arenahabit --es name OpenedSettings --es kind ZERO_LAUNCHES --es target com.android.settings; sleep 1
-broadcast arenahabit --es name NeverOpened --es kind ZERO_LAUNCHES --es target com.example.neveropened; sleep 1
-broadcast arenacreate --es habit OpenedSettings --es title UsedApp --es relay "$relay_url" --es name AppUser --ei days 1 --ei freezes 1; sleep 3
-broadcast arenacreate --es habit NeverOpened --es title UnusedApp --es relay "$relay_url" --es name AppUser --ei days 1 --ei freezes 1; sleep 3
-fresh_settings
-open_settings; sleep 4
-shell input keyevent KEYCODE_HOME >/dev/null; sleep 2
-broadcast clockdays --el days 1; sleep 1
-broadcast arenasync; sleep 5
-state=$(debug_state)
-check "an app that was used fails a zero launches habit" "UsedApp (completed): AppUser 0 days" "$state"
-check "an app that was not used passes it" "UnusedApp (completed): AppUser 1 days" "$state"
-broadcast clockdays --el days 0; sleep 1
-kill "$relay_pid" 2>/dev/null
 
 echo "--- uninstall protection"
 check "admin blocks uninstall" "DELETE_FAILED" "$(shell pm uninstall "$APP")"

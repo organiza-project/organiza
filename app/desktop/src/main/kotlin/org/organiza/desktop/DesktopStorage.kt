@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
 import org.organiza.ai.ApiKey
 import org.organiza.ai.ApiKeyStore
 import org.organiza.app.StorageUnavailable
-import org.organiza.arena.SecretStore
+import org.organiza.relay.SecretStore
 import org.organiza.domain.Parsed
 import org.organiza.storage.Database
 import org.organiza.storage.Row

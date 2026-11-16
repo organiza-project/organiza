@@ -60,7 +60,7 @@ class SupabaseSchemaTest {
     }
 
     @Test
-    fun `another member of the challenge reads the same mailbox`() {
+    fun `another device of the same person reads the same mailbox`() {
         val box = "cd".repeat(32)
         connection("authenticated", sam).use { it.append(box, byteArrayOf(1)) }
         connection("authenticated", alex).use { db -> assertEquals(1, db.fetch(box, 0).size) }

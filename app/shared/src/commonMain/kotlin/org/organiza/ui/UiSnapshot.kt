@@ -6,7 +6,6 @@ import org.organiza.ai.CopilotAdvice
 import org.organiza.ai.SuggestedBlock
 import org.organiza.presentation.Rank
 import org.organiza.presentation.AgendaModel
-import org.organiza.presentation.ArenaModel
 import org.organiza.presentation.FocusWeek
 import org.organiza.presentation.HomeModel
 import org.organiza.presentation.ProgressionModel
@@ -23,9 +22,6 @@ import org.organiza.sync.BackendKind
 
 @Immutable
 data class Upcoming(val label: String, val time: String, val length: String)
-
-@Immutable
-data class ChallengeView(val id: String, val title: String, val state: String, val model: ArenaModel)
 
 /** The backend choice and account, for onboarding and Profile (ADR-0015). A null kind is local only. */
 @Immutable
@@ -135,8 +131,6 @@ data class UiSnapshot(
     val calendar: CalendarView = CalendarView(),
     val rpg: RpgView = RpgView(),
     val schedule: ImportView = ImportView(),
-    val nudges: List<String> = emptyList(),
-    val selfName: String = "You",
     val canStop: Boolean = false,
     val choices: ChoicesModel? = null,
     val copilot: CopilotView = CopilotView(),
@@ -147,14 +141,12 @@ data class UiSnapshot(
     val monitoring: Boolean = false,
     val lockdown: Boolean = false,
     val upcoming: List<Upcoming> = emptyList(),
-    val challenges: List<ChallengeView> = emptyList(),
     val account: AccountView = AccountView(),
     val hasApiKey: Boolean = false,
     val voiceConsent: Boolean = false,
     val pendingCommand: String? = null,
     val message: String? = null,
     val storageProblem: String? = null,
-    val latestInvite: String? = null,
     val blockedApps: List<String> = emptyList(),
     val blockedSites: List<String> = emptyList(),
     val stored: List<Pair<String, String>> = emptyList(),

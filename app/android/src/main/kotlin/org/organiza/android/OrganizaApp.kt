@@ -33,7 +33,7 @@ import org.organiza.app.OrganizaCore
 import org.organiza.app.Platform
 import org.organiza.app.Prefs
 import org.organiza.app.StorageUnavailable
-import org.organiza.arena.SecretStore
+import org.organiza.relay.SecretStore
 import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
 import org.organiza.domain.port.Capability

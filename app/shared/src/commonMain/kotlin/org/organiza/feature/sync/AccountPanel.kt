@@ -33,7 +33,7 @@ import org.organiza.ui.Type
 import org.organiza.sync.BackendKind
 import org.organiza.presentation.Format
 
-/** Chooses where Arena results and the account live (ADR-0015). Blocking never depends on it. */
+/** Chooses where the account and the shared device usage live (ADR-0015, ADR-0028). Blocking never depends on it. */
 @Composable
 fun BackendPanel(account: AccountView, actions: Actions, withAccount: Boolean = true) {
     val colors = Theme.colors
@@ -41,10 +41,10 @@ fun BackendPanel(account: AccountView, actions: Actions, withAccount: Boolean = 
     var url by rememberSaveable(account.kind) { mutableStateOf(if (account.kind == BackendKind.SELF_HOSTED) account.url else "") }
     var key by remember { mutableStateOf("") }
     Panel {
-        PanelHeader("Where Arena syncs")
+        PanelHeader("Account and sync")
         Txt(
             "Habits, sessions, usage and overrides stay on this device whatever you choose. A backend only holds your " +
-                "account and encrypted challenge results it cannot read.",
+                "account and encrypted usage reports from your devices, which it cannot read.",
             Type.small,
             colors.muted,
         )
@@ -52,7 +52,7 @@ fun BackendPanel(account: AccountView, actions: Actions, withAccount: Boolean = 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ChoiceRow(
                 "Only this device",
-                "No account. To take on challenges with friends, enter a relay address when you start one: a small server that passes your encrypted results along and cannot read them",
+                "No account. Nothing leaves this device, and limits count this device only",
                 kind == null,
             ) { kind = null }
             ChoiceRow(
@@ -137,13 +137,13 @@ fun AccountPanel(account: AccountView, actions: Actions) {
         PanelHeader("Account") { Txt(account.url.removePrefix("https://"), Type.small, colors.muted, maxLines = 1) }
         if (account.signedInAs != null) {
             KeyValue("Signed in as", account.signedInAs)
-            Txt("Challenge results sync through this account, encrypted so the backend cannot read them.", Type.small, colors.muted)
+            Txt("Usage shared between your devices goes through this account, sealed so the backend cannot read it.", Type.small, colors.muted)
             Spacer(Modifier.height(8.dp))
             Action("Sign out", ButtonKind.SECONDARY, enabled = !account.busy) { actions.signOut() }
             Rule()
             DevicesBlock(account, actions)
             Rule()
-            Txt("Deleting removes your account and every challenge result the backend holds, at once. Nothing on this device changes.", Type.small, colors.muted)
+            Txt("Deleting removes your account and every usage report the backend holds, at once. Nothing on this device changes.", Type.small, colors.muted)
             Spacer(Modifier.height(8.dp))
             Action("Delete account & cloud data", ButtonKind.DANGER, enabled = !account.busy, modifier = Modifier.fillMaxWidth()) {
                 actions.deleteAccount()

@@ -26,12 +26,6 @@ import org.organiza.feature.rpg.RpgController
 import org.organiza.feature.blocker.InterventionHost
 import org.organiza.feature.sync.DevicesController
 import org.organiza.feature.sync.SyncController
-import org.organiza.arena.ArenaEngine
-import org.organiza.arena.ChallengeRules
-import org.organiza.arena.CreateResult
-import org.organiza.arena.JoinResult
-import org.organiza.arena.NudgeResult
-import org.organiza.arena.SyncResult
 import org.organiza.calendar.IcsCalendar
 import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
@@ -73,13 +67,11 @@ import org.organiza.storage.StoredRule
 import org.organiza.storage.RuleStore
 import org.organiza.storage.TamperStore
 import androidx.compose.runtime.mutableStateOf
-import org.organiza.ui.ChallengeView
 import org.organiza.ui.HabitProgressView
 import org.organiza.ui.MonitorView
 import org.organiza.ui.UiSnapshot
 import org.organiza.ui.Upcoming
 import org.organiza.presentation.AgendaModel
-import org.organiza.presentation.ArenaModel
 import org.organiza.presentation.FocusWeek
 import org.organiza.presentation.HomeHabitInput
 import org.organiza.presentation.HomeModel
@@ -98,7 +90,7 @@ import org.organiza.voice.VoiceResult
 
 /**
  * The app itself, shared by Android and the Linux desktop (ADR-0025): storage, sessions, habits,
- * Arena, AI and every screen model. [platform] supplies what each OS does differently.
+ * notes, AI and every screen model. [platform] supplies what each OS does differently.
  */
 class OrganizaCore(val platform: Platform) : EnforcementCapabilities, InterventionHost {
     val session = ActiveSession()
@@ -141,7 +133,6 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
 
     /** What the screens show, replaced whole on the main thread (ADR-0012). */
     val uiState = mutableStateOf(UiSnapshot())
-    private val syncedAt = mutableMapOf<String, String>()
     @Volatile var storageFailure: String? = null
         private set
     @Volatile var tamperCount = 0
@@ -184,76 +175,9 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
         val rpg = RpgStore(db)
         val voice = VoiceExecutor(db, clock, scheduler)
         val rules = RuleStore(db)
-        val arena = ArenaEngine(
-            db,
-            clock,
-            ZoneId.systemDefault(),
-            platform.secrets,
-            usageHistory,
-            this@OrganizaCore,
-            allowInsecureRelay = platform.debug,
-        ) { url -> sync.backend.sync.relayFor(url) }
     }
 
     private val usageHistory: AppUsage get() = platform.usage
-
-    // Relay calls can take many seconds, so they must not hold up enforcement work.
-    private val arenaThread = Executors.newSingleThreadExecutor()
-    private var lastArenaRun = 0L
-    private var lastArenaDate: LocalDate? = null
-
-    /** The leaderboard text for the setup screen. */
-    @Volatile var arenaSummary: String = ""
-        private set
-
-    /** The last invite created, ready to share. It is not logged or shown in status text. */
-    @Volatile var latestInvite: String? = null
-        private set
-
-    private fun onArenaThread(work: () -> Unit) {
-        arenaThread.execute {
-            try {
-                work()
-            } catch (failure: RuntimeException) {
-                platform.log("arena work failed: ${failure.javaClass.simpleName}")
-                statusMessage = "Arena error"
-            }
-        }
-    }
-
-    /** Closes finished days and syncs: each new day, and at most hourly otherwise. */
-    private fun runArenaIfDue() {
-        val today = clock.now().atZone(ZoneId.systemDefault()).toLocalDate()
-        val now = System.nanoTime() / 1_000_000
-        val due = lastArenaDate != today || lastArenaRun == 0L || now - lastArenaRun >= ARENA_INTERVAL_MS
-        if (!due) return
-        lastArenaDate = today
-        lastArenaRun = now
-        arenaNow()
-    }
-
-    fun arenaNow() = onArenaThread {
-        val arena = storage?.arena ?: return@onArenaThread
-        arena.closeDays()
-        var unavailable = false
-        for (challenge in arena.challenges()) {
-            when (arena.sync(challenge.id)) {
-                is SyncResult.Synced -> syncedAt[challenge.id] = clock.now().atZone(ZoneId.systemDefault()).toLocalTime().toString().take(5)
-                SyncResult.RelayUnavailable -> unavailable = true
-                else -> Unit
-            }
-        }
-        arenaSummary = describeArena(arena) + if (unavailable) "\nRelay unavailable, results are queued" else ""
-        if (unavailable) statusMessage = "Relay unavailable, results are queued" else requestUiRefresh()
-    }
-
-    private fun describeArena(arena: ArenaEngine): String = arena.challenges().joinToString("\n") { challenge ->
-        val rows = arena.leaderboard(challenge.id).joinToString(" | ") { member ->
-            "${member.name} ${member.successes} days, streak ${member.standing.streak}, " +
-                "${member.standing.status.name.lowercase()}, ${member.verification.name.lowercase()}"
-        }
-        "${challenge.title} (${challenge.state}): $rows"
-    }
 
     private fun habitIdFor(name: String): String {
         val habits = storage?.habits ?: return ""
@@ -395,45 +319,6 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
         requestUiRefresh()
     }
 
-    fun nudge(challengeId: String, memberId: String) = onArenaThread {
-        val arena = storage?.arena ?: return@onArenaThread
-        statusMessage = when (arena.nudge(challengeId, memberId)) {
-            NudgeResult.Sent -> "Nudge sent"
-            NudgeResult.AlreadyToday -> "You already nudged them today"
-            NudgeResult.RelayUnavailable -> "The relay could not be reached. Try again later"
-            else -> "That member could not be nudged"
-        }
-    }
-
-    fun createChallenge(habitName: String, title: String, rules: ChallengeRules, relayUrl: String, displayName: String) =
-        onStorageThread {
-            val arena = storage?.arena ?: return@onStorageThread
-            val today = clock.now().atZone(ZoneId.systemDefault()).toLocalDate().toString()
-            val relay = relayUrl.ifBlank { sync.backend.sync.defaultRelayUrl().orEmpty() }
-            when (val result = arena.create(habitIdFor(habitName), title, today, rules, relay, displayName)) {
-                is CreateResult.Created -> {
-                    latestInvite = result.invite.encode()
-                    statusMessage = "Challenge created. Share the invite like a password."
-                }
-                CreateResult.InsecureRelay -> statusMessage = "The relay must use https"
-                CreateResult.InvalidRules -> statusMessage = "Those challenge rules are not allowed"
-                CreateResult.UnknownHabit -> statusMessage = "Choose a habit first"
-            }
-            arenaNow()
-        }
-
-    fun joinChallenge(invite: String, habitName: String, displayName: String) = onStorageThread {
-        val arena = storage?.arena ?: return@onStorageThread
-        statusMessage = when (arena.join(invite, habitIdFor(habitName), displayName)) {
-            is JoinResult.Joined -> "Joined the challenge"
-            JoinResult.AlreadyJoined -> "You already joined this challenge"
-            JoinResult.InvalidInvite -> "That is not a valid invite"
-            JoinResult.TooLate -> "This challenge has already started"
-            JoinResult.UnknownHabit -> "Choose a habit first"
-        }
-        arenaNow()
-    }
-
     fun addCriterionHabitForTesting(name: String, kind: String, target: String) = onStorageThread {
         val criterion = HabitCriterion(HabitKind.valueOf(kind), target, null)
         storage?.habits?.add(UUID.randomUUID().toString(), name, criterion, clock.now())
@@ -571,7 +456,6 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
             monitorArmed = true
         }
         platform.applyPolicy(state.policy)
-        runArenaIfDue()
         // Give a restarted VPN time to come up before a stored baseline is compared.
         timer.schedule({ checkTamper() }, TAMPER_GRACE_MS, TimeUnit.MILLISECONDS)
         val untilNext = state.nextTransition?.let { Duration.between(clock.now(), it).toMillis() } ?: MAX_TICK_MS
@@ -674,15 +558,6 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
                         Format.duration(Duration.between(view.session.start, view.session.end)),
                     )
                 }
-            val challenges = active.arena.challenges().map { challenge ->
-                val board = active.arena.leaderboard(challenge.id)
-                ChallengeView(
-                    challenge.id,
-                    challenge.title,
-                    challenge.state,
-                    ArenaModel.build(today, challenge.startsOn, challenge.lengthDays, challenge.memberId, board, syncedAt[challenge.id]),
-                )
-            }
             val plans = active.habits.active().map { habit ->
                 HomeHabitInput(
                     habit.id,
@@ -695,21 +570,17 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
             val stayed = active.interventions.between(Instant.EPOCH, now.plusSeconds(1)).count { it.choice == InterventionChoice.STAYED }
             val metDays = plans.sumOf { input -> active.habits.results(input.id, LocalDate.EPOCH, today.plusDays(1)).count { it.value } }
             val streak = plans.maxOfOrNull { input -> longestStreak(active.habits.results(input.id, LocalDate.EPOCH, today.plusDays(1))) } ?: 0
-            val arenaList = active.arena.challenges()
             val facts = ProgressFacts(
                 habitDaysMet = metDays,
                 focusMinutes = allSessions.filter { it.state == SessionState.COMPLETED }
                     .sumOf { Duration.between(it.start, it.finishedAt ?: it.end).toMinutes().coerceAtLeast(0) },
                 stayedFocused = stayed,
                 longestStreak = streak,
-                challengesJoined = arenaList.size,
-                challengesCompleted = arenaList.count { it.state == "completed" },
             )
             val baseXp = Progression.xp(facts)
             game.settle(active, today, zone, baseXp)
             val hero = game.hero(active, baseXp, Progression.badges(facts))
             val progression = hero.progression
-            val nudges = arenaList.flatMap { challenge -> active.arena.nudgesForMe(challenge.id).map { "$it nudged you in ${challenge.title}" } }
             UiSnapshot(
                 home = HomeModel.build(today, plans, now.atZone(zone).hour),
                 agendaToday = AgendaModel.build(now, zone, today, views),
@@ -720,8 +591,6 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
                 calendar = calendar.view(now, zone, views),
                 rpg = game.view(active, today, hero),
                 schedule = schedule.view,
-                nudges = nudges,
-                selfName = arenaList.firstOrNull()?.displayName?.takeIf(String::isNotBlank) ?: "You",
                 onboarding = onboarding,
                 permissions = permissions,
                 device = platform.device,
@@ -737,19 +606,16 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
                 monitoring = sessions.any { it.state == SessionState.ACTIVE && it.tier == FocusTier.MONITOR },
                 lockdown = session.current.blockList.allowOnly,
                 upcoming = upcoming,
-                challenges = challenges,
                 hasApiKey = keySaved,
                 voiceConsent = voiceConsent,
                 pendingCommand = pendingCommand?.let { "Heard: " + it.describe() },
                 message = statusMessage,
                 storageProblem = storageFailure?.let { "Storage problem: $it. Your data has not been deleted." },
-                latestInvite = latestInvite,
                 blockedApps = session.current.blockList.packages.map(::appLabel).sorted(),
                 blockedSites = session.current.blockList.domains.map { it.value }.sorted(),
                 stored = listOf(
                     "Sessions" to sessions.size.toString(),
                     "Habits" to habits.size.toString(),
-                    "Challenges" to challenges.size.toString(),
                     "Tamper events" to active.tamper.all().size.toString(),
                     "Interventions" to active.interventions.between(Instant.EPOCH, now.plusSeconds(1)).size.toString(),
                 ),
@@ -783,12 +649,6 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
         val day = clock.now().atZone(ZoneId.systemDefault()).toLocalDate().minusDays(daysAgo)
         voice.apply(VoiceCommand.MarkHabit(name, day, done))
         refreshUi()
-    }
-
-    /** Looks up an invite on the storage thread and hands it to [use] on the main thread. */
-    fun inviteToShare(use: (String?) -> Unit) = onStorageThread {
-        val invite = latestInvite ?: storage?.arena?.let { arena -> arena.challenges().firstOrNull()?.let { arena.invite(it.id) } }
-        platform.onMain { use(invite) }
     }
 
     /** Called on foreground changes, so a due session applies when the phone is in use. */
@@ -981,14 +841,13 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
             "capabilities=$capabilities tamper=$tamper storageFailure=$failure " +
                 "active=${session.current != SessionPolicy.IDLE} " +
                 "habits=${storage?.habits?.active().orEmpty().joinToString("|") { it.name }} " +
-                "arena=[${arenaSummary.replace('\n', ';')}] choices=[$choices] copilot=${copilot.view().advice != null} " +
+                "choices=[$choices] copilot=${copilot.view().advice != null} " +
                 "message=${statusMessage?.replace('\n', ' ')}",
         )
     }
 
     companion object {
         private const val DATABASE_TOO_NEW = "DATABASE_TOO_NEW"
-        private const val ARENA_INTERVAL_MS = 60 * 60 * 1000L
         private const val PREFERENCES = "organiza"
         private const val VOICE_CONSENT = "voice_consent"
         private const val ONBOARDED = "onboarded"

@@ -23,7 +23,7 @@ import org.organiza.app.AppUsage
 import org.organiza.app.InstalledApp
 import org.organiza.app.Platform
 import org.organiza.app.Prefs
-import org.organiza.arena.SecretStore
+import org.organiza.relay.SecretStore
 import org.organiza.domain.PackageName
 import org.organiza.domain.port.Capability
 import org.organiza.enforcement.SessionPolicy

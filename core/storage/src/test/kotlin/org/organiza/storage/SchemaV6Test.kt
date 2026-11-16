@@ -87,19 +87,4 @@ class SchemaV6Test {
         Migrations.migrate(old)
         assertEquals(HabitPlan.DAILY, HabitStore(old).plan("h"))
     }
-
-    @Test
-    fun `nudges are kept once per sender, receiver and day`() {
-        db.execute("INSERT INTO habit (id, name, criterion_kind, created_at_ms) VALUES ('h', 'Read', 'manual', 0)")
-        val arena = ArenaStore(db)
-        arena.createChallenge(
-            StoredChallenge("c", "h", "T", "2026-11-01", 30, 0, 0, false, "active", "b".repeat(64), "Me", "https://r.example", 0, false, false),
-        )
-        val day = LocalDate.parse("2026-11-03")
-        assertEquals(true, arena.putNudge("c", "a".repeat(64), "b".repeat(64), day))
-        assertEquals(false, arena.putNudge("c", "a".repeat(64), "b".repeat(64), day))
-        assertEquals(listOf("a".repeat(64)), arena.nudgesTo("c", "b".repeat(64), day))
-        assertEquals(true, arena.nudged("c", "a".repeat(64), "b".repeat(64), day))
-        assertEquals(emptyList(), arena.nudgesTo("c", "b".repeat(64), day.plusDays(1)))
-    }
 }

@@ -15,7 +15,7 @@ import org.organiza.sync.DeviceUsage
 
 /**
  * Today's minutes from this person's other devices, so a daily limit counts every device (ADR-0028).
- * Reports are sealed end to end and go through the backend's Arena relay; local only shares nothing.
+ * Reports are sealed end to end and go through the backend's relay; local only shares nothing.
  */
 class DevicesController(private val app: OrganizaCore) {
     private val prefs = app.platform.prefs(PREFERENCES)
@@ -81,15 +81,15 @@ class DevicesController(private val app: OrganizaCore) {
 
     private fun exchangeNow() {
         val backend = app.sync.backend
-        val url = backend.sync.defaultRelayUrl()
+        val relay = backend.sync.relay()
         val link = link()
-        if (url == null || link == null || backend.auth.state() !is AuthState.SignedIn) {
+        if (relay == null || link == null || backend.auth.state() !is AuthState.SignedIn) {
             exchange = null
             return
         }
-        val key = url + link.mailboxId
+        val key = backend.sync.backend.toString() + link.mailboxId
         val usage = exchange?.takeIf { it.first == key }?.second
-            ?: DeviceUsage(link, device, backend.sync.relayFor(url), prefs.string(CURSOR)?.toLongOrNull() ?: 0).also { exchange = key to it }
+            ?: DeviceUsage(link, device, relay, prefs.string(CURSOR)?.toLongOrNull() ?: 0).also { exchange = key to it }
         // Usage is read where storage lives, then sent from here.
         app.onStores {
             val day = today()

@@ -9,7 +9,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 public enum class BackendKind { HOSTED, SELF_HOSTED }
 
-/** Where accounts and Arena messages go (ADR-0015). Local data never depends on it. */
+/** Where accounts and sealed device usage reports go (ADR-0015, ADR-0028). Local data never depends on it. */
 public sealed interface BackendConfig {
     public data object LocalOnly : BackendConfig
 

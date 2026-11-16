@@ -50,11 +50,6 @@ interface Actions {
     fun completeTodo(id: String)
     fun deleteQuest(id: String)
 
-    // Arena
-    fun syncArena()
-    fun shareInvite()
-    fun createChallenge(habit: String, title: String, days: String, freezes: String, relay: String, name: String)
-    fun nudge(challengeId: String, memberId: String)
 
     // Schedule import
     fun pickTimetablePhoto()
@@ -65,7 +60,6 @@ interface Actions {
     fun startDictation()
     fun stopDictation()
     fun dictationLevel(): Float
-    fun joinChallenge(invite: String, habit: String, name: String)
 
     // AI
     fun saveKey(key: String)

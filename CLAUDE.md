@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 0. Mission
 Organiza delivers **OS-level focus enforcement that is hard to bypass and mindful by
 design** (ADR-0005, ADR-0016) with **100% local data ownership**: calendar-driven
-scheduling, BYOK AI coaching, and zero-knowledge peer accountability. Android is the
+scheduling, BYOK AI coaching, notes, and usage that syncs only between your own devices, sealed. Android is the
 main platform; the desktop app shares its screens and core on Linux (ADR-0023) and Windows
 (ADR-0027). iOS waits for an approved next phase.
 
@@ -37,8 +37,8 @@ main platform; the desktop app shares its screens and core on Linux (ADR-0023) a
   schedule engine must work fully offline.
 - **Groq AI is strictly BYOK.** Keys live in the platform keystore, never in the repo
   or plaintext storage. Every outbound prompt passes an on-device PII/URL sanitizer.
-- **Arena (30-day challenges)** syncs only cryptographic commitments over encrypted
-  relays — never raw usage metrics.
+- **Device sync** (ADR-0028) sends only sealed, padded usage reports through a blind
+  relay, readable only by the person's own linked devices — never plain usage metrics.
 - Secrets never committed. See `.gitignore`.
 
 ## 4. Repository Layout
@@ -50,7 +50,7 @@ Recorded in ADR-0002 and ADR-0014. `./gradlew test` runs every JVM test.
 - `core/calendar`, `core/scheduler` — `.ics` parsing; occurrences become sessions, sessions become a `SessionPolicy`.
 - `core/enforcement` — block engine, content policy, DNS sinkhole, override passes and friction (ADR-0016).
 - `core/ai`, `core/voice` — sanitizer, prompts, BYOK Groq client; dictation and the local command grammar.
-- `core/arena` — challenges, Ed25519 commitments, encrypted padded relay messages (ADR-0011).
+- `core/relay` — the blind relay port, `SecretStore`, HKDF and AES-GCM envelopes (ADR-0028, ADR-0029).
 - `core/sync` — auth and sync ports with local-only and Supabase implementations (ADR-0015).
 - `core/presentation` — screen models: every sentence and state a screen shows, with tests (ADR-0012).
 - `app/shared` — Compose Multiplatform: design system (`org.organiza.ui`), every screen and feature controller
@@ -89,7 +89,7 @@ Library modules build with `explicitApi()` and warnings as errors (`build.gradle
   capability = a port in `core/domain` plus a fake in `core/testing`.
 - **One state holder.** `OrganizaCore` (shared; Android's `OrganizaApp` and the desktop's `DesktopPlatform`
   implement its `Platform`) owns storage, the `ActiveSession` policy and the override passes. All storage work runs on one storage thread (`onStorageThread`/`onStores`);
-  AI and Arena calls have their own threads. `refreshUi()` builds a whole immutable `UiSnapshot` from
+  AI and device sync calls have their own threads. `refreshUi()` builds a whole immutable `UiSnapshot` from
   local data and swaps it in; Compose screens only render it and call `ui/Actions`, which
   `CoreActions` maps to the core. Feature controllers (`HubController`, `ScheduleController`,
   `SyncController`, `CopilotController`) keep `OrganizaApp` from growing.
@@ -101,7 +101,7 @@ Library modules build with `explicitApi()` and warnings as errors (`build.gradle
 - **Storage.** SQLCipher on Android, SQLite JDBC in tests, both behind `Database`. Schema changes are
   a new `vN.sql` plus a migration test; released versions are never edited.
 - **Backends.** `Backend.create(config)` returns the auth/sync pair; screens never branch on it.
-  Supabase only stores accounts and opaque Arena ciphertext, reached through two RPC functions.
+  Supabase only stores accounts and opaque device usage ciphertext, reached through two RPC functions.
 - **Gotchas.** Compose skips a composable whose parameters are unchanged and ignores ones it never
   reads, so pass displayed values, not counters. `uiautomator` unbinds Organiza's accessibility
   service; use screenshots and `dumpsys` when testing enforcement. Tesseract comes from JitPack and is

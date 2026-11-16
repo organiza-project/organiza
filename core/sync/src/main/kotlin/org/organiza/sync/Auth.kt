@@ -13,7 +13,7 @@ import kotlinx.serialization.json.put
 import org.organiza.ai.HttpReply
 import org.organiza.ai.HttpTransport
 import org.organiza.ai.post
-import org.organiza.arena.SecretStore
+import org.organiza.relay.SecretStore
 import org.organiza.domain.port.Clock
 
 public sealed interface AuthState {

@@ -11,29 +11,23 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import org.organiza.ai.HttpTransport
 import org.organiza.ai.post
-import org.organiza.arena.ArenaRelay
-import org.organiza.arena.HttpArenaRelay
-import org.organiza.arena.RelayMessage
-import org.organiza.arena.SecretStore
+import org.organiza.relay.Relay
+import org.organiza.relay.RelayMessage
+import org.organiza.relay.SecretStore
 import org.organiza.domain.port.Clock
 
-/** How Arena reaches other people, whatever the backend (ADR-0015). */
+/** How this person's devices reach each other, whatever the backend (ADR-0015, ADR-0028). */
 public interface SyncRepository {
     public val backend: BackendConfig
 
-    /** The relay new challenges use, or null when the person enters one. */
-    public fun defaultRelayUrl(): String?
-
-    /** The relay for a challenge, from the URL in its invite. */
-    public fun relayFor(url: String): ArenaRelay
+    /** The backend's blind relay, or null when everything stays on this device. */
+    public fun relay(): Relay?
 }
 
-public class LocalSync(private val transport: HttpTransport) : SyncRepository {
+public object LocalSync : SyncRepository {
     override val backend: BackendConfig = BackendConfig.LocalOnly
 
-    override fun defaultRelayUrl(): String? = null
-
-    override fun relayFor(url: String): ArenaRelay = HttpArenaRelay(transport, url)
+    override fun relay(): Relay? = null
 }
 
 public class SupabaseSync(
@@ -41,10 +35,7 @@ public class SupabaseSync(
     override val backend: BackendConfig.Supabase,
     private val auth: AuthRepository,
 ) : SyncRepository {
-    override fun defaultRelayUrl(): String = backend.url
-
-    override fun relayFor(url: String): ArenaRelay =
-        if (url.trimEnd('/') == backend.url) SupabaseArenaRelay(transport, backend, auth) else HttpArenaRelay(transport, url)
+    override fun relay(): Relay = SupabaseRelay(transport, backend, auth)
 }
 
 /** The auth and sync pair for one backend choice. The app swaps the whole pair when the choice changes. */
@@ -52,7 +43,7 @@ public class Backend(public val auth: AuthRepository, public val sync: SyncRepos
     public companion object {
         public fun create(config: BackendConfig, transport: HttpTransport, vault: SecretStore, clock: Clock): Backend =
             when (config) {
-                BackendConfig.LocalOnly -> Backend(LocalOnlyAuth, LocalSync(transport))
+                BackendConfig.LocalOnly -> Backend(LocalOnlyAuth, LocalSync)
                 is BackendConfig.Supabase -> {
                     val auth = SupabaseAuth(transport, config, vault, clock)
                     Backend(auth, SupabaseSync(transport, config, auth))
@@ -61,12 +52,15 @@ public class Backend(public val auth: AuthRepository, public val sync: SyncRepos
     }
 }
 
-/** The blind mailbox over the `arena_append` and `arena_fetch` functions in `supabase/migrations`. */
-public class SupabaseArenaRelay(
+/**
+ * The blind mailbox over the `arena_append` and `arena_fetch` functions in `supabase/migrations`. They keep
+ * their Arena-era names so existing backends need no migration.
+ */
+public class SupabaseRelay(
     private val transport: HttpTransport,
     private val config: BackendConfig.Supabase,
     private val auth: AuthRepository,
-) : ArenaRelay {
+) : Relay {
     override fun append(mailbox: String, data: ByteArray) {
         val body = buildJsonObject {
             put("p_mailbox", mailbox)

@@ -21,7 +21,7 @@ kotlin {
         // One copy of the Geist file: Android reads it as a font resource, the desktop from the classpath.
         named("desktopMain") { resources.srcDir("src/androidMain/res") }
         commonMain.dependencies {
-            api(project(":core:arena"))
+            api(project(":core:relay"))
             api(project(":core:sync"))
             api(project(":core:presentation"))
             api(project(":core:scheduler"))

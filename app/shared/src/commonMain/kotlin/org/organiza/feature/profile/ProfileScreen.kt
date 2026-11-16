@@ -60,7 +60,6 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
                         "first-session" -> Glyph.CLOCK
                         "week-streak", "month-streak" -> Glyph.FLAME
                         "held-the-line" -> Glyph.SHIELD
-                        "team-player" -> Glyph.ARENA
                         else -> Glyph.CROWN
                     }
                     Medallion(glyph, badge.title, badge.earned)
@@ -75,8 +74,8 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
             "Supabase cloud sync",
             when {
                 account.signedInAs != null -> "Signed in as ${account.signedInAs}"
-                account.kind != null -> "On. Sign in below to sync challenges"
-                else -> "Off: challenges use a relay you enter"
+                account.kind != null -> "On. Sign in below to share usage across your devices"
+                else -> "Off. Everything stays on this device"
             },
             account.kind != null,
         ) { on ->

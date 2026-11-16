@@ -129,8 +129,6 @@ public data class ProgressFacts(
     val focusMinutes: Long,
     val stayedFocused: Int,
     val longestStreak: Int,
-    val challengesJoined: Int,
-    val challengesCompleted: Int,
 )
 
 public data class Badge(val id: String, val title: String, val detail: String, val earned: Boolean)
@@ -171,15 +169,13 @@ public object Progression {
     public fun titleFor(level: Int): String = Rank.of(level).title
 
     public fun xp(facts: ProgressFacts): Int =
-        facts.habitDaysMet * 10 + (facts.focusMinutes / 5).toInt() + facts.stayedFocused * 5 + facts.challengesCompleted * 100
+        facts.habitDaysMet * 10 + (facts.focusMinutes / 5).toInt() + facts.stayedFocused * 5
 
     public fun badges(facts: ProgressFacts): List<Badge> = listOf(
         Badge("first-session", "First session", "Finish a focus session", facts.focusMinutes > 0),
         Badge("week-streak", "Seven days", "A 7-day habit streak", facts.longestStreak >= 7),
         Badge("month-streak", "Thirty days", "A 30-day habit streak", facts.longestStreak >= 30),
         Badge("held-the-line", "Held the line", "Stay focused 10 times", facts.stayedFocused >= 10),
-        Badge("team-player", "Team player", "Join a challenge", facts.challengesJoined > 0),
-        Badge("finisher", "Finisher", "Complete a challenge", facts.challengesCompleted > 0),
     )
 
     public fun build(facts: ProgressFacts): ProgressionModel = of(xp(facts), badges(facts))

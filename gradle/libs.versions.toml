@@ -5,7 +5,6 @@ junit = "5.13.4"
 sqlite-jdbc = "3.54.1.0"
 sqlcipher = "4.20.0"
 kotlinx-serialization = "1.9.0"
-bouncycastle = "1.86"
 compose-bom = "2026.03.00"
 sqlite-jdbc-crypt = "3.53.4.0"
 activity-compose = "1.12.4"
@@ -27,7 +26,6 @@ sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
 sqlcipher = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher" }
 androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "androidx-sqlite" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
-bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
 compose-foundation = { module = "androidx.compose.foundation:foundation" }
 compose-ui = { module = "androidx.compose.ui:ui" }

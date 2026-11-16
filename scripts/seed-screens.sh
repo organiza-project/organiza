@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fills a fresh debug install with believable sample data for screenshot reviews (ADR-0012).
-# Everything here is sample data: three habits, a calendar day and one challenge with a second
-# member. Usage: scripts/seed-screens.sh   (expects one emulator, and the debug APK built)
+# Everything here is sample data: three habits, a calendar day, daily limits and a focus session.
+# Usage: scripts/seed-screens.sh   (expects one emulator, and the debug APK built)
 set -u
 ADB="${ANDROID_HOME:-$HOME/Android/Sdk}/platform-tools/adb"
 APP=org.organiza.app
@@ -59,18 +59,3 @@ bc questtap --es name "Doomscrolled" --ez up false
 # A daily limit nearly used up, for the hub's bars.
 bc limit --es package com.android.chrome --el minutes 15
 bc limit --es package com.google.android.youtube --el minutes 60
-
-# One challenge with a second member, through the reference relay and the peer process.
-python3 scripts/arena-relay.py 18081 >/dev/null 2>&1 &
-relay_pid=$!
-trap 'kill "$relay_pid" 2>/dev/null' EXIT
-sleep 1
-bc arenacreate --es habit "Read 20 pages" --es title "No Reels November" --es relay http://10.0.2.2:18081 --es name Jack --ei days 30 --ei freezes 2
-sleep 3
-"$ADB" logcat -c
-bc arenainvite
-sleep 1
-invite=$("$ADB" logcat -d -s OrganizaDebug:I | tr -d '\r' | grep -o 'invite=.*' | tail -1 | cut -d= -f2-)
-./gradlew -q :core:arena:arenaPeer "-Ppeer=honest,http://127.0.0.1:18081,$invite" --console=plain >/dev/null 2>&1
-bc arenasync
-sleep 4

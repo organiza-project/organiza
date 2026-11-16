@@ -39,16 +39,10 @@ class RecordingActions : Actions {
     override fun discardCommand() { calls += "discardCommand" }
     override fun importCalendar() { calls += "importCalendar" }
     override fun weeklyReview() { calls += "weeklyReview" }
-    override fun syncArena() { calls += "syncArena" }
-    override fun shareInvite() { calls += "shareInvite" }
     override fun linkDevices(code: String) { calls += "linkDevices $code" }
     override fun unlinkDevices() { calls += "unlinkDevices" }
     override fun shareDeviceCode() { calls += "shareDeviceCode" }
     override fun openAppInfo() { calls += "openAppInfo" }
-    override fun createChallenge(habit: String, title: String, days: String, freezes: String, relay: String, name: String) {
-        calls += "createChallenge"
-    }
-    override fun joinChallenge(invite: String, habit: String, name: String) { calls += "joinChallenge" }
     override fun saveKey(key: String) { calls += "saveKey" }
     override fun removeKey() { calls += "removeKey" }
     override fun setVoiceConsent(on: Boolean) { calls += "setVoiceConsent $on" }
@@ -76,7 +70,6 @@ class RecordingActions : Actions {
     override fun addHabitPlan(name: String, frequency: HabitFrequency, target: Int, reminderMinute: Int?, goalMinutes: Int?, linkedPackage: String?) {
         calls += "addHabitPlan $name $frequency $target $reminderMinute $goalMinutes $linkedPackage"
     }
-    override fun nudge(challengeId: String, memberId: String) { calls += "nudge $memberId" }
     override fun pickTimetablePhoto() { calls += "pickTimetablePhoto" }
     override fun setImportText(text: String) { calls += "setImportText" }
     override fun extractSchedule() { calls += "extractSchedule" }

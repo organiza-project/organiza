@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    api(project(":core:arena"))
+    api(project(":core:relay"))
     api(project(":core:scheduler"))
     testImplementation(project(":core:testing"))
 }

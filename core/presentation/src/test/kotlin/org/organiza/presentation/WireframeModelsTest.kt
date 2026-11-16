@@ -98,13 +98,13 @@ class WireframeModelsTest {
 
     @Test
     fun `xp comes from local results and sets the level and title`() {
-        val model = Progression.build(ProgressFacts(habitDaysMet = 60, focusMinutes = 1500, stayedFocused = 40, longestStreak = 9, challengesJoined = 1, challengesCompleted = 0))
+        val model = Progression.build(ProgressFacts(habitDaysMet = 60, focusMinutes = 1500, stayedFocused = 40, longestStreak = 9))
         assertEquals(60 * 10 + 1500 / 5 + 40 * 5, model.xp)
         assertEquals(7, model.level)
         assertEquals("Level 7 · Novice", model.title)
         assertEquals("Initiate at level 10 · 1,150 XP to go", model.rankLine)
         assertTrue(model.fraction in 0.0..1.0)
-        assertEquals(setOf("first-session", "week-streak", "held-the-line", "team-player"), model.badges.filter { it.earned }.map { it.id }.toSet())
+        assertEquals(setOf("first-session", "week-streak", "held-the-line"), model.badges.filter { it.earned }.map { it.id }.toSet())
     }
 
     @Test

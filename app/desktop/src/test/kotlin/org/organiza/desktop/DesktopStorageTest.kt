@@ -13,7 +13,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.organiza.app.OrganizaCore
 import org.organiza.app.StorageUnavailable
-import org.organiza.arena.SecretStore
+import org.organiza.relay.SecretStore
 import org.organiza.storage.Migrations
 import org.organiza.testing.FakeSecretStore
 

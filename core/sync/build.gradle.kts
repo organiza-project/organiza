@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    api(project(":core:arena"))
+    api(project(":core:relay"))
     implementation(libs.kotlinx.serialization.json)
     testImplementation(project(":core:testing"))
     testImplementation(libs.embedded.postgres)

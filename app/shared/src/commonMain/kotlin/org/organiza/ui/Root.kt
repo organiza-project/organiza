@@ -35,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.organiza.feature.ai.CopilotScreen
-import org.organiza.feature.arena.ArenaScreen
 import org.organiza.feature.habits.HabitsScreen
 import org.organiza.feature.habits.NewHabitScreen
 import org.organiza.feature.home.HomeScreen
@@ -94,7 +93,6 @@ fun OrganizaRoot(ui: UiSnapshot, actions: Actions, request: Pair<Route, Long>? =
                         route == Route.COPILOT -> CopilotScreen(ui, actions, back)
                         tab == Tab.HOME -> HomeScreen(ui, actions, open) { tab = it }
                         tab == Tab.HABITS -> HabitsScreen(ui, actions, open)
-                        tab == Tab.ARENA -> ArenaScreen(ui, actions)
                         tab == Tab.METRICS -> MetricsScreen(ui, actions)
                         else -> ProfileScreen(ui, actions)
                     }

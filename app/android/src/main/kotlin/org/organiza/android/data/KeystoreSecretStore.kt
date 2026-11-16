@@ -2,9 +2,12 @@ package org.organiza.android.data
 
 import android.content.Context
 import java.io.File
-import org.organiza.arena.SecretStore
+import org.organiza.relay.SecretStore
 
-/** Holds challenge secrets, sealed by the Keystore and kept out of backups (ADR-0011). */
+/**
+ * Holds the device link and sync session, sealed by the Keystore and kept out of backups. The folder and
+ * key alias keep their Arena-era names so secrets saved by earlier versions are still found.
+ */
 class KeystoreSecretStore(context: Context) : SecretStore {
     private val directory = File(context.noBackupFilesDir, "arena")
     private val sealer = KeystoreSealer("organiza_arena_wrap")

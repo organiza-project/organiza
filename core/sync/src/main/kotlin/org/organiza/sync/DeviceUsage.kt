@@ -10,8 +10,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
-import org.organiza.arena.ArenaCrypto
-import org.organiza.arena.ArenaRelay
+import org.organiza.relay.RelayCrypto
+import org.organiza.relay.Relay
 
 /**
  * A secret this person's devices share, and what it derives (ADR-0028). The relay learns only
@@ -19,8 +19,8 @@ import org.organiza.arena.ArenaRelay
  */
 public class DeviceLink private constructor(private val secret: ByteArray) {
     private val salt = "organiza-devices-v1".toByteArray()
-    public val mailboxId: String = ArenaCrypto.hkdf(secret, salt, "mailbox".toByteArray(), KEY_BYTES).joinToString("") { "%02x".format(it) }
-    private val key = ArenaCrypto.hkdf(secret, salt, "envelope".toByteArray(), KEY_BYTES)
+    public val mailboxId: String = RelayCrypto.hkdf(secret, salt, "mailbox".toByteArray(), KEY_BYTES).joinToString("") { "%02x".format(it) }
+    private val key = RelayCrypto.hkdf(secret, salt, "envelope".toByteArray(), KEY_BYTES)
     private val associated = salt + mailboxId.toByteArray()
 
     public val code: String get() = PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(secret)
@@ -32,12 +32,12 @@ public class DeviceLink private constructor(private val secret: ByteArray) {
         // The relay takes at most 8 KB; the least used apps are left out first.
         while (json.size > MAX_PLAIN && entries.isNotEmpty()) json = encode(report, entries.also { it.removeAt(it.lastIndex) })
         val padded = json + ByteArray((BLOCK - json.size % BLOCK) % BLOCK) { ' '.code.toByte() }
-        return ArenaCrypto.seal(key, padded, associated)
+        return RelayCrypto.seal(key, padded, associated)
     }
 
     /** Null for anything damaged, from another link, or not a report. */
     internal fun open(data: ByteArray): DeviceReport? {
-        val plain = ArenaCrypto.open(key, data, associated) ?: return null
+        val plain = RelayCrypto.open(key, data, associated) ?: return null
         return try {
             val root = Json.parseToJsonElement(plain.decodeToString()) as JsonObject
             DeviceReport(
@@ -68,7 +68,7 @@ public class DeviceLink private constructor(private val secret: ByteArray) {
         private const val BLOCK = 1024
         private const val MAX_PLAIN = 7 * BLOCK
 
-        public fun create(): DeviceLink = DeviceLink(ArenaCrypto.randomBytes(KEY_BYTES))
+        public fun create(): DeviceLink = DeviceLink(RelayCrypto.randomBytes(KEY_BYTES))
 
         /** The link a code from another device carries, or null when it is not one. */
         public fun fromCode(code: String): DeviceLink? {
@@ -94,7 +94,7 @@ public data class DeviceReport(val device: String, val day: LocalDate, val minut
 public class DeviceUsage(
     private val link: DeviceLink,
     private val self: String,
-    private val relay: ArenaRelay,
+    private val relay: Relay,
     cursor: Long = 0,
 ) {
     public var cursor: Long = cursor

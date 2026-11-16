@@ -10,13 +10,13 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.organiza.ai.UrlConnectionTransport
-import org.organiza.testing.FakeArenaRelay
+import org.organiza.testing.FakeRelay
 import org.organiza.testing.FakeClock
 import org.organiza.testing.FakeSecretStore
 
 class DeviceUsageTest {
     private val today = LocalDate.of(2026, 11, 9)
-    private val relay = FakeArenaRelay()
+    private val relay = FakeRelay()
 
     @Test
     fun `devices that share a code add up each other's minutes by app name`() {
@@ -79,7 +79,7 @@ class DeviceUsageTest {
                 auth.signUp("me@example.org", "correct horse 1")
                 auth.signIn("me@example.org", "correct horse 1")
                 val sync = SupabaseSync(transport, config, auth)
-                return DeviceUsage(LINK, name, sync.relayFor(checkNotNull(sync.defaultRelayUrl())))
+                return DeviceUsage(LINK, name, checkNotNull(sync.relay()))
             }
             val phone = device("phone")
             val laptop = device("laptop")

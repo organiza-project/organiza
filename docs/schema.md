@@ -13,17 +13,11 @@ version is 9. Decisions are in ADR-0004, ADR-0006, ADR-0008, ADR-0011, ADR-0013,
 | `habit` | A criterion and its plan | `manual`, `screen_time_under` or `zero_launches`; daily, weekly or monthly with a target of met days and an optional reminder time; from v8 an optional minute goal and linked app |
 | `habit_log` | One result per habit per local day | Holds the result only, never the underlying usage |
 | `habit_minutes` | Minutes logged by hand per habit and day (v8) | App minutes from a linked app are read live and never stored |
-| `challenge` | A peer challenge over a habit | A habit in a challenge cannot be deleted |
-| `challenge_log` | One daily commitment, and the only table that feeds sync | Columns are pinned by an allow-list test |
-| `arena_member` | Other people in a challenge | A public key and a chosen display name |
-| `arena_entry` | Results received from other people | Columns are pinned by a test and carry no usage data |
-| `arena_reveal` | A member's revealed salts | Stored as the signed message they sent |
 | `tamper_event` | A capability lost during a session | Capability and time only; columns are pinned by a test |
 | `usage_limit` | A daily foreground limit per app | 5 to 720 minutes; applies all day |
 | `setting` | Switches and small values outside sessions | Reels and Shorts blocking, the last day RPG damage was settled |
 | `rpg_task` | A habit, daily or to-do | The title stays on this phone; only a to-do has a done time |
 | `rpg_event` | Each XP or HP change, applied in id order | One `daily` row per task and day; rows outlive a deleted task |
-| `arena_nudge` | Nudges sent and received | Once per sender, receiver and day; member IDs only |
 | `intervention_event` | A blocked app or site, and whether the person stayed focused or overrode | The block-list entry, never the URL; reason, note and pass length for overrides; columns are pinned by a test |
 | `focus_change` | The app that came to the front on the Linux desktop, or none (v9) | Time and desktop app only, never window titles or URLs; Linux has no OS usage log, so the app keeps this one |
 

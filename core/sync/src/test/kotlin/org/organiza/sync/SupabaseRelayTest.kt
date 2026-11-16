@@ -9,7 +9,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
-import org.organiza.arena.HttpArenaRelay
 import org.organiza.testing.FakeClock
 import org.organiza.testing.FakeHttpTransport
 import org.organiza.testing.FakeSecretStore
@@ -19,7 +18,7 @@ class SupabaseRelayTest {
     private val http = FakeHttpTransport()
     private val clock = FakeClock(Instant.parse("2026-11-02T10:00:00Z"))
     private val auth = SupabaseAuth(http, config, FakeSecretStore(), clock)
-    private val relay = SupabaseArenaRelay(http, config, auth)
+    private val relay = SupabaseRelay(http, config, auth)
     private val mailbox = "a".repeat(64)
 
     private fun signIn() {
@@ -68,18 +67,9 @@ class SupabaseRelayTest {
     }
 
     @Test
-    fun `the backend's own url routes to supabase, any other to a plain relay`() {
-        val sync = SupabaseSync(http, config, auth)
-        assertIs<SupabaseArenaRelay>(sync.relayFor("https://abc.supabase.co"))
-        assertIs<HttpArenaRelay>(sync.relayFor("https://relay.example.org"))
-        assertEquals("https://abc.supabase.co", sync.defaultRelayUrl())
-    }
-
-    @Test
-    fun `local only always uses the relay in the invite`() {
-        val sync = LocalSync(http)
-        assertIs<HttpArenaRelay>(sync.relayFor("https://relay.example.org"))
-        assertNull(sync.defaultRelayUrl())
+    fun `a supabase backend relays through itself, and local only has no relay`() {
+        assertIs<SupabaseRelay>(SupabaseSync(http, config, auth).relay())
+        assertNull(LocalSync.relay())
     }
 
     @Test

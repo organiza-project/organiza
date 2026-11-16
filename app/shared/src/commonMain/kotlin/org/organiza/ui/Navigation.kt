@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 /** The five destinations, with Home in the middle as the wireframe draws it (ADR-0018). */
 enum class Tab(val label: String, val glyph: Glyph) {
     HABITS("Habits", Glyph.HABITS),
-    ARENA("Arena", Glyph.ARENA),
     HOME("Home", Glyph.HOME),
     METRICS("Metrics", Glyph.METRICS),
     PROFILE("Profile", Glyph.PROFILE),
@@ -123,7 +122,7 @@ private fun SideItem(glyph: Glyph, label: String, active: Boolean, role: Role, o
 }
 
 /** A sidebar reads top-down, so Home leads and Profile ends it; the bottom bar keeps Home in the middle. */
-private val SIDE_TABS = listOf(Tab.HOME, Tab.HABITS, Tab.METRICS, Tab.ARENA, Tab.PROFILE)
+private val SIDE_TABS = listOf(Tab.HOME, Tab.HABITS, Tab.METRICS, Tab.PROFILE)
 
 /** At this width and above the tabs move from the bottom bar to [SideBar]. */
 val WIDE = 840.dp

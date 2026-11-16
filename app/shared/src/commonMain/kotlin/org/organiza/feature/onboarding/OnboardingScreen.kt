@@ -57,7 +57,7 @@ fun OnboardingScreen(ui: UiSnapshot, actions: Actions) {
         OnboardingStep.WELCOME -> Welcome()
         OnboardingStep.PERMISSIONS -> PermissionsStep(ui, actions)
         OnboardingStep.BACKEND -> {
-            TitleBlock("Where your data lives", "Everything works offline. A backend is only for challenges with friends.")
+            TitleBlock("Where your data lives", "Everything works offline. A backend only lets your devices share usage, so one limit counts them all.")
             BackendPanel(ui.account, actions)
         }
         OnboardingStep.AI -> {

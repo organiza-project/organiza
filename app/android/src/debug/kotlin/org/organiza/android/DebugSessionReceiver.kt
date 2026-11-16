@@ -19,7 +19,6 @@ import org.organiza.android.feature.voice.VoiceRecorder
 import org.organiza.domain.PackageName
 import org.organiza.domain.Parsed
 import org.organiza.domain.port.BlockTarget
-import org.organiza.arena.ChallengeRules
 import org.organiza.scheduler.ManualRequest
 import org.organiza.storage.RpgKind
 import org.organiza.storage.StoredRule
@@ -93,32 +92,12 @@ class DebugSessionReceiver : BroadcastReceiver() {
             }
             "voiceconfirm" -> app.core.confirmVoiceCommand()
             "voicediscard" -> app.core.discardVoiceCommand()
-            "arenacreate" -> app.core.createChallenge(
-                intent.getStringExtra("habit").orEmpty(),
-                intent.getStringExtra("title").orEmpty(),
-                ChallengeRules(
-                    intent.getIntExtra("days", 1),
-                    intent.getIntExtra("freezes", 0),
-                    intent.getIntExtra("maxFailures", 0),
-                    strict,
-                ),
-                intent.getStringExtra("relay").orEmpty(),
-                intent.getStringExtra("name").orEmpty(),
-            )
-            "arenahabit" -> app.core.addCriterionHabitForTesting(
-                intent.getStringExtra("name").orEmpty(),
-                intent.getStringExtra("kind").orEmpty(),
-                intent.getStringExtra("target").orEmpty(),
-            )
             "habitday" -> app.core.markHabitDaysAgoForTesting(
                 intent.getStringExtra("name").orEmpty(),
                 intent.getLongExtra("ago", 0),
                 intent.getBooleanExtra("done", true),
             )
             "addhabit" -> app.core.addHabit(intent.getStringExtra("name").orEmpty())
-            "arenamark" -> app.core.markHabitDone(intent.getStringExtra("name").orEmpty())
-            "arenasync" -> app.core.arenaNow()
-            "arenainvite" -> Log.i("OrganizaDebug", "invite=${app.core.latestInvite}")
             "clockdays" -> app.core.clockOffsetForTesting = Duration.ofDays(intent.getLongExtra("days", 0))
             // Today's foreground seconds for one package, as the limits and the hub read them.
             "usage" -> {

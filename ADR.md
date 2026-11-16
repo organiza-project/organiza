@@ -1275,3 +1275,29 @@ anyone holding the code, so the app tells people to share it like a password. Li
 - A key derived from the account password: the backend sees the password at sign-in, so it could
   derive the key too.
 - Syncing totals per category: needs category limits, which do not exist yet.
+
+## ADR-0029: Arena is removed
+
+### Status
+Accepted, 2026-11-16. Supersedes ADR-0011 and the Arena parts of ADR-0015, ADR-0018 and ADR-0021.
+
+### Context
+Organiza is becoming a private organizer for one person's digital life: habits, focus, notes and
+usage. Thirty day challenges with friends pulled the other way, toward accounts, invites and other
+people's data, and cost a tab, an engine, seven tables and the most complex test paths.
+
+### Decision
+- The Arena tab, screens, engine, challenge state machine, wire format, signatures and commitments
+  are deleted on Android and the desktop, with their tests, debug commands and script checks.
+- Schema v10 drops `challenge`, `challenge_log`, `arena_member`, `arena_entry`, `arena_conflict`,
+  `arena_reveal` and `arena_nudge`. Challenge history on a device is deleted on upgrade.
+- What device sync still needs moves to `core/relay`: the blind `Relay` port, `SecretStore`, and HKDF
+  with AES-GCM envelopes. Ed25519 and BouncyCastle go. Sync has one relay, the backend's own.
+- The backend keeps `arena_message`, `arena_append` and `arena_fetch` under those names, since device
+  usage reports travel through them and renaming would break every existing backend. Android keeps
+  its secret folder and key alias names, so a saved device link and sign-in survive the upgrade.
+- XP no longer counts challenges, and the two challenge badges go. Notes take the tab (ADR-0030).
+
+### Consequences
+Nothing in the apps mentions or depends on challenges. Arena could return later from git history,
+but its tables would need a new migration.

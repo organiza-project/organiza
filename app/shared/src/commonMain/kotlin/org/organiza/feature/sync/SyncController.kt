@@ -13,7 +13,7 @@ import org.organiza.sync.BackendKind
 import org.organiza.sync.BackendProblem
 
 /**
- * Holds the backend choice and its auth and sync pair (ADR-0015). Screens and Arena only see
+ * Holds the backend choice and its auth and sync pair (ADR-0015). Screens and device sync only see
  * [backend], so switching between local only, hosted and self-hosted changes nothing else.
  */
 class SyncController(private val app: OrganizaCore) {

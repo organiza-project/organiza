@@ -131,13 +131,5 @@ class MainActivity : ComponentActivity() {
             startActivity(Intent.createChooser(send, "Send the device code to yourself"))
         }
 
-        override fun shareInvite() = core.inviteToShare { invite ->
-            if (invite == null) {
-                core.showMessage("Create or join a challenge first")
-            } else {
-                val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, invite)
-                startActivity(Intent.createChooser(send, "Share the invite"))
-            }
-        }
     }
 }

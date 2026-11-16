@@ -236,15 +236,6 @@ class DesktopActions(core: OrganizaCore, private val app: DesktopApp, private va
         core.schedule.readPhoto { output("tesseract", file.absolutePath, "stdout") }
     }
 
-    override fun shareInvite() = core.inviteToShare { invite ->
-        if (invite == null) {
-            core.showMessage("Create or join a challenge first")
-        } else {
-            Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(invite), null)
-            core.showMessage("Invite copied. Share it like a password")
-        }
-    }
-
     override fun shareDeviceCode() {
         val code = core.devices.code() ?: return core.showMessage("Start sharing usage first")
         Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(code), null)

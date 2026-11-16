@@ -1,9 +1,9 @@
 package org.organiza.testing
 
 import java.io.IOException
-import org.organiza.arena.ArenaRelay
-import org.organiza.arena.RelayMessage
-import org.organiza.arena.SecretStore
+import org.organiza.relay.Relay
+import org.organiza.relay.RelayMessage
+import org.organiza.relay.SecretStore
 
 public class FakeSecretStore : SecretStore {
     private val stored = mutableMapOf<String, ByteArray>()
@@ -26,7 +26,7 @@ public class FakeSecretStore : SecretStore {
 }
 
 /** A blind mailbox in memory, which records what a real relay would be able to see. */
-public class FakeArenaRelay : ArenaRelay {
+public class FakeRelay : Relay {
     private val mailboxes = mutableMapOf<String, MutableList<ByteArray>>()
 
     public var offline: Boolean = false

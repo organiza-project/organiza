@@ -3,7 +3,7 @@ package org.organiza.app
 import java.time.Duration
 import java.time.Instant
 import org.organiza.ai.ApiKeyStore
-import org.organiza.arena.SecretStore
+import org.organiza.relay.SecretStore
 import org.organiza.domain.PackageName
 import org.organiza.domain.port.Capability
 import org.organiza.domain.port.UsageHistory
