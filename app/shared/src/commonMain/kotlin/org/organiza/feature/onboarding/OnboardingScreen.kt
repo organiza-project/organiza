@@ -112,6 +112,9 @@ private fun PermissionsStep(ui: UiSnapshot, actions: Actions) {
             PermissionItem(row, actions)
         }
     }
+    // Offered here, off by default: a firmer way to keep old habits from coming back.
+    Txt("A firmer option", Type.section, modifier = Modifier.padding(top = 8.dp))
+    org.organiza.feature.profile.LockoutPanel(ui, actions)
 }
 
 @Composable

@@ -13,6 +13,8 @@ import org.organiza.storage.HabitFrequency
 import org.organiza.storage.HabitPlan
 import org.organiza.storage.RpgKind
 import org.organiza.sync.BackendKind
+import org.organiza.domain.PackageName
+import org.organiza.domain.Parsed
 import org.organiza.ui.Actions
 import org.organiza.ui.UsageSpan
 import org.organiza.ui.CalendarMode
@@ -66,7 +68,7 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
         if (input.rejected.isNotEmpty()) core.showMessage("Could not read: ${input.rejected.joinToString()}")
     }
 
-    override fun stopSession() = core.stopSession()
+    override fun stopSession() = core.guard("End the focus session early", loosens = true) { core.stopSession() }
 
     override fun fix(item: ProtectionItem) = grant(
         when (item.kind) {
@@ -131,15 +133,30 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
 
     override fun summarizeMonitor() = core.summarizeMonitor()
 
-    override fun setFocusApp(pkg: String, on: Boolean) = core.hub.setApp(pkg, on)
+    override fun setFocusApp(pkg: String, on: Boolean) = core.guard("Take ${label(pkg)} off the focus list", loosens = !on) { core.hub.setApp(pkg, on) }
 
     override fun addFocusSite(raw: String) = core.hub.addSite(raw)
 
-    override fun removeFocusSite(domain: String) = core.hub.removeSite(domain)
+    override fun removeFocusSite(domain: String) = core.guard("Stop blocking $domain", loosens = true) { core.hub.removeSite(domain) }
 
-    override fun setLimit(pkg: String, minutes: Long?) = core.hub.setLimit(pkg, minutes)
+    override fun setLimit(pkg: String, minutes: Long?) {
+        val current = core.hub.limits.entries.firstOrNull { it.key.value == pkg }?.value?.toMinutes()
+        // Adding or lowering a limit is always allowed; removing or raising one is loosening.
+        val loosens = current != null && (minutes == null || minutes > current)
+        core.guard(if (minutes == null) "Remove the limit on ${label(pkg)}" else "Raise the limit on ${label(pkg)}", loosens) {
+            core.hub.setLimit(pkg, minutes)
+        }
+    }
 
-    override fun setFeed(feed: ShortFormFeed, on: Boolean) = core.hub.setFeed(feed, on)
+    override fun setFeed(feed: ShortFormFeed, on: Boolean) = core.guard("Turn a short video blocker off", loosens = !on) { core.hub.setFeed(feed, on) }
+
+    private fun label(pkg: String): String = (PackageName.parse(pkg) as? Parsed.Valid)?.value?.let(core::appLabel) ?: pkg
+
+    override fun setLockout(on: Boolean) = core.setLockout(on)
+
+    override fun unlock(typed: String) = core.unlock(typed)
+
+    override fun cancelUnlock() = core.cancelUnlock()
 
 
     override fun selectDay(day: LocalDate, then: CalendarMode?) = core.calendar.select(day, then)
@@ -148,7 +165,7 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
 
     override fun saveFocusBlock(replacing: String?, day: LocalDate, startMinute: Int, minutes: Int) = core.calendar.save(replacing, day, startMinute, minutes)
 
-    override fun deleteFocusBlock(id: String) = core.calendar.delete(id)
+    override fun deleteFocusBlock(id: String) = core.guard("Delete a focus block", loosens = true) { core.calendar.delete(id) }
 
     override fun addQuest(kind: RpgKind, title: String) = core.game.add(kind, title)
 

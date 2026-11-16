@@ -1355,3 +1355,25 @@ On Android, the system keeps detailed usage events for only about a week, so old
 can read as less than they were; other devices' history comes from their reports. Category names are
 the ones each platform declares, so the same app can sit under slightly different categories on two
 systems.
+
+## ADR-0032: An optional lockout that asks for an essay before loosening a rule
+
+### Status
+Accepted, 2026-11-16. Extends the friction of ADR-0016 to settings.
+
+### Context
+The pause adds friction to opening a blocked app, but a limit could still be removed or a blocker
+turned off in two taps, which is exactly what an urge does.
+
+### Decision
+- A **Lockout** setting, off by default, is offered in onboarding and in Profile.
+- With it on, a change that loosens a rule waits: removing or raising a daily limit, taking an app or
+  site off the focus list, turning a short video blocker off, deleting a focus block, ending a session
+  early, and turning the lockout itself off. Tightening stays instant.
+- The change runs only after the person types an original essay of about 90 words, letter by letter.
+  `Lockout.accept` keeps an edit only when it adds the next right letter or deletes, so a paste or a
+  wrong letter changes nothing. The typed text is never stored.
+
+### Consequences
+Loosening a rule takes a few minutes of deliberate typing. The setting lives in the encrypted database
+like the others; reinstalling the app, which clears it, remains possible, as ADR-0005 accepts.

@@ -83,6 +83,11 @@ interface Actions {
     fun signOut()
     fun deleteAccount()
 
+    // The lockout (ADR-0032)
+    fun setLockout(on: Boolean)
+    fun unlock(typed: String)
+    fun cancelUnlock()
+
     // The usage report (ADR-0031)
     fun setUsageSpan(span: UsageSpan)
     fun shiftUsage(step: Int)

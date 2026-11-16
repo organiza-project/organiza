@@ -43,6 +43,9 @@ class RecordingActions : Actions {
     override fun unlinkDevices() { calls += "unlinkDevices" }
     override fun shareDeviceCode() { calls += "shareDeviceCode" }
     override fun openAppInfo() { calls += "openAppInfo" }
+    override fun setLockout(on: Boolean) { calls += "setLockout $on" }
+    override fun unlock(typed: String) { calls += "unlock" }
+    override fun cancelUnlock() { calls += "cancelUnlock" }
     override fun setUsageSpan(span: org.organiza.ui.UsageSpan) { calls += "setUsageSpan $span" }
     override fun shiftUsage(step: Int) { calls += "shiftUsage $step" }
     override fun shiftUsageEdge(start: Boolean, days: Int) { calls += "shiftUsageEdge $start $days" }

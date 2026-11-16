@@ -56,6 +56,7 @@ fun OrganizaRoot(ui: UiSnapshot, actions: Actions, request: Pair<Route, Long>? =
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     // Screens opened on top of a tab (ADR-0018). Back closes the top one.
     val stack = remember { mutableStateListOf<Route>() }
+    ui.unlockReason?.let { UnlockDialog(it, actions) }
     val open: (Route) -> Unit = { stack.add(it) }
     val back: () -> Unit = { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }
     BackHandler(enabled = stack.isNotEmpty() && !ui.onboarding) { back() }

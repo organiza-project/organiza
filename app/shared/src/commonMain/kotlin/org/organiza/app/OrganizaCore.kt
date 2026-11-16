@@ -28,6 +28,8 @@ import org.organiza.feature.sync.DevicesController
 import org.organiza.feature.notes.NotesController
 import org.organiza.feature.metrics.UsageController
 import org.organiza.storage.NoteStore
+import org.organiza.storage.Setting
+import org.organiza.presentation.Lockout
 import org.organiza.storage.DeviceUsageStore
 import org.organiza.storage.Reminder
 import org.organiza.feature.sync.SyncController
@@ -114,6 +116,41 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     val sync by lazy { SyncController(this) }
     val devices by lazy { DevicesController(this) }
     val journal by lazy { NotesController(this) }
+
+    /** Whether loosening a rule needs the essay (ADR-0032). Read from settings with each refresh. */
+    @Volatile var lockout = false
+        private set
+
+    /** A loosening change waiting for the essay, with what it does in words. */
+    @Volatile private var pendingUnlock: Pair<String, () -> Unit>? = null
+
+    /** Runs [change] now, or, with the lockout on and [loosens] true, once the essay is typed. */
+    fun guard(reason: String, loosens: Boolean, change: () -> Unit) {
+        if (!lockout || !loosens) return change()
+        pendingUnlock = reason to change
+        requestUiRefresh()
+    }
+
+    fun unlock(typed: String) {
+        val pending = pendingUnlock ?: return
+        if (!Lockout.done(typed)) return showMessage("The essay must be typed exactly")
+        pendingUnlock = null
+        pending.second()
+        requestUiRefresh()
+    }
+
+    fun cancelUnlock() {
+        pendingUnlock = null
+        showMessage("Nothing was changed")
+    }
+
+    fun setLockout(on: Boolean) = guard("Turn the lockout off", loosens = !on) {
+        onStores { stores ->
+            stores.settings.setFlag(Setting.LOCKOUT, on)
+            lockout = on
+            showMessage(if (on) "Lockout is on. Loosening a rule now needs the essay" else "Lockout is off")
+        }
+    }
     val usageReport by lazy { UsageController(this) }
     val copilot by lazy { CopilotController(this) }
     val chat by lazy { ChatController(this) }
@@ -601,6 +638,8 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
                 hub = hub.view(active, zone),
                 notes = journal.view(active, today, zone),
                 usage = usageReport.view(active, today, zone),
+                lockout = active.settings.flag(Setting.LOCKOUT).also { lockout = it },
+                unlockReason = pendingUnlock?.first,
                 calendar = calendar.view(now, zone, views),
                 rpg = game.view(active, today, hero),
                 schedule = schedule.view,

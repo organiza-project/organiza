@@ -86,6 +86,22 @@ class DesktopAppTest {
     }
 
     @Test
+    fun `with the lockout on, removing a limit waits for the whole essay`() {
+        val chrome = "linux.google_chrome"
+        actions.setLimit(chrome, 30)
+        eventually("the limit is set") { core.hub.limits.keys.any { it.value == chrome } }
+        actions.setLockout(true)
+        eventually("the lockout is on") { core.lockout }
+        actions.setLimit(chrome, null)
+        eventually("the change waits") { core.uiState.value.unlockReason == "Remove the limit on Chrome" }
+        actions.unlock(org.organiza.presentation.Lockout.ESSAY.dropLast(1))
+        Thread.sleep(300)
+        assertTrue(core.hub.limits.keys.any { it.value == chrome }, "a wrong text changed nothing")
+        actions.unlock(org.organiza.presentation.Lockout.ESSAY)
+        eventually("the limit is gone") { core.hub.limits.keys.none { it.value == chrome } }
+    }
+
+    @Test
     fun `a note is written, saved and shown under today`() = runComposeUiTest {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }

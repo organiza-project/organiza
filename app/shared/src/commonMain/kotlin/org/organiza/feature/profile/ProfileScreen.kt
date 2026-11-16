@@ -68,6 +68,7 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
         }
     }
     MessagePanel(ui.message)
+    LockoutPanel(ui, actions)
     Panel {
         val account = ui.account
         SwitchRow(
@@ -122,5 +123,18 @@ private fun VaultPanels(ui: UiSnapshot, actions: Actions) {
         Txt("Walk through permissions, the backend and the AI key again.", Type.small, colors.muted)
         Spacer(Modifier.height(8.dp))
         Action("Run setup again", ButtonKind.SECONDARY) { actions.restartOnboarding() }
+    }
+}
+
+/** The lockout switch (ADR-0032), here and in onboarding. Off unless the person turns it on. */
+@Composable
+fun LockoutPanel(ui: UiSnapshot, actions: Actions) {
+    Panel {
+        SwitchRow(
+            "Lockout",
+            "Removing or raising a limit, turning a blocker off, or ending a session early asks you to type a short essay " +
+                "first, letter by letter, with no pasting. Turning lockout off asks for it too.",
+            ui.lockout,
+        ) { actions.setLockout(it) }
     }
 }
