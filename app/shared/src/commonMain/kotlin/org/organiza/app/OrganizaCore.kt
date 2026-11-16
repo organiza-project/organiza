@@ -535,6 +535,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
             val db = platform.openDatabase()
             if (Migrations.migrate(db) is MigrationResult.TooNew) throw StorageUnavailable(DATABASE_TOO_NEW)
             storage = Storage(db, clock).also { hub.load(it) }
+            storageFailure = null
             // Read once: on the desktop each read starts a keyring helper. Saving and removing keep it current.
             keySaved = apiKeys.load() != null
             rescheduleReminders()
@@ -548,7 +549,13 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
 
     /** Applies due transitions and puts the resulting policy in force. Storage thread only. */
     private fun reconcile() {
-        val active = storage ?: return
+        // A locked keyring (automatic login) or a busy disk can keep storage shut at start; keep trying.
+        if (storage == null) openStorage()
+        val active = storage ?: return run {
+            tick?.cancel(false)
+            tick = timer.schedule({ onStorageThread { reconcile() } }, STORAGE_RETRY_MS, TimeUnit.MILLISECONDS)
+            refreshUi()
+        }
         val state = active.scheduler.reconcile()
         if (state.policy != session.current) {
             // A pass belongs to the session it was taken in.
@@ -985,6 +992,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
         private const val PREFERENCES = "organiza"
         private const val VOICE_CONSENT = "voice_consent"
         private const val ONBOARDED = "onboarded"
+        private const val STORAGE_RETRY_MS = 30_000L
         private const val MIN_TICK_MS = 500L
         private const val MAX_TICK_MS = 30_000L
         private const val REQUEST_INTERVAL_MS = 5_000L

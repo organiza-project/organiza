@@ -34,7 +34,12 @@ object DesktopStorage {
     fun open(file: Path, keyring: SecretStore): EncryptedDatabase {
         val key = keyring.get(KEY) ?: run {
             // A new key for an existing file could only make it unreadable, so it is never made.
-            if (Files.exists(file)) throw StorageUnavailable("The database key is missing from the keyring, so the database was left as it is.")
+            if (Files.exists(file)) {
+                throw StorageUnavailable(
+                    "the login keyring did not give the database key. If your keyring is locked, as it is after an " +
+                        "automatic login, unlock it with your login password; Organiza tries again every 30 seconds",
+                )
+            }
             ByteArray(KEY_BYTES).also(SecureRandom()::nextBytes).also { keyring.put(KEY, it) }
         }
         Files.createDirectories(file.parent)

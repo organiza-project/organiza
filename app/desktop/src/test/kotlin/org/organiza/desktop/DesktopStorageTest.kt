@@ -85,6 +85,22 @@ class DesktopStorageTest {
     }
 
     @Test
+    fun `storage opens once a locked keyring answers, without restarting`() {
+        DesktopStorage.open(file, keyring).use { Migrations.migrate(it) }
+        // With automatic login the keyring stays locked until the person unlocks it.
+        var locked = true
+        val core = core(object : SecretStore by keyring {
+            override fun get(name: String): ByteArray? = if (locked) null else keyring.get(name)
+        })
+        settle(core)
+        assertNotNull(core.uiState.value.storageProblem)
+        locked = false
+        core.requestReconcileNow()
+        settle(core)
+        assertEquals(null, core.uiState.value.storageProblem)
+    }
+
+    @Test
     fun `the Groq key is read from the keyring once, not on every refresh`() {
         val reads = mutableListOf<String>()
         val core = core(object : SecretStore by keyring {
