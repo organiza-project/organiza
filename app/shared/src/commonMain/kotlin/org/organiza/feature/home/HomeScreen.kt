@@ -59,7 +59,7 @@ fun HomeScreen(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit, goTo: (T
             habits.forEach { habit -> HabitCard(habit) { done -> actions.markToday(habit.id, habit.name, done) } }
         }
     }
-    QuestsPanel(ui.rpg, actions, hero = false)
+    QuestsPanel(ui.rpg, actions, open, hero = false)
 }
 
 /** The day's status at a glance: the dial beside the goals met and what is left. */

@@ -103,6 +103,7 @@ private fun DevicesBlock(account: AccountView, actions: Actions) {
             Type.small,
             colors.muted,
         )
+        account.deviceSync?.let { Txt(it, Type.small, colors.muted) }
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Action("Copy device code", ButtonKind.SECONDARY) { actions.shareDeviceCode() }

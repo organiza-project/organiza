@@ -53,7 +53,7 @@ private val CORNER = RoundedCornerShape(6.dp)
  * leaves the hero card to the Habits tab and heads the lists "Quests" instead (ADR-0022).
  */
 @Composable
-fun QuestsPanel(rpg: RpgView, actions: Actions, hero: Boolean = true) {
+fun QuestsPanel(rpg: RpgView, actions: Actions, open: (Route) -> Unit, hero: Boolean = true) {
     val colors = Theme.colors
     var kind by rememberSaveable { mutableStateOf(RpgKind.DAILY) }
     var title by rememberSaveable { mutableStateOf("") }
@@ -74,9 +74,15 @@ fun QuestsPanel(rpg: RpgView, actions: Actions, hero: Boolean = true) {
         Spacer(Modifier.height(10.dp))
         StatBar("XP", rpg.xpFraction, rpg.xpCaption, colors.data)
     }
-    Segmented(RpgKind.entries, kind, { label(it) + " " + rpg.tasks.count { task -> task.kind == it } }) { kind = it }
+    // A habit is added one way everywhere, on the New habit screen; the Habits kind stays for ones made before.
+    val kinds = RpgKind.entries.filter { it != RpgKind.HABIT || rpg.tasks.any { task -> task.kind == RpgKind.HABIT } }
+    Segmented(kinds, kind, { label(it) + " " + rpg.tasks.count { task -> task.kind == it } }) { kind = it }
     Txt(rule(kind), Type.small, colors.muted)
     rpg.tasks.filter { it.kind == kind }.forEach { task -> TaskCard(task, actions) }
+    if (kind == RpgKind.HABIT) {
+        Action("New habit", ButtonKind.PRIMARY) { open(Route.NEW_HABIT) }
+        return
+    }
     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Field(title, { title = it }, "New ${single(kind)}", Modifier.weight(1f))
         Box(Modifier.padding(bottom = 12.dp)) {

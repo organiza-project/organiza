@@ -45,12 +45,19 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
         Txt(progression.title, Type.title.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center), modifier = Modifier.fillMaxWidth().semantics { heading() })
         Panel {
             Row(Modifier.fillMaxWidth()) {
-                Txt("XP", Type.bodyStrong, modifier = Modifier.weight(1f))
-                Txt("${progression.xp} XP · ${progression.toNext} XP to the next level", Type.small, colors.muted)
+                Txt("Level ${progression.level}", Type.bodyStrong, modifier = Modifier.weight(1f))
+                Txt("${progression.xp} XP in total", Type.small, colors.muted)
             }
             Spacer(Modifier.height(8.dp))
             ProgressPill(progression.fraction, ink = colors.data)
-            Txt("Earned on this device from habits, focus time and staying focused. Never shared.", Type.small, colors.muted, Modifier.padding(top = 8.dp))
+            Txt("${progression.toNext} XP more to reach level ${progression.level + 1}.", Type.body, modifier = Modifier.padding(top = 8.dp))
+            Txt(
+                "You earn 10 XP for each day you meet a habit, 1 XP for every 5 minutes of focus, and 5 XP each time you " +
+                    "stay focused at a pause. Quests add their own. XP stays on this device.",
+                Type.small,
+                colors.muted,
+                Modifier.padding(top = 4.dp),
+            )
         }
         Panel {
             PanelHeader("Badges") { Txt("${progression.badges.count { it.earned }} of ${progression.badges.size}", Type.small, colors.muted) }

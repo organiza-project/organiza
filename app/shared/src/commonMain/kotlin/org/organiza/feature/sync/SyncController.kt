@@ -45,6 +45,7 @@ class SyncController(private val app: OrganizaCore) {
             busy = busy,
             devicesLinked = app.devices.linked,
             otherDevices = app.devices.others(),
+            deviceSync = app.devices.lastResult,
         )
     }
 

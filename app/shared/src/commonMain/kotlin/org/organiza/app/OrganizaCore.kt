@@ -233,7 +233,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
 
     /** Sets every habit reminder again, after a change, a reminder firing or a reboot. */
     fun rescheduleReminders() = onStorageThread {
-        val active = storage ?: return@onStorageThread
+        val active = storage ?: return@onStorageThread notSaved()
         // A note's reminder has its own time; ids keep it apart from a habit's.
         val reminders = active.habits.reminders() +
             active.notes.upcoming(clock.now()).map { Reminder("note-${it.id}", it.body.take(80), 0, it.remindAt) }
@@ -242,7 +242,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     }
 
     fun addHabitPlan(name: String, plan: HabitPlan) = onStorageThread {
-        val active = storage ?: return@onStorageThread
+        val active = storage ?: return@onStorageThread notSaved()
         val clean = name.trim()
         if (clean.isEmpty()) return@onStorageThread
         val existing = active.habits.active().firstOrNull { it.name.equals(clean, ignoreCase = true) }
@@ -262,7 +262,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
      * and messages, or nothing at all while the apps used are watched.
      */
     fun startFocus(minutes: Int, strict: Boolean, shortForm: Boolean, tier: FocusTier) = onStorageThread {
-        val active = storage ?: return@onStorageThread
+        val active = storage ?: return@onStorageThread notSaved()
         val request = when (tier) {
             FocusTier.LOCKDOWN -> ManualRequest(lockdownApps(), emptySet(), strict, shortForm, tier = tier)
             FocusTier.MONITOR -> ManualRequest(emptySet(), emptySet(), tier = tier)
@@ -306,7 +306,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     }
 
     fun logMinutes(habitId: String, minutes: Int) = onStorageThread {
-        val active = storage ?: return@onStorageThread
+        val active = storage ?: return@onStorageThread notSaved()
         if (minutes !in 1..MAX_LOG_MINUTES) return@onStorageThread
         val today = clock.now().atZone(ZoneId.systemDefault()).toLocalDate()
         if (active.habits.loggedMinutes(habitId, today) + minutes > MAX_LOG_MINUTES) {
@@ -448,7 +448,12 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     }
 
     /** Runs [work] with the stores on the storage thread, if storage opened. */
-    fun onStores(work: (Storage) -> Unit) = onStorageThread { storage?.let(work) }
+    fun onStores(work: (Storage) -> Unit) = onStorageThread { storage?.let(work) ?: notSaved() }
+
+    // Every change that needs storage says so when storage is shut, rather than doing nothing.
+    private fun notSaved() {
+        statusMessage = "Not saved: " + (storageFailure ?: "storage is still opening. Try again in a moment")
+    }
 
     fun onStorageThread(work: () -> Unit) {
         storageThread.execute {
@@ -803,7 +808,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
 
     /** Logs a finished intervention (ADR-0016). Called once per intervention by the overlay. */
     fun recordIntervention(flow: InterventionFlow, outcome: InterventionOutcome) = onStorageThread {
-        val active = storage ?: return@onStorageThread
+        val active = storage ?: return@onStorageThread notSaved()
         val overrode = outcome as? InterventionOutcome.Overrode
         active.interventions.record(
             StoredIntervention(
@@ -866,7 +871,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
 
     /** Called whenever the OS may have taken a capability away. */
     fun checkTamper() = onStorageThread {
-        val active = storage ?: return@onStorageThread
+        val active = storage ?: return@onStorageThread notSaved()
         val lost = monitor.check()
         val current = active.sessions.inState(SessionState.ACTIVE).firstOrNull()?.id
         lost.forEach { active.tamper.record(current, it.capability, it.at) }

@@ -286,7 +286,7 @@ leaky='Prep for Sarah Connor, jane@clinic.example, 415-555-2671, https://x.examp
 broadcast aiendpoint --es url http://10.0.2.2:18080; sleep 1
 broadcast clearkey; sleep 1
 broadcast aireview; sleep 3
-check "no key means no call" "NO_KEY" "$(debug_state)"
+check "no key means no call" "no Groq key is saved" "$(debug_state)"
 check_eq "control: nothing was sent without a key" "0" "$(sent | wc -l)"
 broadcast savekey --es key "$test_key"; sleep 2
 check "the key is saved" "API key saved" "$(debug_state)"
@@ -372,7 +372,7 @@ kill_now; sleep 4
 broadcast aiendpoint --es url http://10.0.2.2:1; sleep 1
 broadcast aireview; sleep 4
 check "the key survives a process kill" "failure" "$(debug_state | tr 'A-Z' 'a-z')"
-check_not "control: it is not reported as missing" "NO_KEY" "$(debug_state)"
+check_not "control: it is not reported as missing" "no Groq key is saved" "$(debug_state)"
 broadcast clearkey; sleep 1
 check_not "removing the key deletes the file" "groq.key" "$(in_app "ls no_backup")"
 

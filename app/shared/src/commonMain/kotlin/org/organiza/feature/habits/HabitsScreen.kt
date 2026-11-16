@@ -44,7 +44,7 @@ fun HabitsScreen(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit) {
         Action("Calendar", ButtonKind.SECONDARY) { open(Route.AGENDA) }
         Action("Import", ButtonKind.SECONDARY) { open(Route.IMPORT) }
     }
-    QuestsPanel(ui.rpg, actions)
+    QuestsPanel(ui.rpg, actions, open)
     Panel {
         PanelHeader("Last 30 days") { Txt("Today", Type.small, colors.data) }
         if (matrix.rows.isEmpty()) {

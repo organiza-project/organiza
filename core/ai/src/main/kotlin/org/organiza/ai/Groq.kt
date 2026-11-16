@@ -95,15 +95,19 @@ public class GroqEndpoint private constructor(baseUrl: String) {
     }
 }
 
-public enum class AiFailure {
-    NO_KEY,
-    INVALID_KEY,
-    RATE_LIMITED,
-    MODEL_UNAVAILABLE,
-    BAD_REQUEST,
-    SERVER,
-    OFFLINE,
-    MALFORMED,
+/** Why an AI call failed. Its text reads as the end of a sentence, so messages can say "failed: <text>". */
+public enum class AiFailure(private val text: String) {
+    NO_KEY("no Groq key is saved. Add one in Profile"),
+    INVALID_KEY("Groq refused the key. Check it in Profile, or make a new one at console.groq.com"),
+    RATE_LIMITED("Groq's free limit is used up for now. Try again in a minute"),
+    MODEL_UNAVAILABLE("the AI model is not available at the moment. Try again later"),
+    BAD_REQUEST("Groq could not take that request. Try shorter text"),
+    SERVER("Groq is having trouble. Try again in a few minutes"),
+    OFFLINE("there is no internet connection"),
+    MALFORMED("the AI's answer could not be read. Try again"),
+    ;
+
+    override fun toString(): String = text
 }
 
 public sealed interface AiResult<out T> {

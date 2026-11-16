@@ -70,6 +70,10 @@ class DevicesController(private val app: OrganizaCore) {
         return Duration.ofMinutes(usage.minutes(app.platform.appLabel(pkg), today()))
     }
 
+    /** What the last exchange did, in words, for the account panel; null before the first. */
+    @Volatile var lastResult: String? = null
+        private set
+
     /** How many other devices have reported today. */
     fun others(): Int = exchange?.second?.devices(today()) ?: 0
 
@@ -111,6 +115,7 @@ class DevicesController(private val app: OrganizaCore) {
             prefs.put(mapOf(POSTED to today.toString()))
             val received = usage.pull()
             prefs.put(mapOf(CURSOR to usage.cursor.toString()))
+            lastResult = "Last shared at ${java.time.LocalTime.now().toString().take(5)}"
             // Kept in the encrypted database, so Metrics can show every device's history (ADR-0031).
             if (received.isNotEmpty()) {
                 app.onStores {
@@ -123,9 +128,16 @@ class DevicesController(private val app: OrganizaCore) {
             app.requestUiRefresh()
         } catch (failure: IOException) {
             app.platform.log("device usage exchange failed: ${failure.javaClass.simpleName}")
+            fail("The backend could not be reached. Usage is kept and shared on the next try")
         } catch (failure: RuntimeException) {
             app.platform.log("device usage exchange failed: ${failure.javaClass.simpleName}")
+            fail("Sharing usage failed. Usage is kept and shared on the next try")
         }
+    }
+
+    private fun fail(text: String) {
+        lastResult = text
+        app.requestUiRefresh()
     }
 
     // Storage thread: the desktop reads its own focus log. [day] is read once, so minutes and their day agree at midnight.

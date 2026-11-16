@@ -33,6 +33,7 @@ data class AccountView(
     val busy: Boolean = false,
     val devicesLinked: Boolean = false,
     val otherDevices: Int = 0,
+    val deviceSync: String? = null,
 )
 
 enum class UsageSpan(val label: String) { DAY("Day"), WEEK("Week"), MONTH("Month"), RANGE("Range") }
