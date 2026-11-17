@@ -310,10 +310,10 @@ done
 check "control: the request log holds bodies" "focusMinutes" "$(sent | grep '^BODY')"
 echo garbage > "$FAKE_DIR/mode"
 broadcast aicopilot; sleep 3
-check "a malformed copilot reply is reported" "Copilot failed: MALFORMED" "$(debug_state)"
+check "a malformed copilot reply is reported" "Copilot failed: the AI's answer could not be read" "$(debug_state)"
 echo error > "$FAKE_DIR/mode"
 broadcast aicopilot; sleep 3
-check "a server error is reported" "Copilot failed: SERVER" "$(debug_state)"
+check "a server error is reported" "Copilot failed: Groq is having trouble" "$(debug_state)"
 echo "--- voice commands"
 echo grant > "$FAKE_DIR/mode"
 hear() { # transcript
@@ -365,7 +365,7 @@ check "the real recorder runs without crashing" "Voice" "$(debug_state)"
 
 kill "$fake_pid" 2>/dev/null; sleep 1
 broadcast aicopilot; sleep 4
-check "offline is reported" "Copilot failed: OFFLINE" "$(debug_state)"
+check "offline is reported" "Copilot failed: there is no internet connection" "$(debug_state)"
 session stop
 broadcast aiendpoint --es url http://10.0.2.2:18080
 kill_now; sleep 4
