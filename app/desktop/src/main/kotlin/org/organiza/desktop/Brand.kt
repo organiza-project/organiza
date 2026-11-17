@@ -34,6 +34,9 @@ object Brand {
     // shortcut: black suits GNOME's and most dark panels; a light KDE panel shows a black square, fixed only by a StatusNotifierItem tray.
     val trayMark: Painter = BrandPainter(ground = false, tray = true)
 
+    /** The mark in one light ink on a clear ground, as GNOME draws the icons of its top bar (AppIndicator). */
+    val symbolicMark: Painter = BrandPainter(ground = false, mono = true)
+
     /**
      * The icon drawn at each size the window manager may show it. Compose hands the window a single
      * picture, which Mutter and KWin scale to the dock, Alt+Tab and title bar sizes and blur.
@@ -49,7 +52,7 @@ object Brand {
 }
 
 // The 108-unit grid of the SVGs. The mark alone is drawn larger, on a 60-unit grid, as LogoMark does.
-private class BrandPainter(private val ground: Boolean, private val tray: Boolean = false) : Painter() {
+private class BrandPainter(private val ground: Boolean, private val tray: Boolean = false, private val mono: Boolean = tray) : Painter() {
     override val intrinsicSize: Size = Size(256f, 256f)
 
     override fun DrawScope.onDraw() {
@@ -66,6 +69,6 @@ private class BrandPainter(private val ground: Boolean, private val tray: Boolea
             size = Size(radius * 2, radius * 2),
             style = Stroke(width = 8.5f * unit, cap = StrokeCap.Round),
         )
-        drawCircle(if (tray) Color(0xFFF2F4F7) else Color(0xFF6EA2F2), radius = 5.75f * unit, center = center)
+        drawCircle(if (mono) Color(0xFFF2F4F7) else Color(0xFF6EA2F2), radius = 5.75f * unit, center = center)
     }
 }

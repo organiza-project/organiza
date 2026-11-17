@@ -1,5 +1,6 @@
 package org.organiza.desktop
 
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.unit.dp
@@ -45,8 +46,24 @@ fun main(args: Array<String>) {
         }
     }
     application {
-        val tray = platform.trayWanted && SystemTray.isSupported()
-        if (tray) {
+        // GNOME and other AppIndicator hosts draw the native menu; elsewhere the AWT tray stands in.
+        val native = platform.trayWanted && IndicatorTray.available
+        val tray = platform.trayWanted && (native || SystemTray.isSupported())
+        if (native) {
+            DisposableEffect(Unit) {
+                val indicator = IndicatorTray.start(platform.dataDir, { choice ->
+                    visible.value = true
+                    when (choice) {
+                        "copilot" -> request.value = Route.COPILOT to System.nanoTime()
+                        "quit" -> {
+                            listener.close()
+                            exitApplication()
+                        }
+                    }
+                }, platform::onMain)
+                onDispose { indicator?.close() }
+            }
+        } else if (tray) {
             OrganizaTray(
                 onOpen = { visible.value = true },
                 items = listOf(

@@ -90,7 +90,7 @@ class DesktopPlatform(
     override fun permissions(): Set<Permission> = buildSet {
         if (tracking) add(Permission.TRACKING)
         if (autostart.enabled()) add(Permission.AUTOSTART)
-        if (trayWanted && SystemTray.isSupported()) add(Permission.TRAY)
+        if (trayWanted && (IndicatorTray.available || SystemTray.isSupported())) add(Permission.TRAY)
         if (shortcut) add(Permission.SHORTCUT)
     }
 

@@ -210,7 +210,7 @@ class DesktopActions(core: OrganizaCore, private val app: DesktopApp, private va
             Permission.AUTOSTART -> platform.autostart.enable()
             Permission.TRAY -> {
                 platform.trayWanted = true
-                if (WINDOWS) "Closing the window now leaves Organiza in the notification area" else if (java.awt.SystemTray.isSupported()) "Closing the window now leaves Organiza in the top bar" else
+                if (WINDOWS) "Closing the window now leaves Organiza in the notification area" else if (IndicatorTray.available || java.awt.SystemTray.isSupported()) "Closing the window now leaves Organiza in the top bar" else
                     "Your desktop shows no top bar icons. On GNOME, turn on the AppIndicator extension"
             }
             Permission.SHORTCUT -> Shortcut.install().also { platform.shortcut = Shortcut.installed() }

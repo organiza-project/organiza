@@ -32,6 +32,13 @@ class BrandTest {
     }
 
     @Test
+    fun `the native tray mark is one light ink on a clear ground`() {
+        val mark = Brand.render(Brand.symbolicMark, 60)
+        assertEquals(0, mark.at(0.0, 0.0).alpha)
+        assertEquals(0xF2F4F7, mark.at(0.5, 0.5).rgb and 0xFFFFFF, "the dot is light, not blue")
+    }
+
+    @Test
     fun `the top bar mark is the open ring, light on a clear ground`() {
         val mark = Brand.render(Brand.mark, 22)
         assertEquals(0, mark.at(0.0, 0.0).alpha)

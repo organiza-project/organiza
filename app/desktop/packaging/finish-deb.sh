@@ -8,6 +8,9 @@ trap 'rm -rf "$work"' EXIT
 dpkg-deb -R "$deb" "$work"
 grep -q '^Homepage:' "$work/DEBIAN/control" ||
     sed -i '/^Description:/i Homepage: https://github.com/organiza-project/organiza' "$work/DEBIAN/control"
+# The native top bar menu (IndicatorTray); without them the plain AWT tray is used.
+grep -q '^Recommends:' "$work/DEBIAN/control" ||
+    sed -i '/^Description:/i Recommends: python3-gi, gir1.2-ayatanaappindicator3-0.1' "$work/DEBIAN/control"
 # GNOME then puts the window under the launcher's name and icon.
 desktop="$work/opt/organiza/lib/organiza-Organiza.desktop"
 grep -q '^StartupWMClass=' "$desktop" || echo 'StartupWMClass=organiza-Organiza' >> "$desktop"
