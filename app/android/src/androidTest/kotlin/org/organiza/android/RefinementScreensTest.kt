@@ -90,7 +90,8 @@ class RefinementScreensTest {
         show { CopilotScreen(UiSnapshot(chat = chat, pendingCommand = "Heard: Log 30 minutes of reading"), actions) {} }
         compose.onNodeWithText("I can do that.").assertExists()
         compose.onNodeWithText("Confirm").performClick()
-        compose.onNode(hasSetTextAction()).performTextInput("How do I focus?")
+        // The About me field comes first; the chat field is the second.
+        compose.onAllNodes(hasSetTextAction())[1].performTextInput("How do I focus?")
         compose.onNodeWithContentDescription("Send").performClick()
         assertEquals(listOf("confirmCommand", "sendChat How do I focus?"), actions.calls)
     }
