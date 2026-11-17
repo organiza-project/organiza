@@ -30,7 +30,7 @@ wall: a screen that says no until you find the toggle that says yes.
 | | A typical screen-time app | Organiza |
 |---|---|---|
 | **Where your usage lives** | Their servers, under their account | An encrypted database on your device (SQLCipher, AES-256), keyed by the system keystore |
-| **What leaves the device** | Usage, sites, habits, for their analytics | Nothing by default. Opt-in: sealed challenge results and sealed minutes for your own devices |
+| **What leaves the device** | Usage, sites, habits, for their analytics | Nothing by default. Opt-in: sealed minutes per app, readable only by your own devices |
 | **How a block feels** | A wall, or a button that skips it | The Stoic Pause: a breath, a reason, a phrase typed word by word, then a time limit you choose |
 | **Enforcement** | Often an overlay that is easy to dismiss | OS-level: the Android accessibility service and a local DNS filter; on the desktop the blocked app is frozen behind a full-screen pause |
 | **AI** | Their model, your data | Bring your own Groq key; prompts are scrubbed on the device first |
@@ -49,12 +49,11 @@ anywhere, it cannot be sold, leaked, subpoenaed from a vendor or used to train s
 - **No collector to switch off.** No analytics, crash-reporting or ad SDK is in any module or
   build type; the dependency list is in [`gradle/libs.versions.toml`](gradle/libs.versions.toml).
 - **Logs stay on the device** and never contain URLs, window titles or which apps you use.
-- **What may sync is fenced by tests.** Challenge results come only from the `challenge_log`
-  table, whose column allow-list a test enforces, and usage leaves only as sealed reports your own
-  devices can open ([ADR-0028](ADR.md)).
+- **Only sealed reports sync.** Usage leaves a device only as sealed, padded reports that your own
+  linked devices can open, and a test checks the backend sees no app names ([ADR-0028](ADR.md)).
 - **AI sees no names.** Prompts pass an on-device sanitizer, use your own key, and describe the
   hours you get distracted rather than the apps.
-- **No account by default.** Every feature but Arena, cross-device limits and the AI copilot works
+- **No account by default.** Every feature but sharing usage between devices and the AI copilot works
   offline, with no sign-up.
 
 Organiza never claims to be unbypassable: safe mode, revoking a permission or uninstalling all
@@ -79,10 +78,14 @@ when your mind was clear ([ADR-0005](ADR.md), [ADR-0016](ADR.md)).
   session. Limits can count all your devices: a two hour limit on Discord is two hours across your
   phone, laptop and PC ([ADR-0028](ADR.md)).
 - **Habits as a role-playing game.** Habits, dailies and to-dos earn experience and keep streaks.
-- **Arena.** Thirty day challenges with friends that share only signed, encrypted results, never
-  usage ([ADR-0011](ADR.md)).
-- **AI copilot on your key.** With a free Groq key, the copilot suggests weekly focus blocks and
-  habit tips, and turns a timetable photo or a spoken command into sessions. Your hardest hours are
+- **Notes.** A journal and reminders, typed or dictated, by day and subject. The AI reads a note
+  only when you ask it to organize that one note ([ADR-0030](ADR.md)).
+- **Screen time report.** Where your time went over a day, a week, a month or any range, by category
+  and app, from all your devices on any one of them ([ADR-0031](ADR.md)).
+- **Lockout.** Optional, and off unless you choose it: removing a limit, turning off a blocker or ending
+  a session early first asks you to type a short essay, letter by letter, no pasting ([ADR-0032](ADR.md)).
+- **AI copilot on your key.** A guide to organizing your life and reaching your goals, tailored by an
+  About me you write. With a free Groq key it suggests weekly focus blocks and habit tips, and turns a timetable photo or a spoken command into sessions. Your hardest hours are
   worked out on the device, with or without it ([ADR-0017](ADR.md)).
 
 ## Platform support
@@ -94,7 +97,9 @@ when your mind was clear ([ADR-0005](ADR.md), [ADR-0016](ADR.md)).
 | Limits across devices, end-to-end encrypted | ✓ | ✓ | ✓ |
 | Focus sessions, calendar import | ✓ | ✓ | ✓ |
 | Habits, quests and RPG progress | ✓ | ✓ | ✓ |
-| Arena challenges and account sync | ✓ | ✓ | ✓ |
+| Notes with reminders | ✓ | ✓ | ✓ |
+| Screen time by range and category, all devices | ✓ | ✓ | ✓ |
+| Lockout for loosening rules | ✓ | ✓ | ✓ |
 | AI copilot (bring your own Groq key) | ✓ | ✓ | ✓ |
 | Voice commands | ✓ | ✓ | ✓ |
 | Website blocking | ✓ <sup>2</sup> | | |
@@ -165,9 +170,9 @@ prompt passes an on-device sanitizer that replaces links, email addresses, phone
 names you mark as private before it is sent, and the copilot works from the hours you get
 distracted, never from which apps ([ADR-0009](ADR.md), [ADR-0017](ADR.md)).
 
-**Database (BYODB).** A backend is optional. It adds an account, Arena challenges and limits
-across devices, and it only ever holds accounts and padded ciphertext. Choose under **Profile** >
-**Where Arena syncs**:
+**Database (BYODB).** A backend is optional. It adds an account so your devices can share usage
+and limits, and it only ever holds accounts and padded ciphertext. Choose under **Profile** >
+**Account and sync**:
 
 - **This device only.** Nothing leaves the device.
 - **Organiza hosted.** Builds made with a hosted project baked in offer it.
@@ -186,7 +191,7 @@ are shared, and each platform adds a thin layer that talks to its OS ([ADR-0023]
 
 ```
 core/        Plain Kotlin, tested on the JVM: block engine, friction, scheduler, storage,
-             calendar, AI sanitizer and client, voice, Arena crypto, sync, screen models
+             calendar, AI sanitizer and client, voice, relay crypto, sync, screen models
 app/shared   Compose UI and the app core (OrganizaCore), shared by every platform
 app/android  Accessibility service, local DNS filter, device admin, Keystore, SQLCipher
 app/desktop  Focus sources (GNOME, Hyprland, Sway, X11, Windows), the process freezer,

@@ -1,7 +1,7 @@
 # Self-hosting the Organiza backend
 
-Organiza works fully offline. A backend adds an account, Arena challenges with friends, and daily
-limits that count all your devices. Whatever you choose, the backend only ever holds accounts and
+Organiza works fully offline. A backend adds an account, so your devices can share usage and daily
+limits count all of them. Whatever you choose, the backend only ever holds accounts and
 **encrypted, padded messages** it cannot read (ADR-0015, ADR-0028). This guide runs that backend
 on your own machine in about five minutes, with Docker or Portainer.
 
@@ -86,7 +86,7 @@ It should answer with GoTrue's name and version.
 
 ## 4. Connect the app
 
-On every device: **Profile** > **Where Arena syncs** (or the setup screens) > **My own Supabase**,
+On every device: **Profile** > **Account and sync** (or the setup screens) > **My own Supabase**,
 then enter the URL and the anon key that `make-keys.sh` printed. Create an account on the first
 device and sign in with it on the others.
 
@@ -112,7 +112,7 @@ reports: share it like a password, only with yourself.
 | It sees | It never sees |
 |---------|---------------|
 | Account emails and password hashes | Habits, sessions, apps, sites, calendar titles |
-| When a signed-in account sends or reads a message | Who is in which challenge, or how anyone is doing |
+| When a signed-in account sends or reads a message | Which apps you use, or for how long |
 | Opaque mailbox IDs and padded ciphertext | Usage minutes, app names, or how many apps a report holds |
 
 The schema and its guarantees are described in [`supabase-setup.md`](supabase-setup.md), which

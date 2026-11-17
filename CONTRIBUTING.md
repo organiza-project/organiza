@@ -8,7 +8,7 @@ Decisions and their reasons are in [`ADR.md`](ADR.md); read the ADRs for any are
 - **Privacy is not negotiable.** No telemetry, no analytics SDKs, no cloud dependency for
   blocking or scheduling. Usage, URLs, window titles and habits stay on the device. Anything that
   leaves the phone goes through the sanitizer (`core/ai/Sanitizer.kt`), or is encrypted end to end
-  (Arena).
+  (device usage reports, ADR-0028).
 - **Keys stay out of the repository.** Groq keys live in Android Keystore. Never commit
   `local.properties`, keystores or `.env` files.
 - **Tests first.** Write the failing test, watch it fail, then make it pass.
@@ -25,7 +25,7 @@ core/            Plain Kotlin, tested on the JVM (ADR-0002)
   calendar/      .ics parsing
   ai/            Groq client, prompts, sanitizer, distraction windows
   voice/         Voice commands
-  arena/         Challenges, encryption, relays
+  relay/         The blind relay port, SecretStore, sealed envelopes
   sync/          Auth and sync ports, Supabase implementations (ADR-0015)
   presentation/  Screen models: what each screen says and shows
   testing/       Hand-written fakes for the ports
@@ -34,7 +34,7 @@ app/android/     The Android app, grouped by feature (ADR-0014)
   feature/blocker     Accessibility service, pause screen, VPN, device admin
   feature/focus       Focus screen and session form
   feature/habits      Habits, voice and calendar
-  feature/arena       Challenges
+  feature/notes       Notes and reminders
   feature/vault       Settings
   feature/sync        Backend choice and account
   feature/ai          Copilot and AI key
@@ -87,8 +87,8 @@ Use the anon or publishable key only. The app refuses service-role and secret ke
 
 ## Self-hosting the backend
 
-The backend only stores accounts and encrypted messages: challenge results and the sealed
-device usage reports of ADR-0028. To run your own:
+The backend only stores accounts and encrypted messages: the sealed device usage reports of
+ADR-0028. To run your own:
 
 1. Create a Supabase project, or run the small Docker stack in `supabase/self-host`
    ([`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md)).

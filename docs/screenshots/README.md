@@ -19,7 +19,6 @@ by `scripts/seed-screens.sh`, with real interventions on reddit.com and x.com in
 | `12-habits.png` | Habits: 30-day matrix, voice commands and what is coming up |
 | `13-agenda.png` | Agenda: today on an hour grid with the running session |
 | `14-hub.png` | Distraction blocker hub: Reels and Shorts switches, apps and limits |
-| `15-arena.png` | Arena: podium, friend list with XP, streaks and nudges |
 | `16-metrics.png` | Metrics: focus this week, choices, copilot and protection |
 | `17-profile.png` | Profile: level, XP, badges, cloud sync and API switches |
 

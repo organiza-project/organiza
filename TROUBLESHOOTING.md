@@ -128,7 +128,7 @@ give the stack a domain (Caddy gets a certificate) or put it behind your reverse
 You pasted the `service_role` or a `sb_secret_` key. That key bypasses row-level security for
 every user, so Organiza refuses it. Use the anon or publishable key.
 
-### Sign-in works but challenges or shared limits do not sync
+### Sign-in works but shared usage does not sync
 
 The schema is missing or PostgREST has not seen it. Run `supabase/setup.sql` again (it is safe to
 repeat), then `docker restart organiza-rest-1`. Check that `curl https://your-address/auth/v1/health`

@@ -1,7 +1,7 @@
 # Setting up a Supabase backend
 
-Organiza works fully offline. A backend is for Arena challenges with friends and for daily limits
-that count all your devices: it holds accounts and encrypted, padded messages, and nothing else
+Organiza works fully offline. A backend lets your devices share usage, so daily limits
+count all of them: it holds accounts and encrypted, padded messages, and nothing else
 (ADR-0015, ADR-0028). These steps set up a project on supabase.com; to run the backend on your own
 machine with Docker or Portainer, see [SELF_HOSTING.md](SELF_HOSTING.md).
 
@@ -29,20 +29,19 @@ All three names should come back.
 
 | Object | Purpose |
 |--------|---------|
-| `arena_message` | Opaque ciphertext, one row per message, under a mailbox ID derived from the challenge secret |
+| `arena_message` | Opaque ciphertext, one row per message, under a mailbox ID derived from the device link code |
 | `arena_append(mailbox, data)` | Adds a message. Needs a signed-in user. At most 500 messages per user per day |
 | `arena_fetch(mailbox, after)` | Returns up to 200 messages after a cursor. Needs a signed-in user |
 | `delete_account()` | Deletes the caller's account and, by cascade, every message they sent (ADR-0020) |
 
 Row-level security is on for `arena_message`, with **no policies**, and every direct grant to `anon`
 and `authenticated` is revoked. Clients cannot list, read, change or delete rows. They can only
-call the three functions, and reading a mailbox needs its 64-character ID, which only invite holders
-can derive.
+call the three functions, and reading a mailbox needs its 64-character ID, which only your linked
+devices can derive.
 
-There are deliberately no `profiles`, `challenges` or membership tables. Display names, members and
-results live inside the encrypted messages, so the server never learns who is in which challenge or
-how anyone is doing. Tables like those would put that social graph on the server, which ADR-0011
-and ADR-0015 rule out.
+There are deliberately no `profiles`, device or usage tables. Device names, apps and minutes live
+inside the encrypted messages, so the server never learns which devices are yours or how you use
+them (ADR-0015, ADR-0028). The names keep their `arena_` prefix from an earlier feature (ADR-0029).
 
 ## 2. Configure authentication
 
@@ -83,25 +82,13 @@ key: it bypasses row-level security for every user, and the app refuses it.
 ## What the backend can see
 
 The account's email address, a password hash, mailbox IDs, message sizes and timing, and network
-addresses. It cannot see habits, sessions, blocked apps or sites, overrides, AI keys, or challenge
-results.
+addresses. It cannot see habits, sessions, blocked apps or sites, overrides, notes, AI keys, or
+usage.
 
-## Checking Arena sync end to end
+## Checking sync end to end
 
-`ArenaSyncE2ETest` (in `core/sync`) runs two phones through a one-day challenge over real HTTP: sign
-in, create, join, close the day, publish signed commitments, then reveal and confirm. `./gradlew test`
-always runs it against a local stand-in built from `supabase/migrations`. To run it against your own
-project, hosted or self-hosted, create two throwaway accounts and run:
-
-```bash
-ORGANIZA_E2E_SUPABASE_URL=https://YOUR-PROJECT.supabase.co \
-ORGANIZA_E2E_SUPABASE_KEY=YOUR_PUBLISHABLE_OR_ANON_KEY \
-ORGANIZA_E2E_ALICE='alice@example.org:a-long-password' \
-ORGANIZA_E2E_BOB='bob@example.org:another-long-password' \
-./gradlew :core:sync:test --tests '*ArenaSyncE2ETest*' --rerun
-```
-
-Add `ORGANIZA_E2E_SIGN_UP=1` to create the two accounts first; that works when email confirmation
-is off. Each run leaves a few padded ciphertext messages under a random mailbox; deleting the two
-accounts removes them.
+`DeviceUsageTest` (in `core/sync`) has two devices share their minutes through a local stand-in for
+Supabase built from `supabase/migrations`, over real HTTP; `./gradlew test` always runs it. To check
+your own project, sign in on two devices, turn on **Usage across devices** on one, paste its device
+code on the other, and open **Metrics** after a few minutes: both devices' time shows there.
 
