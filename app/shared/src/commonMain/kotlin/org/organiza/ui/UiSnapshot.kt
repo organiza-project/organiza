@@ -172,7 +172,6 @@ data class UiSnapshot(
     val voiceConsent: Boolean = false,
     val pendingCommand: String? = null,
     val message: String? = null,
-    val storageProblem: String? = null,
     val notes: NotesView = NotesView(),
     val usage: UsageView = UsageView(),
     val lockout: Boolean = false,

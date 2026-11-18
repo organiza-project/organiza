@@ -101,7 +101,7 @@ class OrganizaApp : Application(), Platform {
                 key.fill(0)
             }
         } catch (failure: StorageException) {
-            throw StorageUnavailable(failure.failure.name, failure)
+            throw StorageUnavailable(failure.failure.reason, failure)
         }
     }
 

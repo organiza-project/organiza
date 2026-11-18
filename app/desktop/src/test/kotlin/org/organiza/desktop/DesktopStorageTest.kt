@@ -81,7 +81,8 @@ class DesktopStorageTest {
         })
         core.requestUiRefresh()
         settle(core)
-        assertNotNull(core.uiState.value.storageProblem)
+        // Shown in the message panel every screen draws, not only in a field nothing reads.
+        assertEquals("Storage problem: python3 is needed to reach the keyring. Your data has not been deleted.", core.uiState.value.message)
     }
 
     @Test
@@ -93,11 +94,11 @@ class DesktopStorageTest {
             override fun get(name: String): ByteArray? = if (locked) null else keyring.get(name)
         })
         settle(core)
-        assertNotNull(core.uiState.value.storageProblem)
+        assertNotNull(core.uiState.value.message)
         locked = false
         core.requestReconcileNow()
         settle(core)
-        assertEquals(null, core.uiState.value.storageProblem)
+        assertEquals(null, core.uiState.value.message)
     }
 
     @Test

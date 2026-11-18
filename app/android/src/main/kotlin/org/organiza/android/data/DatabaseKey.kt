@@ -4,7 +4,12 @@ import android.content.Context
 import java.io.File
 import java.security.SecureRandom
 
-enum class StorageFailure { KEY_MISSING, KEY_UNREADABLE, DATABASE_UNREADABLE, DATABASE_TOO_NEW }
+enum class StorageFailure(val reason: String) {
+    KEY_MISSING("the database key is missing, so the database cannot be opened"),
+    KEY_UNREADABLE("the phone's keystore could not unlock the database key"),
+    DATABASE_UNREADABLE("the database could not be opened with its key"),
+    DATABASE_TOO_NEW("this data was saved by a newer version of Organiza. Update the app"),
+}
 
 class StorageException(val failure: StorageFailure, cause: Throwable? = null) : Exception(failure.name, cause)
 

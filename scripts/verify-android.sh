@@ -432,7 +432,7 @@ in_app "echo damaged > no_backup/database.key" >/dev/null
 kill_now
 shell am start -W -n "$APP/org.organiza.android.MainActivity" >/dev/null
 sleep 5
-check "the failure is reported" "storageFailure=KEY_UNREADABLE" "$(debug_state)"
+check "the failure is reported" "storageFailure=the phone's keystore could not unlock the database key" "$(debug_state)"
 check_eq "the database file is kept" "${before// /}" "$(in_app "wc -c < databases/organiza.db")"
 shell input keyevent KEYCODE_HOME >/dev/null
 

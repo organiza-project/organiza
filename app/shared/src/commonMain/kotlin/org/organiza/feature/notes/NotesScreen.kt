@@ -31,6 +31,7 @@ fun NotesScreen(ui: UiSnapshot, actions: Actions) {
     val notes = ui.notes
     val colors = Theme.colors
     TitleBlock("Notes", "Journal, thoughts and reminders. They stay on this device.")
+    MessagePanel(ui.message)
     Composer(notes, actions)
     if (notes.model.subjects.isNotEmpty()) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

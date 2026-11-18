@@ -474,6 +474,8 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
         }
     }
 
+    private fun storageProblem() = storageFailure?.let { "Storage problem: ${it.trimEnd('.')}. Your data has not been deleted." }
+
     private fun openStorage() {
         try {
             val db = platform.openDatabase()
@@ -547,8 +549,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
                 device = platform.device,
                 account = sync.view(),
                 hasApiKey = keySaved,
-                message = statusMessage,
-                storageProblem = storageFailure?.let { "Storage problem: $it. Your data has not been deleted." },
+                message = statusMessage ?: storageProblem(),
             )
         } else {
             val sessions = SessionState.entries.flatMap { active.sessions.inState(it) }
@@ -673,8 +674,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
                 hasApiKey = keySaved,
                 voiceConsent = voiceConsent,
                 pendingCommand = pendingCommand?.let { "Heard: " + it.describe() },
-                message = statusMessage,
-                storageProblem = storageFailure?.let { "Storage problem: $it. Your data has not been deleted." },
+                message = statusMessage ?: storageProblem(),
                 blockedApps = session.current.blockList.packages.map(::appLabel).sorted(),
                 blockedSites = session.current.blockList.domains.map { it.value }.sorted(),
                 stored = listOf(
@@ -911,7 +911,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     }
 
     companion object {
-        private const val DATABASE_TOO_NEW = "DATABASE_TOO_NEW"
+        private const val DATABASE_TOO_NEW = "this data was saved by a newer version of Organiza. Update the app"
         private const val PREFERENCES = "organiza"
         private const val VOICE_CONSENT = "voice_consent"
         private const val ONBOARDED = "onboarded"
