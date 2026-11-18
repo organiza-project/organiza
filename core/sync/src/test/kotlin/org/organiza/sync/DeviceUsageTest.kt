@@ -98,6 +98,22 @@ class DeviceUsageTest {
         }
     }
 
+    @Test
+    fun `the relay forgets a mailbox's messages after fifteen days`() {
+        LocalSupabase().use { backend ->
+            val config = BackendConfig.Supabase(BackendKind.SELF_HOSTED, backend.url, backend.anonKey)
+            val auth = SupabaseAuth(UrlConnectionTransport(), config, FakeSecretStore(), FakeClock(Instant.parse("2026-11-09T12:00:00Z")))
+            auth.signUp("me@example.org", "correct horse 1")
+            auth.signIn("me@example.org", "correct horse 1")
+            val phone = DeviceUsage(LINK, "phone", checkNotNull(SupabaseSync(UrlConnectionTransport(), config, auth).relay()))
+            phone.post(today.minusDays(16), mapOf("Discord" to 10))
+            backend.age(16)
+            phone.post(today, mapOf("Discord" to 20))
+            // Reports matter for two weeks at most; older ones would only grow the table and slow a new device's first read.
+            assertEquals(1, backend.messages().size)
+        }
+    }
+
     private companion object {
         val LINK = DeviceLink.create()
     }

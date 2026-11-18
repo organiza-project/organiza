@@ -56,6 +56,11 @@ class LocalSupabase : AutoCloseable {
 
     fun userId(email: String): UUID? = users[email]?.id
 
+    /** Makes every stored message [days] older, as if it had been sent that long ago. */
+    fun age(days: Int) = postgres.postgresDatabase.connection.use { db ->
+        db.createStatement().use { it.execute("update public.arena_message set created_at = created_at - interval '$days days'") }
+    }
+
     override fun close() {
         server.stop(0)
         postgres.close()

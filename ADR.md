@@ -1399,3 +1399,23 @@ without Organiza reading their journal or usage on its own.
 ### Consequences
 Advice can be personal without any automatic sharing. What the copilot knows is exactly what the person
 wrote, and they can read and change it in one place.
+
+## ADR-0034: The relay forgets messages after fifteen days
+
+### Status
+Accepted, 2026-11-18. Amends ADR-0015 and ADR-0028.
+
+### Context
+Each linked device posts a sealed report every twenty minutes, about 40 MB a year per device, and
+the relay kept every message forever. A hosted free project would fill within a year, and a newly
+linked device read the whole mailbox history before it showed anything.
+
+### Decision
+- `arena_append` first deletes its own mailbox's messages older than fifteen days, then appends.
+  Reports matter for fourteen days at most: the backfill after linking, then each finished day.
+- The deletion runs in the same call, so no scheduler or extension is needed and self-hosted
+  projects behave like the hosted one.
+
+### Consequences
+A mailbox holds at most about two weeks of messages. A device offline for longer than that misses
+the oldest reports, which only means older days of other devices are missing from its Metrics.
