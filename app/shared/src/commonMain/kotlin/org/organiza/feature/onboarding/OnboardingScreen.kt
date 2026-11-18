@@ -86,7 +86,7 @@ private fun Welcome() {
     Panel {
         Point("Local first", "Sessions, habits and what you block live encrypted on this device. It all works with no account and no network.")
         Rule()
-        Point("Private by design", "No tracking and no analytics. App names, websites and calendar titles never leave this device.")
+        Point("Private by design", "No tracking and no analytics. Websites and calendar titles never leave this device; app time goes only to your own devices, sealed, if you turn that on.")
         Rule()
         Point(
             "Mindful friction",

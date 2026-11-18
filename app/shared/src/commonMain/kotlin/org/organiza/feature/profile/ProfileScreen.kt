@@ -111,7 +111,7 @@ private fun VaultPanels(ui: UiSnapshot, actions: Actions) {
         PanelHeader("On this device")
         ui.stored.forEach { (label, value) -> KeyValue(label, value) }
         Rule()
-        Txt("Encrypted with a key held by the system keystore. App names, websites and calendar titles never leave this device.", Type.small, colors.muted)
+        Txt("Encrypted with a key held by the system keystore. Websites and calendar titles never leave this device; app time goes only to your own devices, sealed, if you turn that on.", Type.small, colors.muted)
     }
     Panel {
         PanelHeader("Voice")
