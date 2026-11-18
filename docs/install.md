@@ -5,7 +5,7 @@ without uninstalling:
 
 | File | Built with | Use it to |
 |------|------------|-----------|
-| `dist/organiza-release.apk` | `./gradlew :app:android:dogfoodApks` | Dogfood: minified with R8, about 40 MB |
+| `dist/organiza-dogfood.apk` | `./gradlew :app:android:dogfoodApks` | Dogfood: minified with R8, about 40 MB |
 | `dist/organiza-debug.apk` | the same task | Rule out R8: not minified, debuggable, about 50 MB |
 
 Both need Android 8.0 (API 26) or later and contain native code for `arm64-v8a`, `armeabi-v7a`,
@@ -13,6 +13,11 @@ Both need Android 8.0 (API 26) or later and contain native code for `arm64-v8a`,
 checked-in dogfood key, `app/android/debug.keystore`, with v1, v2 and v3 signatures, so a build
 from any machine or CI updates the one on your phone. An Organiza installed before November 2026
 was signed with a different key: uninstall it once.
+
+The dogfood key is public, so never hand these APKs to anyone else. The published APK,
+`dist/organiza-release.apk`, comes from `./gradlew :app:android:releaseApk` with your own release key
+(CONTRIBUTING.md). Moving a phone from a dogfood build to it needs one uninstall, which erases the
+phone's Organiza data.
 
 ## Install over USB
 
@@ -24,7 +29,7 @@ adb devices
 ```
 
 ```bash
-adb install -r -d dist/organiza-release.apk
+adb install -r -d dist/organiza-dogfood.apk
 ```
 
 `-r` replaces an installed copy and `-d` allows a lower version code. If it fails, adb prints the

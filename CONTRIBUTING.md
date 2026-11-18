@@ -61,11 +61,21 @@ export JAVA_HOME=/path/to/jdk-17
 
 ### Release signing
 
-Debug and release builds are signed with the checked-in dogfood key, `app/android/debug.keystore`.
-It is a test key: never publish to a store with it. `./gradlew :app:android:dogfoodApks` writes
-both APKs to `dist/` with v1, v2 and v3 signatures. A real release key is used instead when these
-properties are set, for example in
-`~/.gradle/gradle.properties` (never in the repository):
+Debug and dogfood builds are signed with the checked-in key, `app/android/debug.keystore`. It is
+public: anything signed with it could replace an installed Organiza and read its data, so never
+publish with it. `./gradlew :app:android:dogfoodApks` writes `dist/organiza-debug.apk` and
+`dist/organiza-dogfood.apk` with v1, v2 and v3 signatures.
+
+The APK to publish comes from `./gradlew :app:android:releaseApk`, which writes
+`dist/organiza-release.apk` signed with your own release key and stops when none is set. Make the
+key once and keep it, and a backup, outside the repository; every later version must be signed with
+it, or phones refuse the update:
+
+```bash
+keytool -genkeypair -keystore ~/organiza-release.jks -alias organiza -keyalg RSA -keysize 4096 -validity 10000
+```
+
+Then set these properties, for example in `~/.gradle/gradle.properties` (never in the repository):
 
 ```properties
 organiza.release.storeFile=/path/to/release.jks

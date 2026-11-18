@@ -3,6 +3,9 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// A release key is read from properties kept outside the repository (CONTRIBUTING.md).
+val releaseStore: String? = providers.gradleProperty("organiza.release.storeFile").orNull
+
 android {
     namespace = "org.organiza.android"
     compileSdk = 36
@@ -20,8 +23,6 @@ android {
         buildConfigField("String", "SUPABASE_ANON_KEY", quoted(providers.gradleProperty("organiza.supabaseAnonKey").orNull))
     }
 
-    // A release key is read from properties kept outside the repository (CONTRIBUTING.md).
-    val releaseStore = providers.gradleProperty("organiza.release.storeFile").orNull
     signingConfigs {
         // The dogfood key is checked in, so every machine and CI signs alike and builds update each
         // other in place. It is a test key: never publish to a store with it (ADR-0014).
@@ -53,7 +54,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Without a release key, dogfood builds are signed with the debug key (ADR-0014).
+            // Without a release key this is the dogfood build; releaseApk refuses to publish it (ADR-0014).
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
@@ -79,11 +80,12 @@ composeCompiler {
 // out v1 signing at this minSdk and some vendor installers still look for it (docs/install.md).
 val buildTools: String = androidComponents.sdkComponents.sdkDirectory.get().asFile.resolve("build-tools")
     .listFiles().orEmpty().filter { it.isDirectory }.maxByOrNull { it.name }?.absolutePath.orEmpty()
-val dogfoodSigned = listOf("debug", "release").map { variant ->
+// The dogfood release is named for what it is, so it is never mistaken for the published one.
+val dogfoodSigned = listOf("debug" to "debug", "release" to "dogfood").map { (variant, name) ->
     tasks.register<Exec>("dogfood${variant.replaceFirstChar(Char::uppercase)}Apk") {
         dependsOn("assemble${variant.replaceFirstChar(Char::uppercase)}")
         val input = layout.buildDirectory.file("outputs/apk/$variant/android-$variant.apk")
-        val output = rootProject.layout.projectDirectory.file("dist/organiza-$variant.apk")
+        val output = rootProject.layout.projectDirectory.file("dist/organiza-$name.apk")
         inputs.file(input)
         outputs.file(output)
         doFirst { output.asFile.parentFile.mkdirs() }
@@ -98,6 +100,31 @@ val dogfoodSigned = listOf("debug", "release").map { variant ->
     }
 }
 tasks.register("dogfoodApks") { dependsOn(dogfoodSigned) }
+
+// The APK to publish, signed with the person's own release key. The checked-in key is public, so
+// anything signed with it could replace an installed Organiza and read its data (ADR-0014).
+tasks.register<Exec>("releaseApk") {
+    dependsOn("assembleRelease")
+    val input = layout.buildDirectory.file("outputs/apk/release/android-release.apk")
+    val output = rootProject.layout.projectDirectory.file("dist/organiza-release.apk")
+    inputs.file(input)
+    outputs.file(output)
+    doFirst {
+        checkNotNull(releaseStore) { "Set organiza.release.storeFile and its passwords in ~/.gradle/gradle.properties (CONTRIBUTING.md)" }
+        output.asFile.parentFile.mkdirs()
+    }
+    // Passwords go through the environment, not the command line other processes can read.
+    environment("ORGANIZA_STORE_PASS", providers.gradleProperty("organiza.release.storePassword").orNull.orEmpty())
+    environment("ORGANIZA_KEY_PASS", providers.gradleProperty("organiza.release.keyPassword").orNull.orEmpty())
+    commandLine(
+        "$buildTools/apksigner", "sign",
+        "--ks", releaseStore?.let { file(it).absolutePath }.orEmpty(), "--ks-pass", "env:ORGANIZA_STORE_PASS",
+        "--ks-key-alias", providers.gradleProperty("organiza.release.keyAlias").orNull.orEmpty(), "--key-pass", "env:ORGANIZA_KEY_PASS",
+        "--v1-signing-enabled", "true", "--v2-signing-enabled", "true", "--v3-signing-enabled", "true",
+        "--min-sdk-version", "24",
+        "--out", output.asFile.absolutePath, input.get().asFile.absolutePath,
+    )
+}
 
 fun quoted(value: String?): String = "\"" + value.orEmpty().replace("\\", "").replace("\"", "") + "\""
 
