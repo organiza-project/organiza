@@ -55,15 +55,27 @@ object Reminders {
         val allowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         if (!allowed) return
+        manager.notify(id.hashCode(), notification(context, name, id))
+    }
+
+    /** The reminder; on a locked screen only a plain line shows, never the note or the habit's name. */
+    internal fun notification(context: Context, name: String, id: String): android.app.Notification {
         val open = PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-        val notification = android.app.Notification.Builder(context, CHANNEL)
+        val text = if (id.startsWith(NOTE)) "A reminder from your notes" else "Time for this habit. Mark it done in Organiza."
+        val locked = android.app.Notification.Builder(context, CHANNEL)
+            .setSmallIcon(R.drawable.ic_launcher_monochrome)
+            .setContentTitle("Organiza")
+            .setContentText(text)
+            .build()
+        return android.app.Notification.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setContentTitle(name)
-            .setContentText(if (id.startsWith(NOTE)) "A reminder from your notes" else "Time for this habit. Mark it done in Organiza.")
+            .setContentText(text)
+            .setVisibility(android.app.Notification.VISIBILITY_PRIVATE)
+            .setPublicVersion(locked)
             .setContentIntent(open)
             .setAutoCancel(true)
             .build()
-        manager.notify(id.hashCode(), notification)
     }
 
     internal fun readId(intent: Intent): String = intent.getStringExtra(EXTRA_ID).orEmpty()
