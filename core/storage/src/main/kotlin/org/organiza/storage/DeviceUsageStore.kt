@@ -4,7 +4,10 @@ import java.time.LocalDate
 
 public data class DeviceAppMinutes(val app: String, val category: String, val minutes: Long)
 
-/** Other devices' daily minutes per app (ADR-0031). Each report replaces its device's whole day. */
+/**
+ * Daily minutes per app (ADR-0031): other devices' reports, and this device's own finished days under
+ * [SELF], kept because Android forgets app usage after about a week. Each put replaces that device's day.
+ */
 public class DeviceUsageStore(private val db: Database) {
     public fun put(device: String, day: LocalDate, apps: List<DeviceAppMinutes>) {
         db.transaction {
@@ -13,10 +16,16 @@ public class DeviceUsageStore(private val db: Database) {
         }
     }
 
-    /** Every device's minutes from [from] to [to], by day. */
-    public fun between(from: LocalDate, to: LocalDate): Map<LocalDate, List<DeviceAppMinutes>> = db.query(
-        "SELECT day, app, category, minutes FROM device_usage WHERE day BETWEEN ? AND ? ORDER BY day DESC, minutes DESC, app",
-        listOf(from.toString(), to.toString()),
+    /** Minutes from [from] to [to], by day: the other devices', or with [mine] this device's own. */
+    public fun between(from: LocalDate, to: LocalDate, mine: Boolean = false): Map<LocalDate, List<DeviceAppMinutes>> = db.query(
+        "SELECT day, app, category, minutes FROM device_usage WHERE day BETWEEN ? AND ? AND (device = ?) = ? " +
+            "ORDER BY day DESC, minutes DESC, app",
+        listOf(from.toString(), to.toString(), SELF, if (mine) 1L else 0L),
     ) { row -> LocalDate.parse(row.string(0)) to DeviceAppMinutes(row.string(1).orEmpty(), row.string(2).orEmpty(), row.long(3) ?: 0) }
         .groupBy({ it.first }, { it.second })
+
+    public companion object {
+        /** The device name of this device's own rows; reports carry random or hashed ids, never this. */
+        public const val SELF: String = "this-device"
+    }
 }

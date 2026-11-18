@@ -59,6 +59,9 @@ interface Platform {
     /** This app's own package, which never counts as screen time. */
     val selfPackage: String
 
+    /** A value that survives reinstalling Organiza on this machine, or null. Only ever used hashed. */
+    val machineId: String? get() = null
+
     /** The hosted Supabase project of this build, or blanks when it has none. */
     val hostedUrl: String
     val hostedKey: String

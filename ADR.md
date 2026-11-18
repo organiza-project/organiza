@@ -1420,3 +1420,28 @@ linked device read the whole mailbox history before it showed anything.
 ### Consequences
 A mailbox holds at most about two weeks of messages. A device offline for longer than that misses
 the oldest reports, which only means older days of other devices are missing from its Metrics.
+
+## ADR-0035: This device keeps its own days, and reports carry a stable device id
+
+### Status
+Accepted, 2026-11-18. Amends ADR-0028 and ADR-0031.
+
+### Context
+Android keeps app usage events for about a week, so a Month or longer range showed nothing for the
+phone's own earlier days. Each device named itself in reports with a random id kept in app settings,
+so a reinstall looked like a new device: its old reports counted again, against limits and in
+Metrics. A device that was offline for days posted only yesterday and today when it came back.
+
+### Decision
+- Each new Metrics report first keeps the last six finished days the OS still knows in `device_usage`,
+  under the reserved device name `this-device`, grouped by app name. Finished days older than
+  yesterday are read from there when present; today and yesterday are always read live.
+- Reports name the device by SHA-256 of a machine value: `ANDROID_ID` on Android, which survives
+  reinstalls for the same signing key, and `/etc/machine-id` on Linux. Windows keeps the random id.
+  The hash appears only inside sealed reports.
+- After a gap, a device posts every day since its last post, up to fourteen, using its kept days.
+
+### Consequences
+Month and Range show the phone's own history from the day this version runs. A reinstall keeps its
+device id. Devices updating from the random id count their old id as another device until the relay
+forgets those reports (ADR-0034) or the day ends.

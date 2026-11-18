@@ -23,4 +23,12 @@ class DeviceUsageStoreTest {
             store.between(day.minusDays(6), day),
         )
     }
+
+    @Test
+    fun `this device's own days are kept apart from the other devices'`() {
+        store.put(DeviceUsageStore.SELF, day, listOf(DeviceAppMinutes("Chess", "Games", 20)))
+        store.put("laptop", day, listOf(DeviceAppMinutes("Discord", "Communication", 30)))
+        assertEquals(mapOf(day to listOf(DeviceAppMinutes("Chess", "Games", 20))), store.between(day, day, mine = true))
+        assertEquals(mapOf(day to listOf(DeviceAppMinutes("Discord", "Communication", 30))), store.between(day, day))
+    }
 }

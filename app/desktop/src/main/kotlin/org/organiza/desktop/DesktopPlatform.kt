@@ -45,6 +45,8 @@ class DesktopPlatform(
     override val device: Device = Device.DESKTOP
     override val debug: Boolean = System.getProperty("organiza.debug") == "true"
     override val selfPackage: String = SELF.value
+    // shortcut: Windows has none here, so a reinstall there gets a new device id; read MachineGuid if that matters.
+    override val machineId: String? by lazy { runCatching { Path.of("/etc/machine-id").toFile().readText().trim() }.getOrNull()?.ifEmpty { null } }
     // Baked in by a hosted build (build.gradle.kts); empty, people choose local only or their own Supabase.
     override val hostedUrl: String = System.getProperty("organiza.supabaseUrl").orEmpty()
     override val hostedKey: String = System.getProperty("organiza.supabaseAnonKey").orEmpty()

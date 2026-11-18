@@ -7,6 +7,8 @@ import org.organiza.app.OrganizaCore
 import org.organiza.presentation.AppMinutes
 import org.organiza.presentation.Format
 import org.organiza.presentation.UsageReport
+import org.organiza.storage.DeviceAppMinutes
+import org.organiza.storage.DeviceUsageStore
 import org.organiza.ui.UsageSpan
 import org.organiza.ui.UsageView
 
@@ -50,24 +52,50 @@ class UsageController(private val app: OrganizaCore) {
         val key = "$first $last ${allDevices && linked}"
         val now = System.nanoTime()
         val report = cached?.takeIf { it.first == key && now - it.second < CACHE_NS }?.third
-            ?: build(stores, first, last, today, zone, allDevices && linked).also { cached = Triple(key, now, it) }
+            ?: build(stores, first, last, today, zone, allDevices && linked).also { keep(stores, today, zone); cached = Triple(key, now, it) }
         return UsageView(report, span, Format.dayMonth(first), Format.dayMonth(last), allDevices, linked, last < today)
     }
 
     private fun build(stores: OrganizaCore.Storage, first: LocalDate, last: LocalDate, today: LocalDate, zone: ZoneId, others: Boolean): UsageReport {
-        val usage = app.platform.usage
-        val categories = app.platform.launchable().associate { it.pkg to it.category }
-        val days = (0..ChronoUnit.DAYS.between(first, last)).map { first.plusDays(it) }.associateWith { day ->
-            if (!usage.permitted()) emptyList() else {
-                val start = day.atStartOfDay(zone).toInstant()
-                usage.perApp(start, minOf(day.plusDays(1).atStartOfDay(zone).toInstant(), app.clock.now()).coerceAtLeast(start))
-                    .filterKeys { it.value != app.platform.selfPackage }
-                    .map { (pkg, time) -> AppMinutes(app.platform.appLabel(pkg), categories[pkg.value] ?: "Other", time.toMinutes()) }
-            }
-        }
+        val saved = stores.deviceUsage.between(first, last, mine = true)
         val remote = if (others) stores.deviceUsage.between(first, last) else emptyMap()
-        val merged = days.mapValues { (day, local) -> local + remote[day].orEmpty().map { AppMinutes(it.app, it.category, it.minutes) } }
-        return UsageReport.build(merged, first, last, today)
+        val days = (0..ChronoUnit.DAYS.between(first, last)).map { first.plusDays(it) }.associateWith { day ->
+            (mine(day, today, zone, saved) + remote[day].orEmpty()).map { AppMinutes(it.app, it.category, it.minutes) }
+        }
+        return UsageReport.build(days, first, last, today)
+    }
+
+    /**
+     * Storage thread. This device's minutes per app name on [day]: the kept count for a finished day,
+     * since Android forgets app usage after about a week, otherwise what the OS still knows.
+     */
+    fun mine(day: LocalDate, today: LocalDate, zone: ZoneId, saved: Map<LocalDate, List<DeviceAppMinutes>>): List<DeviceAppMinutes> =
+        saved[day]?.takeIf { day < today.minusDays(1) } ?: live(day, zone)
+
+    private fun live(day: LocalDate, zone: ZoneId): List<DeviceAppMinutes> {
+        val usage = app.platform.usage
+        if (!usage.permitted()) return emptyList()
+        val categories = app.platform.launchable().associate { it.pkg to it.category }
+        val start = day.atStartOfDay(zone).toInstant()
+        val end = minOf(maxOf(app.clock.now(), start), day.plusDays(1).atStartOfDay(zone).toInstant())
+        // By name, so two packages one app ships under count as that app.
+        return usage.perApp(start, end)
+            .filterKeys { it.value != app.platform.selfPackage }
+            .entries.groupBy({ app.platform.appLabel(it.key) to (categories[it.key.value] ?: OTHER) }, { it.value.toMinutes() })
+            .map { (key, minutes) -> DeviceAppMinutes(key.first, key.second, minutes.sum()) }
+            .filter { it.minutes > 0 }
+    }
+
+    /**
+     * Storage thread, with each new report. Keeps the finished days the OS still knows, before it forgets them.
+     * shortcut: a missing day with no usage is asked again each time, at most six reads a minute; mark empty days if that shows up.
+     */
+    private fun keep(stores: OrganizaCore.Storage, today: LocalDate, zone: ZoneId) {
+        if (!app.platform.usage.permitted()) return
+        val saved = stores.deviceUsage.between(today.minusDays(KEEP_DAYS), today.minusDays(1), mine = true)
+        (1..KEEP_DAYS).map(today::minusDays).filter { it !in saved }.forEach { day ->
+            live(day, zone).takeIf { it.isNotEmpty() }?.let { stores.deviceUsage.put(DeviceUsageStore.SELF, day, it) }
+        }
     }
 
     private fun rangeOf(today: LocalDate): Pair<LocalDate, LocalDate> {
@@ -93,5 +121,7 @@ class UsageController(private val app: OrganizaCore) {
 
     private companion object {
         const val CACHE_NS = 60_000_000_000L
+        const val KEEP_DAYS = 6L
+        const val OTHER = "Other"
     }
 }

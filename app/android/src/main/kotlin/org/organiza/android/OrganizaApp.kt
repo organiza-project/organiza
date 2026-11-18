@@ -55,6 +55,8 @@ class OrganizaApp : Application(), Platform {
     override val device: Device = Device.PHONE
     override val debug: Boolean get() = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
     override val selfPackage: String get() = packageName
+    // Kept across reinstalls for the same signing key, and different for every app, so it names no one.
+    override val machineId: String? get() = android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID)
     override val hostedUrl: String = BuildConfig.SUPABASE_URL
     override val hostedKey: String = BuildConfig.SUPABASE_ANON_KEY
     override val usage by lazy { AndroidUsageHistory(this) }

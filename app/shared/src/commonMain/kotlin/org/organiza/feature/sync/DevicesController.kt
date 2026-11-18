@@ -23,8 +23,12 @@ class DevicesController(private val app: OrganizaCore) {
     private val secrets = app.platform.secrets
     private val network = Executors.newSingleThreadScheduledExecutor { Thread(it, "organiza-devices").apply { isDaemon = true } }
 
-    /** A random name for this device inside the sealed reports; it never leaves them. */
-    private val device: String = prefs.string(DEVICE) ?: UUID.randomUUID().toString().also { prefs.put(mapOf(DEVICE to it)) }
+    /**
+     * This device's name inside the sealed reports; it never leaves them. Taken from the machine, hashed, so a
+     * reinstall keeps it and the old reports are not counted as another device; random where there is none.
+     */
+    val deviceId: String = app.platform.machineId?.let(::hashed)
+        ?: prefs.string(DEVICE) ?: UUID.randomUUID().toString().also { prefs.put(mapOf(DEVICE to it)) }
 
     // Read from the keyring once: on Linux each read starts a helper process, and screens ask often.
     @Volatile private var current: DeviceLink? = null
@@ -94,17 +98,17 @@ class DevicesController(private val app: OrganizaCore) {
         }
         val key = backend.sync.backend.toString() + link.mailboxId
         val usage = exchange?.takeIf { it.first == key }?.second
-            ?: DeviceUsage(link, device, relay, prefs.string(CURSOR)?.toLongOrNull() ?: 0).also { exchange = key to it }
+            ?: DeviceUsage(link, deviceId, relay, prefs.string(CURSOR)?.toLongOrNull() ?: 0).also { exchange = key to it }
         // Usage is read where storage lives, then sent from here.
         app.onStores { stores ->
             val today = today()
-            // Right after linking, two weeks of history go out once; each new day, yesterday's final count.
-            val days = when {
-                prefs.string(POSTED) == null -> (0L until BACKFILL_DAYS).map { today.minusDays(it) }
-                prefs.string(POSTED) != today.toString() -> listOf(today.minusDays(1), today)
-                else -> listOf(today)
-            }
-            val reports = days.associateWith { byName(it) }.filterValues { it.isNotEmpty() }
+            // Right after linking, two weeks of history go out once; later, every day since the last post,
+            // so days spent offline are filled in too, the last one with its final count.
+            val posted = prefs.string(POSTED)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            val since = maxOf(posted ?: LocalDate.MIN, today.minusDays(BACKFILL_DAYS - 1))
+            val days = generateSequence(today) { it.minusDays(1) }.takeWhile { !it.isBefore(since) }.toList()
+            val saved = stores.deviceUsage.between(since, today, mine = true)
+            val reports = days.associateWith { app.usageReport.mine(it, today, ZoneId.systemDefault(), saved) }.filterValues { it.isNotEmpty() }
             network.execute { trade(usage, today, reports, stores) }
         }
     }
@@ -140,21 +144,6 @@ class DevicesController(private val app: OrganizaCore) {
         app.requestUiRefresh()
     }
 
-    // Storage thread: the desktop reads its own focus log. [day] is read once, so minutes and their day agree at midnight.
-    private fun byName(day: LocalDate): List<DeviceAppMinutes> {
-        val usage = app.platform.usage
-        if (!usage.permitted()) return emptyList()
-        val zone = ZoneId.systemDefault()
-        val start = day.atStartOfDay(zone).toInstant()
-        val end = minOf(maxOf(app.clock.now(), start), day.plusDays(1).atStartOfDay(zone).toInstant())
-        val categories = app.platform.launchable().associate { it.pkg to it.category }
-        return usage.perApp(start, end)
-            .filterKeys { it.value != app.platform.selfPackage }
-            .entries.groupBy({ app.platform.appLabel(it.key) to (categories[it.key.value] ?: OTHER) }, { it.value.toMinutes() })
-            .map { (key, minutes) -> DeviceAppMinutes(key.first, key.second, minutes.sum()) }
-            .filter { it.minutes > 0 }
-    }
-
     private fun link(): DeviceLink? {
         if (!loaded) {
             // A keyring that cannot be reached means not linked for now; storage reports that problem itself.
@@ -163,6 +152,9 @@ class DevicesController(private val app: OrganizaCore) {
         }
         return current
     }
+
+    private fun hashed(raw: String): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest("organiza-device:$raw".toByteArray()).joinToString("") { "%02x".format(it) }.take(32)
 
     private fun today(): LocalDate = app.clock.now().atZone(ZoneId.systemDefault()).toLocalDate()
 

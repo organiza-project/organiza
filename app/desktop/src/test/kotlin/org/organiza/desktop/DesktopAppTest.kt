@@ -117,6 +117,46 @@ class DesktopAppTest {
     }
 
     @Test
+    fun `metrics keeps this computer's finished days, so they still show once the log forgets them`() {
+        core.onboarded = true
+        val zone = java.time.ZoneId.systemDefault()
+        val day = java.time.LocalDate.now(zone).minusDays(3)
+        val start = day.atTime(10, 0).atZone(zone).toInstant()
+        val chrome = checkNotNull(LinuxApps.packageName("google-chrome"))
+        fun <T> stored(read: (OrganizaCore.Storage) -> T): T {
+            val result = java.util.concurrent.atomic.AtomicReference<T>()
+            val done = java.util.concurrent.CountDownLatch(1)
+            core.onStores { result.set(read(it)); done.countDown() }
+            done.await(5, java.util.concurrent.TimeUnit.SECONDS)
+            return result.get()
+        }
+        stored { org.organiza.storage.FocusLog(it.db).apply { record(start, chrome); record(start.plusSeconds(30 * 60), null) } }
+        platform.tracking = true
+        // A new range is a new report, and each new report keeps the finished days.
+        actions.setUsageSpan(org.organiza.ui.UsageSpan.DAY)
+        fun kept(): Boolean = stored { it.deviceUsage.between(day, day, mine = true).isNotEmpty() }
+        eventually("the day is kept") { kept() }
+        // Android forgets app usage after about a week; an empty log stands in for that here.
+        core.onStores { it.db.execute("DELETE FROM focus_change") }
+        actions.setUsageSpan(org.organiza.ui.UsageSpan.DAY)
+        actions.setUsageSpan(org.organiza.ui.UsageSpan.WEEK)
+        eventually("the week still counts it") { core.uiState.value.usage.report.total == "30m" }
+    }
+
+    @Test
+    fun `a reinstalled computer keeps its device id, so its old reports are not counted as another device`() {
+        val again = Files.createTempDirectory("organiza-home")
+        val fresh = DesktopPlatform(
+            keyring = FakeSecretStore(),
+            apps = emptyList(),
+            env = mapOf("HOME" to again.toString(), "XDG_DATA_HOME" to "$again/data", "XDG_CONFIG_HOME" to "$again/config"),
+            database = again.resolve("data/organiza/organiza.db"),
+            autostart = SystemdAutostart(again.resolve("config")),
+        )
+        assertEquals(core.devices.deviceId, OrganizaCore(fresh).devices.deviceId)
+    }
+
+    @Test
     fun `a focus session starts on the desktop and home shows it running`() = runComposeUiTest {
         core.onboarded = true
         actions.setFocusApp("linux.google_chrome", true)
