@@ -1368,8 +1368,9 @@ turned off in two taps, which is exactly what an urge does.
 ### Decision
 - A **Lockout** setting, off by default, is offered in onboarding and in Profile.
 - With it on, a change that loosens a rule waits: removing or raising a daily limit, taking an app or
-  site off the focus list, turning a short video blocker off, deleting a focus block, ending a session
-  early, and turning the lockout itself off. Tightening stays instant.
+  site off the focus list, turning a short video blocker off, deleting, moving or shortening a focus
+  block, ending a session early, cancelling one by voice or through the copilot, unlinking devices, and
+  turning the lockout itself off. Tightening stays instant.
 - The change runs only after the person types an original essay of about 90 words, letter by letter.
   `Lockout.accept` keeps an edit only when it adds the next right letter or deletes, so a paste or a
   wrong letter changes nothing. The typed text is never stored.

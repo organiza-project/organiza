@@ -18,6 +18,7 @@ import org.organiza.domain.Parsed
 import org.organiza.ui.Actions
 import org.organiza.ui.UsageSpan
 import org.organiza.ui.CalendarMode
+import org.organiza.voice.VoiceCommand
 
 /** Audio held in memory while a talk button is down (ADR-0010). */
 interface Recorder {
@@ -101,7 +102,7 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
 
     override fun linkDevices(code: String) = core.devices.link(code)
 
-    override fun unlinkDevices() = core.devices.unlink()
+    override fun unlinkDevices() = core.guard("Stop counting your other devices", loosens = true) { core.devices.unlink() }
 
     // Only Android has App info and restricted settings.
     override fun openAppInfo() = Unit
@@ -165,7 +166,8 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
 
     override fun showCalendar(mode: CalendarMode) = core.calendar.show(mode)
 
-    override fun saveFocusBlock(replacing: String?, day: LocalDate, startMinute: Int, minutes: Int) = core.calendar.save(replacing, day, startMinute, minutes)
+    override fun saveFocusBlock(replacing: String?, day: LocalDate, startMinute: Int, minutes: Int) =
+        core.guard("Move or shorten a focus block", loosens = replacing != null) { core.calendar.save(replacing, day, startMinute, minutes) }
 
     override fun deleteFocusBlock(id: String) = core.guard("Delete a focus block", loosens = true) { core.calendar.delete(id) }
 
@@ -237,7 +239,8 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
         core.handleSpeech(active.stop(), active.sampleRate)
     }
 
-    override fun confirmCommand() = core.confirmVoiceCommand()
+    override fun confirmCommand() =
+        core.guard("Cancel a focus session", loosens = core.pendingCommand is VoiceCommand.CancelSession) { core.confirmVoiceCommand() }
 
     override fun discardCommand() = core.discardVoiceCommand()
 

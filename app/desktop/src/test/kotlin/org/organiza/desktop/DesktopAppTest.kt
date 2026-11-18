@@ -102,6 +102,21 @@ class DesktopAppTest {
     }
 
     @Test
+    fun `with the lockout on, moving a block, cancelling by voice and unlinking also wait for the essay`() {
+        actions.setLockout(true)
+        eventually("the lockout is on") { core.lockout }
+        actions.saveFocusBlock("block-1", java.time.LocalDate.now().plusDays(1), 9 * 60, 30)
+        eventually("moving waits") { core.uiState.value.unlockReason == "Move or shorten a focus block" }
+        actions.cancelUnlock()
+        core.propose(org.organiza.voice.VoiceCommand.CancelSession("focus", null))
+        actions.confirmCommand()
+        eventually("cancelling waits") { core.uiState.value.unlockReason == "Cancel a focus session" }
+        actions.cancelUnlock()
+        actions.unlinkDevices()
+        eventually("unlinking waits") { core.uiState.value.unlockReason == "Stop counting your other devices" }
+    }
+
+    @Test
     fun `a focus session starts on the desktop and home shows it running`() = runComposeUiTest {
         core.onboarded = true
         actions.setFocusApp("linux.google_chrome", true)
