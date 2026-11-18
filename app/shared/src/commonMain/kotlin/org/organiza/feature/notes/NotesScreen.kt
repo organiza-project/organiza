@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -96,9 +97,16 @@ private fun NoteItem(note: NoteRow, busy: Boolean, actions: Actions) {
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Txt(note.body, Type.body)
         Txt(listOfNotNull(note.time, note.subject, note.reminder).joinToString(" · "), Type.small, colors.muted, Modifier.padding(top = 4.dp))
+        // A note cannot come back, so deleting takes a second tap.
+        var deleting by remember(note.id) { mutableStateOf(false) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Action("Organize with AI", ButtonKind.TEXT, enabled = !busy) { actions.organizeNote(note.id) }
-            Action("Delete", ButtonKind.TEXT) { actions.deleteNote(note.id) }
+            if (deleting) {
+                Action("Delete for good", ButtonKind.DANGER) { actions.deleteNote(note.id) }
+                Action("Keep", ButtonKind.TEXT) { deleting = false }
+            } else {
+                Action("Organize with AI", ButtonKind.TEXT, enabled = !busy) { actions.organizeNote(note.id) }
+                Action("Delete", ButtonKind.TEXT) { deleting = true }
+            }
         }
     }
 }

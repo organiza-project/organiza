@@ -181,6 +181,20 @@ class DesktopAppTest {
     }
 
     @Test
+    fun `deleting a note takes a second tap`() = runComposeUiTest {
+        core.onboarded = true
+        setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
+        onNodeWithContentDescription("Notes").performClick()
+        onAllNodes(hasSetTextAction())[0].performTextInput("Call the bank")
+        onNodeWithText("Save note").performClick()
+        waitUntilExactlyOneExists(hasText("Call the bank"), 5_000)
+        onNodeWithText("Delete").performClick()
+        onNodeWithText("Call the bank").assertExists()
+        onNodeWithText("Delete for good").performClick()
+        waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Call the bank")).fetchSemanticsNodes().isEmpty() }
+    }
+
+    @Test
     fun `the habits tab shows habits on the desktop`() = runComposeUiTest {
         core.onboarded = true
         actions.addHabit("Read twenty pages")
