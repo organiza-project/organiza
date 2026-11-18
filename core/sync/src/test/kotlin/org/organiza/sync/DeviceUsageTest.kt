@@ -114,6 +114,16 @@ class DeviceUsageTest {
         }
     }
 
+    @Test
+    fun `a device posts two weeks after linking, then every day since its last post`() {
+        val today = LocalDate.parse("2026-11-18")
+        assertEquals(14, DeviceUsage.daysToPost(null, today).size)
+        assertEquals(listOf(today), DeviceUsage.daysToPost(today, today))
+        // Back after three days offline: the last posted day gets its final count, and the gap is filled.
+        assertEquals((0L..3L).map(today::minusDays), DeviceUsage.daysToPost(today.minusDays(3), today))
+        assertEquals(today.minusDays(13), DeviceUsage.daysToPost(today.minusDays(40), today).last())
+    }
+
     private companion object {
         val LINK = DeviceLink.create()
     }

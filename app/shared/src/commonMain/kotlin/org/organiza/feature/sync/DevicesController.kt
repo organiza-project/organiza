@@ -104,10 +104,8 @@ class DevicesController(private val app: OrganizaCore) {
             val today = today()
             // Right after linking, two weeks of history go out once; later, every day since the last post,
             // so days spent offline are filled in too, the last one with its final count.
-            val posted = prefs.string(POSTED)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-            val since = maxOf(posted ?: LocalDate.MIN, today.minusDays(BACKFILL_DAYS - 1))
-            val days = generateSequence(today) { it.minusDays(1) }.takeWhile { !it.isBefore(since) }.toList()
-            val saved = stores.deviceUsage.between(since, today, mine = true)
+            val days = DeviceUsage.daysToPost(prefs.string(POSTED)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }, today)
+            val saved = stores.deviceUsage.between(days.last(), today, mine = true)
             val reports = days.associateWith { app.usageReport.mine(it, today, ZoneId.systemDefault(), saved) }.filterValues { it.isNotEmpty() }
             network.execute { trade(usage, today, reports, stores) }
         }
@@ -163,7 +161,6 @@ class DevicesController(private val app: OrganizaCore) {
         const val DEVICE = "device"
         const val CURSOR = "cursor"
         const val POSTED = "posted"
-        const val BACKFILL_DAYS = 14L
         const val OTHER = "Other"
         const val SECRET = "devices-secret"
         const val FIRST_S = 30L

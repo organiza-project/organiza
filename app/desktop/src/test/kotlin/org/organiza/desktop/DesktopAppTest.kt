@@ -181,6 +181,26 @@ class DesktopAppTest {
     }
 
     @Test
+    fun `the metrics range moves by whole months and a custom range by its edges, never past today`() {
+        core.onboarded = true
+        val today = java.time.LocalDate.now()
+        fun range() = core.uiState.value.usage.let { it.from to it.to }
+        fun day(date: java.time.LocalDate) = org.organiza.presentation.Format.dayMonth(date)
+        actions.setUsageSpan(org.organiza.ui.UsageSpan.MONTH)
+        actions.shiftUsage(-1)
+        val last = today.minusMonths(1)
+        eventually("last month") { range() == day(last.withDayOfMonth(1)) to day(last.withDayOfMonth(last.lengthOfMonth())) }
+        actions.shiftUsage(1)
+        actions.shiftUsage(1)
+        eventually("this month, up to today") { range() == day(today.withDayOfMonth(1)) to day(today) }
+        actions.setUsageSpan(org.organiza.ui.UsageSpan.RANGE)
+        actions.shiftUsageEdge(true, -3)
+        eventually("a range of ten days") { range() == day(today.minusDays(9)) to day(today) }
+        actions.shiftUsageEdge(false, 5)
+        eventually("the end stays at today") { range() == day(today.minusDays(9)) to day(today) }
+    }
+
+    @Test
     fun `deleting a note takes a second tap`() = runComposeUiTest {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }

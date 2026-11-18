@@ -151,4 +151,15 @@ public class DeviceUsage(
     public fun devices(day: LocalDate): Int = latest.values.count { it.day == day }
 
     private fun key(app: String) = app.trim().lowercase()
+
+    public companion object {
+        /** Days of history a device posts right after linking, and at most after a gap. */
+        public const val BACKFILL_DAYS: Long = 14
+
+        /** Newest first: every day since [posted], which gets its final count, or two weeks when nothing was posted yet. */
+        public fun daysToPost(posted: LocalDate?, today: LocalDate): List<LocalDate> {
+            val since = maxOf(posted ?: LocalDate.MIN, today.minusDays(BACKFILL_DAYS - 1))
+            return generateSequence(today) { it.minusDays(1) }.takeWhile { !it.isBefore(since) }.toList()
+        }
+    }
 }
