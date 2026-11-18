@@ -113,7 +113,8 @@ public class SupabaseAuth(
             return null
         }
         if (reply.status in SUCCESS) return keep(reply)?.access
-        if (reply.status in 400..499) forget()
+        // Only a refused token ends the session; a rate limit (429) or a timeout (408) is tried again later.
+        if (reply.status in REFUSED_TOKEN) forget()
         return null
     }
 
@@ -206,6 +207,7 @@ public class SupabaseAuth(
     private companion object {
         const val VAULT_NAME = "sync_session"
         val SUCCESS = 200..299
+        val REFUSED_TOKEN = setOf(400, 401, 403)
         val REFRESH_MARGIN: Duration = Duration.ofSeconds(60)
     }
 }

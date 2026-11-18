@@ -99,6 +99,20 @@ class SupabaseAuthTest {
     }
 
     @Test
+    fun `too many requests or a timeout keeps the session for the next try`() {
+        http.respond(200, session(expires = 1))
+        auth.signIn("sam@example.org", "pw")
+        clock.advance(Duration.ofMinutes(5))
+        listOf(429, 408).forEach { status ->
+            http.respond(status, """{"code":$status,"msg":"Try again later"}""")
+            assertNull(auth.accessToken())
+            assertEquals(AuthState.SignedIn("sam@example.org"), auth.state())
+        }
+        http.respond(200, session(access = "access-4", refresh = "refresh-4"))
+        assertEquals("access-4", auth.accessToken())
+    }
+
+    @Test
     fun `a revoked refresh token signs the person out`() {
         http.respond(200, session(expires = 1))
         auth.signIn("sam@example.org", "pw")
