@@ -75,6 +75,9 @@ it, or phones refuse the update:
 keytool -genkeypair -keystore ~/organiza-release.jks -alias organiza -keyalg RSA -keysize 4096 -validity 10000
 ```
 
+Every step of a release, from the key to the published installers, is in
+[`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md).
+
 Then set these properties, for example in `~/.gradle/gradle.properties` (never in the repository):
 
 ```properties
