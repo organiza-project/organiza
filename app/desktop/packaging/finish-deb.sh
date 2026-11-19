@@ -19,4 +19,10 @@ install -Dm644 "$here/organiza.png" "$work/usr/share/icons/hicolor/512x512/apps/
 install -Dm644 "$here/../../../docs/brand/icon.svg" "$work/usr/share/icons/hicolor/scalable/apps/organiza.svg"
 sed -i 's|^Icon=.*|Icon=organiza|' "$desktop"
 install -Dm644 "$here/org.organiza.Organiza.metainfo.xml" "$work/usr/share/metainfo/org.organiza.Organiza.metainfo.xml"
+# A running Organiza keeps the old code, and every launch hands off to it. Ending it after an upgrade lets
+# the autostart service (Restart=on-failure) start the new version within seconds; a removal stops it.
+grep -q pkill "$work/DEBIAN/postinst" ||
+    sed -i "s|^xdg-desktop-menu install .*|&\n    pkill -TERM -f '^/opt/organiza/bin/Organiza' \|\| true|" "$work/DEBIAN/postinst"
+grep -q pkill "$work/DEBIAN/prerm" ||
+    sed -i "s|^xdg-desktop-menu uninstall .*|&\n    [ \"\$1\" != remove ] \|\| pkill -TERM -f '^/opt/organiza/bin/Organiza' \|\| true|" "$work/DEBIAN/prerm"
 dpkg-deb --root-owner-group --build "$work" "$deb" > /dev/null

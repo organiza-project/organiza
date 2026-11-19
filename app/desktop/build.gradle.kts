@@ -70,6 +70,8 @@ compose.desktop {
 
 // jpackage has no option for the homepage, AppStream metadata or a themed icon, so they are added to the finished .deb.
 tasks.matching { it.name == "packageDeb" }.configureEach {
+    // Its changes must rebuild the package, not leave an older one in place.
+    inputs.dir("packaging")
     doLast {
         val deb = outputs.files.asFileTree.matching { include("*.deb") }.singleFile
         val finish = ProcessBuilder(file("packaging/finish-deb.sh").path, deb.path).inheritIO().start()
