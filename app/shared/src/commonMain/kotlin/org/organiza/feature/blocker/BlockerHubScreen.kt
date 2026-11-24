@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.organiza.presentation.Device
 import org.organiza.ui.*
 import org.organiza.enforcement.ShortFormFeed
 
@@ -40,7 +41,8 @@ fun BlockerHub(ui: UiSnapshot, actions: Actions, openApp: MutableState<String?> 
     var site by rememberSaveable { mutableStateOf("") }
     var search by rememberSaveable { mutableStateOf("") }
     Txt("Distraction blocker", Type.section, modifier = Modifier.padding(top = 8.dp).semantics { heading() })
-    Panel {
+    // Reels and Shorts are paused inside the phone apps; a computer has no such apps to reach into.
+    if (ui.device == Device.PHONE) Panel {
         PanelHeader("Inside apps")
         Row(verticalAlignment = Alignment.CenterVertically) {
             AppIcon("com.instagram.android", 36.dp, Glyph.CAMERA)

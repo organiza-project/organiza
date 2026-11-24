@@ -203,6 +203,16 @@ class DesktopAppTest {
     }
 
     @Test
+    fun `the desktop offers no reels or shorts switches, which only a phone can enforce`() = runComposeUiTest {
+        core.onboarded = true
+        setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
+        onNodeWithContentDescription("Metrics").performClick()
+        waitUntilExactlyOneExists(hasText("Your apps"), 5_000)
+        onNodeWithText("Block Reels tab only").assertDoesNotExist()
+        onNodeWithText("Block YT Shorts").assertDoesNotExist()
+    }
+
+    @Test
     fun `deleting a note takes a second tap`() = runComposeUiTest {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
