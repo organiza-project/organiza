@@ -19,6 +19,9 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -124,6 +127,34 @@ internal fun AppIcon(pkg: String, size: androidx.compose.ui.unit.Dp = 36.dp, fal
     }
 }
 
-/** The launcher icon of an installed app, or null while it loads or when there is none. */
+/** The launcher icon of an installed app, or null while it loads or when there is none. Each is drawn once. */
 @Composable
-internal expect fun rememberAppIcon(pkg: String): ImageBitmap?
+internal fun rememberAppIcon(pkg: String): ImageBitmap? {
+    val load = appIconLoader()
+    val icon by produceState(AppIcons.get(pkg), pkg) {
+        if (!AppIcons.has(pkg)) value = withContext(Dispatchers.IO) { load(pkg) }.also { AppIcons.put(pkg, it) }
+    }
+    return icon
+}
+
+/** Draws one app's icon; slow, so it runs off the main thread and only once per app. */
+@Composable
+internal expect fun appIconLoader(): (String) -> ImageBitmap?
+
+/** Icons already drawn, so a list scrolled fast or opened again never draws them twice. */
+private object AppIcons {
+    private val drawn = object : LinkedHashMap<String, ImageBitmap?>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap?>): Boolean = size > MAX
+    }
+
+    @Synchronized fun get(pkg: String): ImageBitmap? = drawn[pkg]
+
+    @Synchronized fun has(pkg: String): Boolean = drawn.containsKey(pkg)
+
+    @Synchronized fun put(pkg: String, icon: ImageBitmap?) {
+        drawn[pkg] = icon
+    }
+
+    // About 36 KB each at 96 pixels.
+    private const val MAX = 300
+}

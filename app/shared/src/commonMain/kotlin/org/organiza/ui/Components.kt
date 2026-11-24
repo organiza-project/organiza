@@ -212,7 +212,14 @@ fun MessagePanel(text: String?) {
 
 /** A choice in a short list: one row per option, with the chosen one marked. */
 @Composable
-fun ChoiceRow(title: String, detail: String?, chosen: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+fun ChoiceRow(
+    title: String,
+    detail: String?,
+    chosen: Boolean,
+    enabled: Boolean = true,
+    leading: (@Composable () -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     val colors = Theme.colors
     val shape = RoundedCornerShape(Space.radiusControl)
     Row(
@@ -225,7 +232,9 @@ fun ChoiceRow(title: String, detail: String?, chosen: Boolean, enabled: Boolean 
             .semantics { stateDescription = if (chosen) "Selected" else "Not selected" }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        leading?.invoke()
         Column(Modifier.weight(1f)) {
             Txt(title, Type.bodyStrong)
             if (detail != null) Txt(detail, Type.small, colors.muted)

@@ -74,7 +74,7 @@ fun NewHabitScreen(ui: UiSnapshot, actions: Actions, back: () -> Unit) {
                 if (!ui.hub.usageAllowed) Txt("Linked apps need usage access. Allow it in Metrics.", Type.small, colors.muted)
                 if (linked != null) Action("Unlink", ButtonKind.TEXT) { linked = null; picking = false }
                 ui.hub.apps.sortedBy { it.label.lowercase() }.forEach { option ->
-                    ChoiceRow(option.label, option.category, option.pkg == linked) { linked = option.pkg; picking = false }
+                    ChoiceRow(option.label, option.category, option.pkg == linked, leading = { AppIcon(option.pkg, 32.dp) }) { linked = option.pkg; picking = false }
                 }
             }
         }

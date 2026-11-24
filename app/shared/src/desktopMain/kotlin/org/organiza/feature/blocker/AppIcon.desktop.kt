@@ -1,8 +1,6 @@
 package org.organiza.feature.blocker
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.ImageBitmap
@@ -21,22 +19,15 @@ import javax.swing.filechooser.FileSystemView
 import kotlin.io.path.extension
 import kotlin.io.path.inputStream
 import kotlin.io.path.readBytes
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 import org.organiza.desktop.LinuxApps
 import org.organiza.desktop.WINDOWS
 
 @Composable
-internal actual fun rememberAppIcon(pkg: String): ImageBitmap? {
-    val icon by produceState<ImageBitmap?>(null, pkg) {
-        value = withContext(Dispatchers.IO) {
-            LinuxApps.find(pkg)?.icon?.let { icon ->
-                if (WINDOWS) runCatching { windowsIcon(icon) }.getOrNull() else LinuxApps.iconFile(icon)?.let { runCatching { load(it) }.getOrNull() }
-            }
-        }
+internal actual fun appIconLoader(): (String) -> ImageBitmap? = { pkg ->
+    LinuxApps.find(pkg)?.icon?.let { icon ->
+        if (WINDOWS) runCatching { windowsIcon(icon) }.getOrNull() else LinuxApps.iconFile(icon)?.let { runCatching { load(it) }.getOrNull() }
     }
-    return icon
 }
 
 private fun load(file: Path): ImageBitmap =
