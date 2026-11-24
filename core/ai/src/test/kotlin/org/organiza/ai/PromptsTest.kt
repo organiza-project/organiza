@@ -239,4 +239,11 @@ class PromptsTest {
         assertEquals(AiResult.Ok("Mostly video, and that is fine"), coach.monitorSummary(45, usage))
         assertTrue("\"sessionMinutes\":45" in sentBody().replace("\\\"", "\""))
     }
+
+    @Test
+    fun `an arabic timetable keeps its arabic subjects and reaches the model whole`() {
+        val prompt = Prompts.scheduleExtraction(sanitizer.clean("الأحد 08:00 - 09:30 رياضيات"))
+        assertTrue("any language" in prompt.system)
+        assertTrue("رياضيات" in prompt.user)
+    }
 }

@@ -233,7 +233,9 @@ class DesktopActions(core: OrganizaCore, private val app: DesktopApp, private va
     override fun pickTimetablePhoto() {
         if (output("tesseract", "--version") == null) return core.showMessage("Reading photos needs Tesseract. Install tesseract-ocr, or paste the text")
         val file = choose("Choose a timetable photo", "*.png;*.jpg;*.jpeg") ?: return
-        core.schedule.readPhoto { output("tesseract", file.absolutePath, "stdout") }
+        // English and Arabic when their packs are installed (tesseract-ocr-ara); Tesseract reads only what it has models for.
+        val languages = output("tesseract", "--list-langs").orEmpty().lines().map(String::trim).filter { it in OCR_LANGUAGES }.ifEmpty { listOf("eng") }
+        core.schedule.readPhoto { output("tesseract", file.absolutePath, "stdout", "-l", languages.joinToString("+")) }
     }
 
     override fun shareDeviceCode() {
@@ -252,3 +254,6 @@ class DesktopActions(core: OrganizaCore, private val app: DesktopApp, private va
         return dialog.files.firstOrNull()
     }
 }
+
+/** The OCR languages Organiza reads timetables in, when Tesseract has them installed. */
+private val OCR_LANGUAGES = setOf("eng", "ara")

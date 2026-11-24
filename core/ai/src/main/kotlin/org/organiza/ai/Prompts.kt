@@ -186,7 +186,9 @@ public object Prompts {
     public fun scheduleExtraction(text: SanitizedText): Prompt = Prompt(
         system = "You turn a weekly timetable or a spoken plan into time blocks. The text may be noisy OCR of a photo: " +
             "columns run together, letters are misread and stray symbols appear. Read past the noise for days, times " +
-            "and subjects, and ignore anything else. Keep placeholders such as [NAME1] exactly as written in labels. " + DATA_ONLY +
+            "and subjects, and ignore anything else. The timetable may be in any language, such as Arabic, with its own " +
+            "day names and digits: read those too, and keep each label in the timetable's own language. " +
+            "Keep placeholders such as [NAME1] exactly as written in labels. " + DATA_ONLY +
             """Reply only with JSON: {"blocks": [{"day": "MONDAY", "start": "HH:mm", "minutes": number, """ +
             """"label": string}]}. Use English day names in capitals and a 24-hour clock. Leave out anything """ +
             "without a clear day and time. Give at most 30 blocks, and an empty list when there are none.",

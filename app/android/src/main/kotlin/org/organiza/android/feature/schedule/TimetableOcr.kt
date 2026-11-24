@@ -13,8 +13,9 @@ class TimetableOcr(private val context: Context) {
     fun recognise(uri: Uri): String? {
         val bitmap = decode(uri) ?: return null
         val tess = TessBaseAPI()
+        val (root, languages) = tessData()
         return try {
-            if (!tess.init(tessData().absolutePath, "eng")) return null
+            if (!tess.init(root.absolutePath, languages)) return null
             tess.setImage(bitmap)
             tess.utF8Text
         } finally {
@@ -34,15 +35,22 @@ class TimetableOcr(private val context: Context) {
         return resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
     }
 
-    /** Tesseract reads its model from a folder named tessdata, so the bundled one is copied out once. */
-    private fun tessData(): File {
+    /**
+     * Tesseract reads its models from a folder named tessdata, so the bundled ones (English and Arabic) are
+     * copied out once. Returns that folder and the languages to read with, such as `eng+ara`.
+     */
+    private fun tessData(): Pair<File, String> {
         val root = File(context.noBackupFilesDir, "ocr")
-        val model = File(root, "tessdata/eng.traineddata")
-        if (!model.exists()) {
-            model.parentFile?.mkdirs()
-            context.assets.open("tessdata/eng.traineddata").use { input -> model.outputStream().use(input::copyTo) }
+        val names = context.assets.list("tessdata").orEmpty().filter { it.endsWith(".traineddata") }.sorted()
+        names.forEach { name ->
+            val model = File(root, "tessdata/$name")
+            if (!model.exists()) {
+                model.parentFile?.mkdirs()
+                context.assets.open("tessdata/$name").use { input -> model.outputStream().use(input::copyTo) }
+            }
         }
-        return root
+        // English first: it is the language Tesseract falls back on for digits and times.
+        return root to names.map { it.removeSuffix(".traineddata") }.sortedBy { it != "eng" }.joinToString("+")
     }
 
     private companion object {
