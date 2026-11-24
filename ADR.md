@@ -1412,7 +1412,9 @@ the relay kept every message forever. A hosted free project would fill within a 
 linked device read the whole mailbox history before it showed anything.
 
 ### Decision
-- `arena_append` first deletes its own mailbox's messages older than fifteen days, then appends.
+- `arena_append` first deletes messages older than fifteen days, then appends. At first only its own
+  mailbox's; from 2026-11-24 every mailbox's, so one abandoned after an unlink is cleaned too, with an
+  index on `created_at` keeping that cheap.
   Reports matter for fourteen days at most: the backfill after linking, then each finished day.
 - The deletion runs in the same call, so no scheduler or extension is needed and self-hosted
   projects behave like the hosted one.

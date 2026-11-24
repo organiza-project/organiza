@@ -21,9 +21,9 @@ The checked-in key is public. Only an APK signed with your own key may be publis
 
 ## 3. Backend
 
-- [ ] Run `supabase/migrations/20261118120000_relay_retention.sql` in the hosted project's SQL editor (ADR-0034)
+- [ ] Run `supabase/migrations/20261118120000_relay_retention.sql`, then `20261124120000_relay_retention_all.sql`, in the hosted project's SQL editor (ADR-0034)
 - [ ] Self-hosted: run `supabase/setup.sql` again (`docs/SELF_HOSTING.md`, step 3)
-- [ ] Check: `select prosrc like '%15 days%' from pg_proc where proname = 'arena_append';` returns `true`
+- [ ] Check: `select prosrc like '%m.created_at < now() - interval ''15 days''%' and prosrc not like '%m.mailbox = p_mailbox and%' from pg_proc where proname = 'arena_append';` returns `true`
 
 ## 4. Build the installers
 

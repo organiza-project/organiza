@@ -99,13 +99,16 @@ class DeviceUsageTest {
     }
 
     @Test
-    fun `the relay forgets a mailbox's messages after fifteen days`() {
+    fun `the relay forgets every mailbox's messages after fifteen days`() {
         LocalSupabase().use { backend ->
             val config = BackendConfig.Supabase(BackendKind.SELF_HOSTED, backend.url, backend.anonKey)
             val auth = SupabaseAuth(UrlConnectionTransport(), config, FakeSecretStore(), FakeClock(Instant.parse("2026-11-09T12:00:00Z")))
             auth.signUp("me@example.org", "correct horse 1")
             auth.signIn("me@example.org", "correct horse 1")
             val phone = DeviceUsage(LINK, "phone", checkNotNull(SupabaseSync(UrlConnectionTransport(), config, auth).relay()))
+            val relay = checkNotNull(SupabaseSync(UrlConnectionTransport(), config, auth).relay())
+            // Another person's mailbox, abandoned: nobody posts to it again.
+            DeviceUsage(DeviceLink.create(), "old phone", relay).post(today.minusDays(16), mapOf("Chess" to 5))
             phone.post(today.minusDays(16), mapOf("Discord" to 10))
             backend.age(16)
             phone.post(today, mapOf("Discord" to 20))
