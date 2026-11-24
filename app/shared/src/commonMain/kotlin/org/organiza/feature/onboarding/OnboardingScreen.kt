@@ -2,6 +2,16 @@ package org.organiza.feature.onboarding
 
 import org.organiza.ui.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.semantics.contentDescription
+import org.organiza.feature.sync.DeviceGuide
+import org.organiza.ui.Glyph
+import org.organiza.ui.Icon
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,7 +53,10 @@ import org.organiza.presentation.Permission
 import org.organiza.presentation.OnboardingStep
 import org.organiza.presentation.PermissionRow
 
-/** The first run (ADR-0014). Every step can be left for later, and Profile can run it again. */
+/**
+ * The first run (ADR-0014, ADR-0037): six screens, one theme each, so no screen asks for much at once.
+ * Every step can be left for later, and Profile can run it again.
+ */
 @Composable
 fun OnboardingScreen(ui: UiSnapshot, actions: Actions) {
     var step by rememberSaveable { mutableStateOf(OnboardingStep.WELCOME) }
@@ -52,69 +65,109 @@ fun OnboardingScreen(ui: UiSnapshot, actions: Actions) {
         step = Onboarding.next(step)
         if (step == OnboardingStep.DONE) actions.finishOnboarding()
     }
-    Txt(Onboarding.progress(step), Type.small, Theme.colors.muted, Modifier.padding(top = 20.dp))
-    when (step) {
-        OnboardingStep.WELCOME -> Welcome()
-        OnboardingStep.PERMISSIONS -> PermissionsStep(ui, actions)
-        OnboardingStep.BACKEND -> {
-            TitleBlock("Where your data lives", "Everything works offline. A backend only lets your devices share usage, so one limit counts them all.")
-            BackendPanel(ui.account, actions)
+    // Each step fills the window, with its buttons at the bottom, like a page of its own.
+    val window = LocalWindowInfo.current.containerSize.height
+    val tall = with(LocalDensity.current) { window.toDp() } - 120.dp
+    Column(Modifier.fillMaxWidth().heightIn(min = tall), verticalArrangement = Arrangement.SpaceBetween) {
+        Column(verticalArrangement = Arrangement.spacedBy(Space.gap)) {
+            Dots(step)
+            when (step) {
+                OnboardingStep.WELCOME -> Welcome()
+                OnboardingStep.BLOCKING -> {
+                    Hero(Glyph.SHIELD, "Pause what pulls you in", "When you open something you asked to avoid, Organiza steps in with a pause, not a wall.")
+                    Permissions(ui, actions, step)
+                }
+                OnboardingStep.FURTHER -> {
+                    Hero(Glyph.METRICS, "Go a step further", "See where your time goes, keep distracting sites away, and make Organiza hard to remove on a weak day.")
+                    Permissions(ui, actions, step)
+                }
+                OnboardingStep.LOCKOUT -> {
+                    Hero(Glyph.LOCK, "A firmer promise", "Optional, and off unless you turn it on. Use it if you know you talk yourself out of limits.")
+                    org.organiza.feature.profile.LockoutPanel(ui, actions)
+                }
+                OnboardingStep.DEVICES -> {
+                    Hero(Glyph.DEVICES, "Phone and computer, one picture", "Optional. Link your devices and check any one of them for all your screen time.")
+                    DeviceGuide(ui.account)
+                    BackendPanel(ui.account, actions)
+                }
+                OnboardingStep.AI -> {
+                    Hero(Glyph.CHAT, "A coach that knows you", "Optional. Bring your own Groq key for a guide to your goals, or add one later in Profile.")
+                    AiKeyPanel(ui, actions, title = "Groq key")
+                }
+                OnboardingStep.DONE -> Unit
+            }
+            MessagePanel(ui.message)
         }
-        OnboardingStep.AI -> {
-            TitleBlock("AI coach", "Optional. Bring your own Groq key, or skip and add one later in Profile.")
-            AiKeyPanel(ui, actions, title = "Groq key")
+        Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (step != OnboardingStep.WELCOME) Action("Back", ButtonKind.TEXT) { step = Onboarding.back(step) }
+            Spacer(Modifier.weight(1f))
+            val label = if (step == OnboardingStep.AI && ui.hasApiKey) "Finish" else Onboarding.continueLabel(step, ui.permissions, ui.device)
+            Action(label, ButtonKind.PRIMARY) { advance() }
         }
-        OnboardingStep.DONE -> Unit
     }
-    MessagePanel(ui.message)
-    Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        val label = if (step == OnboardingStep.AI && ui.hasApiKey) "Finish" else Onboarding.continueLabel(step, ui.permissions, ui.device)
-        Action(label, ButtonKind.PRIMARY) { advance() }
-        if (step != OnboardingStep.WELCOME) Action("Back", ButtonKind.TEXT) { step = Onboarding.back(step) }
+}
+
+/** Where the person is: a dot a step, the current one long, read out as "Step n of 6". */
+@Composable
+private fun Dots(step: OnboardingStep) {
+    val colors = Theme.colors
+    val progress = Onboarding.progress(step)
+    Row(Modifier.padding(top = 20.dp).semantics { contentDescription = progress }, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        OnboardingStep.entries.filter { it != OnboardingStep.DONE }.forEach { each ->
+            val current = each == step
+            Box(Modifier.size(width = if (current) 24.dp else 8.dp, height = 8.dp).background(if (each.ordinal <= step.ordinal) colors.text else colors.rule, CircleShape))
+        }
+    }
+}
+
+/** A step's large glyph, headline and one friendly sentence. */
+@Composable
+private fun Hero(glyph: Glyph, title: String, body: String) {
+    val colors = Theme.colors
+    Column(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp)) {
+        Box(Modifier.size(80.dp).background(colors.data, CircleShape), contentAlignment = Alignment.Center) { Icon(glyph, colors.ground, 40.dp) }
+        Txt(title, Type.figure, modifier = Modifier.padding(top = 20.dp).semantics { heading() })
+        Txt(body, Type.body, colors.muted, Modifier.padding(top = 6.dp))
     }
 }
 
 @Composable
 private fun Welcome() {
     val colors = Theme.colors
-    Column(Modifier.fillMaxWidth().padding(top = 24.dp), horizontalAlignment = Alignment.Start) {
-        LogoMark()
-        Spacer(Modifier.height(20.dp))
-        Txt("Organiza", Type.figure, modifier = Modifier.semantics { heading() })
-        Txt("Focus on purpose, on your own terms.", Type.section, colors.muted)
+    Column(Modifier.fillMaxWidth().padding(top = 24.dp)) {
+        LogoMark(96.dp)
+        Txt("Hi, this is Organiza", Type.figure, modifier = Modifier.padding(top = 20.dp).semantics { heading() })
+        Txt("Your habits, notes and screen time in one calm place, on your own terms.", Type.section, colors.muted, Modifier.padding(top = 6.dp))
     }
     Panel {
-        Point("Local first", "Sessions, habits and what you block live encrypted on this device. It all works with no account and no network.")
+        Point(Glyph.SHIELD, "Pauses, not walls", "A blocked app gets a pause and a reason. Every choice stays yours to look back on.")
         Rule()
-        Point("Private by design", "No tracking and no analytics. Websites and calendar titles never leave this device; app time goes only to your own devices, sealed, if you turn that on.")
+        Point(Glyph.FLAME, "Good habits, kept", "Habits, notes and reminders, typed or dictated, with XP as you keep going.")
         Rule()
-        Point(
-            "Mindful friction",
-            "A blocked app does not slam a wall in your face. You get a pause, a reason and a phrase to type, and every choice is yours to look back on.",
-        )
+        Point(Glyph.LOCK, "Yours alone", "Everything is encrypted on this device and works with no account. Nothing tracks you.")
     }
 }
 
 @Composable
-private fun Point(title: String, body: String) {
-    Column(Modifier.padding(vertical = 4.dp)) {
-        Txt(title, Type.bodyStrong)
-        Txt(body, Type.body, Theme.colors.muted)
+private fun Point(glyph: Glyph, title: String, body: String) {
+    Row(Modifier.padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Icon(glyph, Theme.colors.data, 24.dp)
+        Column {
+            Txt(title, Type.bodyStrong)
+            Txt(body, Type.body, Theme.colors.muted)
+        }
     }
 }
 
 @Composable
-private fun PermissionsStep(ui: UiSnapshot, actions: Actions) {
-    TitleBlock("Permissions", "What each one is for. Grant them now or later from the Focus screen.")
+private fun Permissions(ui: UiSnapshot, actions: Actions, step: OnboardingStep) {
     Panel {
-        Onboarding.permissions(ui.permissions, ui.device).forEachIndexed { index, row ->
+        Onboarding.permissions(ui.permissions, ui.device, step).forEachIndexed { index, row ->
             if (index > 0) Rule()
             PermissionItem(row, actions)
         }
     }
-    // Offered here, off by default: a firmer way to keep old habits from coming back.
-    Txt("A firmer option", Type.section, modifier = Modifier.padding(top = 8.dp))
-    org.organiza.feature.profile.LockoutPanel(ui, actions)
+    Txt("Change any of these later in Profile.", Type.small, Theme.colors.muted)
 }
 
 @Composable

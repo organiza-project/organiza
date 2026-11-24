@@ -1,6 +1,7 @@
 package org.organiza.presentation
 
-public enum class OnboardingStep { WELCOME, PERMISSIONS, BACKEND, AI, DONE }
+/** The first run, one theme a screen (ADR-0037): blocking, going further, the lockout, devices, then AI. */
+public enum class OnboardingStep { WELCOME, BLOCKING, FURTHER, LOCKOUT, DEVICES, AI, DONE }
 
 /** What each permission is for, and what to do when it cannot be granted. */
 public enum class Permission(public val title: String, public val why: String, public val fallback: String) {
@@ -62,12 +63,22 @@ public enum class Permission(public val title: String, public val why: String, p
 }
 
 /** The permissions and protections a kind of device offers, in the order they are shown (ADR-0025). */
-public enum class Device(public val permissions: List<Permission>, public val protections: List<Protection>) {
+public enum class Device(
+    public val permissions: List<Permission>,
+    public val protections: List<Protection>,
+    /** The permissions the onboarding's blocking screen asks for; the others come on the next one. */
+    internal val blocking: Set<Permission>,
+) {
     PHONE(
         listOf(Permission.ACCESSIBILITY, Permission.OVERLAY, Permission.BATTERY, Permission.VPN, Permission.USAGE, Permission.DEVICE_ADMIN),
         listOf(Protection.ACCESSIBILITY, Protection.VPN_CONSENT, Protection.BATTERY, Protection.DEVICE_ADMIN, Protection.USAGE),
+        setOf(Permission.ACCESSIBILITY, Permission.OVERLAY, Permission.BATTERY),
     ),
-    DESKTOP(listOf(Permission.TRACKING, Permission.AUTOSTART, Permission.TRAY, Permission.SHORTCUT), listOf(Protection.TRACKING, Protection.AUTOSTART)),
+    DESKTOP(
+        listOf(Permission.TRACKING, Permission.AUTOSTART, Permission.TRAY, Permission.SHORTCUT),
+        listOf(Protection.TRACKING, Protection.AUTOSTART),
+        setOf(Permission.TRACKING, Permission.TRAY),
+    ),
     ;
 
     /** Blocking needs this one; the rest are optional. */
@@ -89,16 +100,40 @@ public object Onboarding {
 
     public fun progress(step: OnboardingStep): String = "Step ${VISIBLE.indexOf(step) + 1} of ${VISIBLE.size}"
 
-    public fun permissions(granted: Set<Permission>, device: Device = Device.PHONE): List<PermissionRow> = device.permissions.map { permission ->
+    /** The permission rows, all of them, or only those [step] asks for. */
+    public fun permissions(granted: Set<Permission>, device: Device = Device.PHONE, step: OnboardingStep? = null): List<PermissionRow> = device.permissions.filter { permission ->
+        when (step) {
+            null -> true
+            OnboardingStep.BLOCKING -> permission in device.blocking
+            OnboardingStep.FURTHER -> permission !in device.blocking
+            else -> false
+        }
+    }.map { permission ->
         val on = if (permission == Permission.OVERLAY) Permission.ACCESSIBILITY in granted else permission in granted
         PermissionRow(permission, on, required = permission == device.required, grantable = permission != Permission.OVERLAY)
     }
 
     public fun continueLabel(step: OnboardingStep, granted: Set<Permission>, device: Device = Device.PHONE): String = when (step) {
         OnboardingStep.WELCOME -> "Start"
-        OnboardingStep.PERMISSIONS -> if (device.required in granted) "Continue" else "Continue without blocking"
-        OnboardingStep.BACKEND -> "Continue"
+        OnboardingStep.BLOCKING -> if (device.required in granted) "Continue" else "Continue without blocking"
+        OnboardingStep.FURTHER, OnboardingStep.LOCKOUT, OnboardingStep.DEVICES -> "Continue"
         OnboardingStep.AI -> "Skip for now"
         OnboardingStep.DONE -> "Done"
+    }
+}
+
+/** One step of sharing usage between devices, as the guide shows it (ADR-0028, ADR-0037). */
+public data class SetupStep(val title: String, val detail: String, val done: Boolean, val current: Boolean)
+
+/** How to make one device show every device's screen time, in the order it has to happen. */
+public object DeviceSetup {
+    public fun steps(syncOn: Boolean, signedIn: Boolean, linked: Boolean): List<SetupStep> {
+        val done = listOf(syncOn, signedIn, linked)
+        val next = done.indexOfFirst { !it }
+        return listOf(
+            "Turn on sync" to "The same backend on every device. Organiza hosted, or your own Supabase.",
+            "Sign in on each device" to "With the same account everywhere.",
+            "Link your devices" to "On one device choose Start sharing and copy its code. Paste the code on each other device.",
+        ).mapIndexed { index, (title, detail) -> SetupStep(title, detail, done[index], index == next) }
     }
 }

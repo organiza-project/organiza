@@ -1462,3 +1462,24 @@ people read as the title.
 
 ### Consequences
 Notes written before v13 have no title and show as before.
+
+## ADR-0037: Onboarding one theme a screen, and a guide to linking devices
+
+### Status
+Accepted, 2026-11-24. Amends ADR-0014 and ADR-0028.
+
+### Context
+Onboarding put every permission, the lockout and the backend on four crowded screens. People could not
+find how to make one device show every device's screen time: the controls sat under the account settings.
+
+### Decision
+- Six screens, each filling the window with one large glyph, a headline and only its own options:
+  welcome; blocking (the required permission and what comes with it); going further (the rest);
+  the lockout, off by default; devices; the AI key. Dots show progress.
+- `DeviceSetup` names the three steps of sharing usage (turn on sync, sign in on each device, link
+  them with a code) and which is next. The guide shows them ticked off, on the devices screen and
+  first in Profile's settings.
+
+### Consequences
+More screens to tap through, each quick. The device guide only explains and tracks progress; the
+controls stay in the account panels below it.

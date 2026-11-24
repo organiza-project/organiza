@@ -35,14 +35,28 @@ class OnboardingScreenTest {
         OrganizaTheme { Column(Modifier.verticalScroll(rememberScrollState())) { OnboardingScreen(ui, actions) } }
     }
 
+    // Past blocking, going further and the lockout, to the devices screen with the backend choice.
+    private fun toDevices() {
+        compose.onNodeWithText("Start").performClick()
+        compose.onNodeWithText("Continue without blocking").performScrollTo().performClick()
+        compose.onNodeWithText("Continue").performScrollTo().performClick()
+        compose.onNodeWithText("Continue").performScrollTo().performClick()
+    }
+
     @Test
     fun walksEveryStepAndFinishes() {
         show(UiSnapshot(onboarding = true))
-        compose.onNodeWithText("Mindful friction").assertExists()
+        compose.onNodeWithText("Pauses, not walls").assertExists()
         compose.onNodeWithText("Start").performClick()
         compose.onNodeWithText("App blocking").assertExists()
+        compose.onNodeWithText("Usage access", substring = true).assertDoesNotExist()
         compose.onNodeWithText("Continue without blocking").performScrollTo().performClick()
-        compose.onNodeWithText("Where your data lives").assertExists()
+        compose.onNodeWithText("Usage access", substring = true).assertExists()
+        compose.onNodeWithText("Continue").performScrollTo().performClick()
+        compose.onNodeWithText("A firmer promise").assertExists()
+        compose.onNodeWithText("Continue").performScrollTo().performClick()
+        compose.onNodeWithText("Your devices").assertExists()
+        compose.onNodeWithText("Link your devices").assertExists()
         compose.onNodeWithText("Continue").performScrollTo().performClick()
         compose.onNodeWithText("Groq key").assertExists()
         compose.onNodeWithText("Skip for now").performScrollTo().performClick()
@@ -73,8 +87,7 @@ class OnboardingScreenTest {
     @Test
     fun theHostedBackendIsOfferedOnlyWhenTheBuildHasOne() {
         show(UiSnapshot(onboarding = true, account = AccountView(hostedAvailable = false)))
-        compose.onNodeWithText("Start").performClick()
-        compose.onNodeWithText("Continue without blocking").performScrollTo().performClick()
+        toDevices()
         compose.onNodeWithText("Not available in this build").assertExists()
         compose.onNodeWithText("Use this").assertIsNotEnabled()
     }
@@ -82,8 +95,7 @@ class OnboardingScreenTest {
     @Test
     fun aSelfHostedProjectIsEnteredAndSaved() {
         show(UiSnapshot(onboarding = true))
-        compose.onNodeWithText("Start").performClick()
-        compose.onNodeWithText("Continue without blocking").performScrollTo().performClick()
+        toDevices()
         compose.onNodeWithText("My own Supabase").performClick()
         compose.onNodeWithText("Project URL (https)").performScrollTo()
         compose.onAllNodes(hasSetTextAction())[0].performTextInput("https://example.supabase.co")

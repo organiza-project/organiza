@@ -82,6 +82,8 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
         },
         second = {
             MessagePanel(ui.message)
+            // First in the settings: people looked for how to link devices and did not find it.
+            org.organiza.feature.sync.DeviceGuide(ui.account)
             LockoutPanel(ui, actions)
             Panel {
                 val account = ui.account

@@ -286,8 +286,12 @@ class DesktopAppTest {
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
         waitUntilExactlyOneExists(hasText("Start"), 5_000)
         onNodeWithText("Start").performClick()
+        // Blocking first: tracking and staying open; starting at login and the shortcut come next.
         waitUntilExactlyOneExists(hasText("Usage tracking"), 5_000)
-        onNodeWithText("Start at login", substring = true).assertExists()
+        onNodeWithText("Keep running when closed", substring = true).assertExists()
+        onNodeWithText("Start at login", substring = true).assertDoesNotExist()
+        onAllNodes(hasText("Continue", substring = true))[0].performClick()
+        waitUntilExactlyOneExists(hasText("Start at login", substring = true), 5_000)
         onNodeWithText("Copilot shortcut", substring = true).assertExists()
         onNodeWithText("Uninstall protection", substring = true).assertDoesNotExist()
     }
