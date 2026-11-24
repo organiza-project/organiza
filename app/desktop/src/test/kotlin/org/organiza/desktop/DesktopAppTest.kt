@@ -3,6 +3,7 @@ package org.organiza.desktop
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
@@ -72,6 +73,13 @@ class DesktopAppTest {
             check(System.nanoTime() < until) { "timed out waiting for $what" }
             Thread.sleep(20)
         }
+    }
+
+    // The snapshot that ends onboarding reaches the UI a moment after it is built, later still on a slow CI
+    // machine, so a tab is tapped only once it is on screen.
+    private fun ComposeUiTest.openTab(name: String) {
+        waitUntilExactlyOneExists(hasContentDescription(name), 10_000)
+        onNodeWithContentDescription(name).performClick()
     }
 
     private fun state(pid: Long): Char = Files.readString(Path.of("/proc/$pid/stat")).substringAfterLast(')').trim().first()
@@ -172,7 +180,7 @@ class DesktopAppTest {
     fun `a note is written, saved and shown under today`() = runComposeUiTest {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
-        onNodeWithContentDescription("Notes").performClick()
+        openTab("Notes")
         // The composer's fields: the title, the note's text (where dictation lands), then its subject.
         onAllNodes(hasSetTextAction())[0].performTextInput("Morning")
         onAllNodes(hasSetTextAction())[1].performTextInput("Walk before work felt good")
@@ -207,7 +215,7 @@ class DesktopAppTest {
     fun `the desktop offers no reels or shorts switches, which only a phone can enforce`() = runComposeUiTest {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
-        onNodeWithContentDescription("Metrics").performClick()
+        openTab("Metrics")
         waitUntilExactlyOneExists(hasText("Your apps"), 5_000)
         onNodeWithText("Block Reels tab only").assertDoesNotExist()
         onNodeWithText("Block YT Shorts").assertDoesNotExist()
@@ -217,7 +225,7 @@ class DesktopAppTest {
     fun `a wide window puts the metrics panels in two columns`() = androidx.compose.ui.test.v2.runDesktopComposeUiTest(1440, 900) {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
-        onNodeWithContentDescription("Metrics").performClick()
+        openTab("Metrics")
         waitUntilExactlyOneExists(hasText("Usage today"), 5_000)
         val left = onNodeWithText("Screen time").fetchSemanticsNode().boundsInRoot
         val right = onNodeWithText("Usage today").fetchSemanticsNode().boundsInRoot
@@ -237,7 +245,7 @@ class DesktopAppTest {
         done.await()
         core.requestUiRefresh()
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
-        onNodeWithContentDescription("Notes").performClick()
+        openTab("Notes")
         waitUntilExactlyOneExists(hasText("Entry 105"), 5_000)
         onNodeWithText("Entry 5").assertDoesNotExist()
         onNodeWithText("Show older notes").performScrollTo().performClick()
@@ -248,7 +256,7 @@ class DesktopAppTest {
     fun `deleting a note takes a second tap`() = runComposeUiTest {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
-        onNodeWithContentDescription("Notes").performClick()
+        openTab("Notes")
         onAllNodes(hasSetTextAction())[1].performTextInput("Call the bank")
         onNodeWithText("Save note").performClick()
         waitUntilExactlyOneExists(hasText("Call the bank"), 5_000)
@@ -263,7 +271,7 @@ class DesktopAppTest {
         core.onboarded = true
         actions.addHabit("Read twenty pages")
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
-        onNodeWithContentDescription("Habits").performClick()
+        openTab("Habits")
         waitUntilExactlyOneExists(hasText("Read twenty pages"), 5_000)
     }
 
@@ -275,7 +283,7 @@ class DesktopAppTest {
         focus.report(Focus("unknown-window", null))
         core.requestUiRefresh()
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
-        onNodeWithContentDescription("Metrics").performClick()
+        openTab("Metrics")
         waitUntilExactlyOneExists(hasContentDescription("Files, 3 m today"), 5_000)
     }
 
@@ -286,7 +294,7 @@ class DesktopAppTest {
         setContent { Box(Modifier.size(1200.dp, 800.dp)) { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } } }
         waitUntilExactlyOneExists(hasContentDescription("Copilot"), 5_000)
         onNodeWithContentDescription("Open the copilot").assertDoesNotExist()
-        onNodeWithContentDescription("Profile").performClick()
+        openTab("Profile")
         onNodeWithText("Voice").assertExists()
     }
 

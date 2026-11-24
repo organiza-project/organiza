@@ -182,7 +182,8 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     @Volatile private var messageGeneration = 0L
 
     /** What the screens show, replaced whole on the main thread (ADR-0012). */
-    val uiState = mutableStateOf(UiSnapshot())
+    // The first snapshot already names the device, so a desktop never shows phone-only controls while starting.
+    val uiState = mutableStateOf(UiSnapshot(device = platform.device))
     @Volatile var storageFailure: String? = null
         private set
     @Volatile var tamperCount = 0
