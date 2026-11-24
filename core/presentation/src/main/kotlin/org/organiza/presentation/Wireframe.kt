@@ -129,6 +129,7 @@ public data class ProgressFacts(
     val focusMinutes: Long,
     val stayedFocused: Int,
     val longestStreak: Int,
+    val notesWritten: Int = 0,
 )
 
 public data class Badge(val id: String, val title: String, val detail: String, val earned: Boolean)
@@ -176,6 +177,8 @@ public object Progression {
         Badge("week-streak", "Seven days", "A 7-day habit streak", facts.longestStreak >= 7),
         Badge("month-streak", "Thirty days", "A 30-day habit streak", facts.longestStreak >= 30),
         Badge("held-the-line", "Held the line", "Stay focused 10 times", facts.stayedFocused >= 10),
+        Badge("ten-hours", "Ten hours", "10 hours of focus sessions", facts.focusMinutes >= 600),
+        Badge("journal-keeper", "Journal keeper", "Write 10 notes", facts.notesWritten >= 10),
     )
 
     public fun build(facts: ProgressFacts): ProgressionModel = of(xp(facts), badges(facts))

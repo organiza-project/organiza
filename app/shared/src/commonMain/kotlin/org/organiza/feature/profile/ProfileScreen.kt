@@ -3,8 +3,6 @@ package org.organiza.feature.profile
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,7 +26,6 @@ import org.organiza.ui.*
 import org.organiza.sync.BackendKind
 
 /** Profile (wireframe screen 9): level, XP and badges from this phone, then the settings. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
     val colors = Theme.colors
@@ -61,15 +58,21 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
         }
         Panel {
             PanelHeader("Badges") { Txt("${progression.badges.count { it.earned }} of ${progression.badges.size}", Type.small, colors.muted) }
-            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                progression.badges.forEach { badge ->
-                    val glyph = when (badge.id) {
-                        "first-session" -> Glyph.CLOCK
-                        "week-streak", "month-streak" -> Glyph.FLAME
-                        "held-the-line" -> Glyph.SHIELD
-                        else -> Glyph.CROWN
+            // Rows of three at every width, so the grid stays even.
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                progression.badges.chunked(3).forEach { row ->
+                    Row(Modifier.fillMaxWidth()) {
+                        row.forEach { badge ->
+                            val glyph = when (badge.id) {
+                                "first-session", "ten-hours" -> Glyph.CLOCK
+                                "week-streak", "month-streak" -> Glyph.FLAME
+                                "held-the-line" -> Glyph.SHIELD
+                                "journal-keeper" -> Glyph.NOTES
+                                else -> Glyph.CROWN
+                            }
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.TopCenter) { Medallion(glyph, badge.title, badge.earned) }
+                        }
                     }
-                    Medallion(glyph, badge.title, badge.earned)
                 }
             }
         }

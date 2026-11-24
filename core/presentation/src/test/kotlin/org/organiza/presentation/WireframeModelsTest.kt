@@ -104,7 +104,7 @@ class WireframeModelsTest {
         assertEquals("Level 7 · Novice", model.title)
         assertEquals("Initiate at level 10 · 1,150 XP to go", model.rankLine)
         assertTrue(model.fraction in 0.0..1.0)
-        assertEquals(setOf("first-session", "week-streak", "held-the-line"), model.badges.filter { it.earned }.map { it.id }.toSet())
+        assertEquals(setOf("first-session", "week-streak", "held-the-line", "ten-hours"), model.badges.filter { it.earned }.map { it.id }.toSet())
     }
 
     @Test
@@ -141,5 +141,14 @@ class WireframeModelsTest {
         assertEquals("Wed", week.days.last().label)
         assertEquals("2 h 00 m this week", week.total)
         assertEquals(90L, week.maxMinutes)
+    }
+
+    @Test
+    fun `six badges, two rows of three, and the new two count focus hours and notes`() {
+        val none = Progression.badges(ProgressFacts(0, 0, 0, 0))
+        assertEquals(6, none.size)
+        assertTrue(none.none { it.earned })
+        val earned = Progression.badges(ProgressFacts(0, 600, 0, 0, notesWritten = 10)).filter { it.earned }.map { it.id }
+        assertEquals(listOf("first-session", "ten-hours", "journal-keeper"), earned)
     }
 }

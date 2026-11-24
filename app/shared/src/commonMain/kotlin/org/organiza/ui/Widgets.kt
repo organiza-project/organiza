@@ -135,15 +135,20 @@ fun Medallion(glyph: Glyph, title: String, earned: Boolean) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+            // An earned badge lights up in the brand blue; one still ahead is a dashed outline.
             Canvas(Modifier.size(56.dp)) {
-                val width = (if (earned) 2.dp else 1.5.dp).toPx()
-                drawCircle(
-                    if (earned) colors.text else colors.control.copy(alpha = 0.35f),
-                    radius = size.minDimension / 2 - width,
-                    style = Stroke(width, pathEffect = if (earned) null else PathEffect.dashPathEffect(floatArrayOf(6f, 6f))),
-                )
+                val width = 1.5.dp.toPx()
+                if (earned) {
+                    drawCircle(colors.data, radius = size.minDimension / 2)
+                } else {
+                    drawCircle(
+                        colors.control.copy(alpha = 0.35f),
+                        radius = size.minDimension / 2 - width,
+                        style = Stroke(width, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))),
+                    )
+                }
             }
-            Icon(glyph, if (earned) colors.text else colors.muted, 24.dp)
+            Icon(glyph, if (earned) colors.ground else colors.muted, 24.dp)
         }
         Txt(title, Type.small, if (earned) colors.text else colors.muted, Modifier.padding(top = 6.dp), maxLines = 2)
     }
