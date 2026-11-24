@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -107,7 +108,8 @@ fun OrganizaRoot(ui: UiSnapshot, actions: Actions, request: Pair<Route, Long>? =
                 }
                 // The page ends at its last panel. The copilot button steps aside there instead of
                 // padding every page with empty space for it. A wide window has it in the sidebar.
-                val atEnd = scroll.maxValue > 0 && scroll.value >= scroll.maxValue - END_SLACK
+                // Derived, so the page recomposes when the answer flips, not on every frame of a scroll.
+                val atEnd by remember(scroll) { derivedStateOf { scroll.maxValue > 0 && scroll.value >= scroll.maxValue - END_SLACK } }
                 FadingFab(onTab && !wide && !atEnd, Modifier.align(Alignment.BottomEnd).padding(16.dp)) { open(Route.COPILOT) }
             }
         }
