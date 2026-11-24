@@ -46,9 +46,10 @@ class FocusSourcesTest {
         val seen = mutableListOf<Focus?>()
         val gate = BlankGate { seen += it }
         gate.focus(Focus("discord", 1))
-        gate.screen(blank = true) { error("not asked while blanking") }
-        gate.focus(Focus("discord", 1))
-        gate.screen(blank = false) { Focus("code", 2) }
+        gate.screen(blank = true)
+        // Taken while dark: held back, then reported on waking, with no second question to GNOME that could come back late.
+        gate.focus(Focus("code", 2))
+        gate.screen(blank = false)
         gate.focus(Focus("firefox", 3))
         assertEquals(listOf(Focus("discord", 1), null, Focus("code", 2), Focus("firefox", 3)), seen)
     }

@@ -62,25 +62,23 @@ object GnomeFocus : FocusSource {
         val monitor = follow(listOf("gdbus", "monitor", "--session", "--dest", "org.gnome.Shell", "--object-path", PATH), onChange) { line ->
             if ("org.organiza.Focus.Changed" in line) focus(line)?.let { gate.focus(it.takeIf { it.app.isNotEmpty() }) }
         } ?: return null
-        val current = ask()
+        val current = output("gdbus", "call", "--session", "--dest", "org.gnome.Shell", "--object-path", PATH, "--method", "org.organiza.Focus.Current")
+            ?.let(::focus)
         if (current == null) {
             monitor.close()
             return null
         }
-        onChange(current.takeIf { it.app.isNotEmpty() })
+        gate.focus(current.takeIf { it.app.isNotEmpty() })
         // A blank screen counts as nothing in front, as a screen turned off does on Android. The lock screen
         // already does: GNOME turns the extension off there. If this watch ends, focus keeps being reported.
         val screen = follow(listOf("gdbus", "monitor", "--session", "--dest", SCREEN_SAVER, "--object-path", SCREEN_SAVER_PATH), {}) { line ->
-            blank(line)?.let { blank -> gate.screen(blank) { ask()?.takeIf { it.app.isNotEmpty() } } }
+            blank(line)?.let(gate::screen)
         }
         return AutoCloseable {
             monitor.close()
             screen?.close()
         }
     }
-
-    private fun ask(): Focus? =
-        output("gdbus", "call", "--session", "--dest", "org.gnome.Shell", "--object-path", PATH, "--method", "org.organiza.Focus.Current")?.let(::focus)
 
     /** True when the screen goes blank, false when it wakes, null for any other line of the screensaver's signals. */
     fun blank(line: String): Boolean? = BLANK.find(line)?.groupValues?.get(1)?.toBooleanStrict()
@@ -136,18 +134,26 @@ object GnomeFocus : FocusSource {
     }
 }
 
-/** Holds back focus reports while the screen is blank, so no app counts then, even one that takes focus. */
+/**
+ * Holds back focus reports while the screen is blank, so no app counts then, even one that takes focus.
+ * Waking reports the last focus seen, held back or not. Both signals arrive on their own threads, so one
+ * report finishes before the next starts and the newest always wins.
+ */
 internal class BlankGate(private val onChange: (Focus?) -> Unit) {
-    @Volatile private var blank = false
+    private var blank = false
+    private var last: Focus? = null
 
+    @Synchronized
     fun focus(focus: Focus?) {
+        last = focus
         if (!blank) onChange(focus)
     }
 
-    /** Blanking reports nothing in front; waking reports what [now] says is in front. */
-    fun screen(blank: Boolean, now: () -> Focus?) {
+    /** Blanking reports nothing in front; waking reports the app last seen in front. */
+    @Synchronized
+    fun screen(blank: Boolean) {
         this.blank = blank
-        onChange(if (blank) null else now())
+        onChange(if (blank) null else last)
     }
 }
 
