@@ -59,16 +59,18 @@ fun NotesScreen(ui: UiSnapshot, actions: Actions) {
 @Composable
 private fun Composer(notes: NotesView, actions: Actions) {
     val colors = Theme.colors
+    var title by rememberSaveable { mutableStateOf("") }
     var body by rememberSaveable { mutableStateOf("") }
     var subject by rememberSaveable { mutableStateOf("") }
     var remind by rememberSaveable { mutableStateOf(REMINDERS.first()) }
     var minute by rememberSaveable { mutableStateOf(9 * 60) }
     var listening by rememberSaveable { mutableStateOf(false) }
-    // A new transcript joins whatever is already typed.
+    // A new transcript joins whatever text is already typed; the title is only ever typed.
     LaunchedEffect(notes.dictatedAt) { notes.dictated?.let { body = listOf(body, it).filter(String::isNotBlank).joinToString(" ") } }
     Panel {
         PanelHeader("New note")
-        Field(body, { body = it }, "What is on your mind?")
+        Field(title, { title = it.take(80) }, "Title")
+        Field(body, { body = it }, "Note: type it, or dictate it below", multiline = true)
         Field(subject, { subject = it }, "Subject, like Journal, Work or Errands")
         Spacer(Modifier.height(8.dp))
         Segmented(REMINDERS, remind, { it }) { remind = it }
@@ -77,7 +79,8 @@ private fun Composer(notes: NotesView, actions: Actions) {
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Action("Save note", ButtonKind.PRIMARY, enabled = body.isNotBlank() && !notes.busy) {
-                actions.addNote(body, subject, REMINDERS.indexOf(remind).takeIf { it > 0 }?.minus(1), minute)
+                actions.addNote(title, body, subject, REMINDERS.indexOf(remind).takeIf { it > 0 }?.minus(1), minute)
+                title = ""
                 body = ""
                 subject = ""
                 remind = REMINDERS.first()
@@ -95,6 +98,7 @@ private fun Composer(notes: NotesView, actions: Actions) {
 private fun NoteItem(note: NoteRow, busy: Boolean, actions: Actions) {
     val colors = Theme.colors
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        note.title?.let { Txt(it, Type.bodyStrong, modifier = Modifier.padding(bottom = 2.dp)) }
         Txt(note.body, Type.body)
         Txt(listOfNotNull(note.time, note.subject, note.reminder).joinToString(" · "), Type.small, colors.muted, Modifier.padding(top = 4.dp))
         // A note cannot come back, so deleting takes a second tap.

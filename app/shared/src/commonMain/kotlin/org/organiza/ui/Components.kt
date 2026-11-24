@@ -130,6 +130,7 @@ fun Field(
     modifier: Modifier = Modifier,
     secret: Boolean = false,
     number: Boolean = false,
+    multiline: Boolean = false,
 ) {
     val colors = Theme.colors
     Column(modifier.fillMaxWidth().padding(bottom = 12.dp)) {
@@ -137,7 +138,8 @@ fun Field(
         BasicTextField(
             value,
             onValueChange,
-            singleLine = true,
+            singleLine = !multiline,
+            minLines = if (multiline) 4 else 1,
             textStyle = Type.body.copy(color = colors.text),
             cursorBrush = SolidColor(colors.text),
             visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,

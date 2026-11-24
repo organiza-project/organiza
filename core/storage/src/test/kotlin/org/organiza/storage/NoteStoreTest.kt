@@ -16,7 +16,7 @@ class NoteStoreTest {
         notes.add(Note("a", "Felt scattered this morning", "Journal", at("08:00"), null))
         notes.add(Note("b", "Call the dentist", null, at("09:00"), at("17:00")))
         assertEquals(listOf("b", "a"), notes.all().map { it.id })
-        notes.update("a", "Felt calm after the walk", "Mood", null)
+        notes.update("a", "Felt calm after the walk", "Mood", null, null)
         assertEquals(Note("a", "Felt calm after the walk", "Mood", at("08:00"), null), notes.all().last())
         notes.delete("b")
         assertEquals(listOf("a"), notes.all().map { it.id })
@@ -34,5 +34,14 @@ class NoteStoreTest {
     fun `an empty note or an overlong subject is refused`() {
         assertFails { notes.add(Note("x", "", null, at("08:00"), null)) }
         assertFails { notes.add(Note("y", "text", "s".repeat(41), at("08:00"), null)) }
+    }
+
+    @Test
+    fun `a note keeps the title typed for it, and a title stays short`() {
+        notes.add(Note("t", "Ask about the new schedule and the parking", "Work", at("08:00"), null, "Monday meeting"))
+        assertEquals("Monday meeting", notes.all().single().title)
+        notes.update("t", "Ask about parking", "Work", null, "Meeting")
+        assertEquals("Meeting", notes.all().single().title)
+        assertFails { notes.add(Note("u", "text", null, at("08:00"), null, "t".repeat(81))) }
     }
 }

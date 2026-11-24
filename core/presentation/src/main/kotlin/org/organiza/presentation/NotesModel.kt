@@ -6,8 +6,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import org.organiza.storage.Note
 
-/** One note as the Notes tab shows it: its text, subject, time of day and reminder. */
-public data class NoteRow(val id: String, val body: String, val subject: String?, val time: String, val reminder: String?)
+/** One note as the Notes tab shows it: its title, text, subject, time of day and reminder. */
+public data class NoteRow(val id: String, val title: String?, val body: String, val subject: String?, val time: String, val reminder: String?)
 
 public data class NoteDay(val label: String, val notes: List<NoteRow>)
 
@@ -33,7 +33,7 @@ public data class NotesModel(val days: List<NoteDay>, val subjects: List<String>
 
         private fun row(note: Note, zone: ZoneId): NoteRow {
             val reminder = note.remindAt?.atZone(zone)?.let { "Reminder ${it.toLocalDate().format(DAY)}, ${it.format(TIME)}" }
-            return NoteRow(note.id, note.body, note.subject, note.createdAt.atZone(zone).format(TIME), reminder)
+            return NoteRow(note.id, note.title, note.body, note.subject, note.createdAt.atZone(zone).format(TIME), reminder)
         }
     }
 }

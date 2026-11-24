@@ -197,7 +197,7 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
 
     override fun setUsageAllDevices(on: Boolean) = core.usageReport.setAllDevices(on)
 
-    override fun addNote(body: String, subject: String, remindDay: Int?, minute: Int) = core.journal.add(body, subject, remindDay, minute)
+    override fun addNote(title: String, body: String, subject: String, remindDay: Int?, minute: Int) = core.journal.add(title, body, subject, remindDay, minute)
 
     override fun deleteNote(id: String) = core.journal.delete(id)
 

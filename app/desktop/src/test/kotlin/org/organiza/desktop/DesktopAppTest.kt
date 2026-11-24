@@ -172,11 +172,13 @@ class DesktopAppTest {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
         onNodeWithContentDescription("Notes").performClick()
-        // The composer's fields: the note, then its subject.
-        onAllNodes(hasSetTextAction())[0].performTextInput("Walk before work felt good")
-        onAllNodes(hasSetTextAction())[1].performTextInput("Journal")
+        // The composer's fields: the title, the note's text (where dictation lands), then its subject.
+        onAllNodes(hasSetTextAction())[0].performTextInput("Morning")
+        onAllNodes(hasSetTextAction())[1].performTextInput("Walk before work felt good")
+        onAllNodes(hasSetTextAction())[2].performTextInput("Journal")
         onNodeWithText("Save note").performClick()
         waitUntilExactlyOneExists(hasText("Walk before work felt good"), 5_000)
+        onNodeWithText("Morning").assertExists()
         onNodeWithText(" · Journal", substring = true).assertExists()
     }
 
@@ -205,7 +207,7 @@ class DesktopAppTest {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
         onNodeWithContentDescription("Notes").performClick()
-        onAllNodes(hasSetTextAction())[0].performTextInput("Call the bank")
+        onAllNodes(hasSetTextAction())[1].performTextInput("Call the bank")
         onNodeWithText("Save note").performClick()
         waitUntilExactlyOneExists(hasText("Call the bank"), 5_000)
         onNodeWithText("Delete").performClick()

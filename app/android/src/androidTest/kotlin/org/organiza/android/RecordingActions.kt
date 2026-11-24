@@ -51,7 +51,7 @@ class RecordingActions : Actions {
     override fun shiftUsage(step: Int) { calls += "shiftUsage $step" }
     override fun shiftUsageEdge(start: Boolean, days: Int) { calls += "shiftUsageEdge $start $days" }
     override fun setUsageAllDevices(on: Boolean) { calls += "setUsageAllDevices $on" }
-    override fun addNote(body: String, subject: String, remindDay: Int?, minute: Int) { calls += "addNote $body $subject $remindDay $minute" }
+    override fun addNote(title: String, body: String, subject: String, remindDay: Int?, minute: Int) { calls += "addNote $title $body $subject $remindDay $minute" }
     override fun deleteNote(id: String) { calls += "deleteNote $id" }
     override fun organizeNote(id: String) { calls += "organizeNote $id" }
     override fun filterNotes(subject: String?) { calls += "filterNotes $subject" }

@@ -1445,3 +1445,20 @@ Metrics. A device that was offline for days posted only yesterday and today when
 Month and Range show the phone's own history from the day this version runs. A reinstall keeps its
 device id. Devices updating from the random id count their old id as another device until the relay
 forgets those reports (ADR-0034) or the day ends.
+
+## ADR-0036: Notes have a typed title, and dictation fills the text
+
+### Status
+Accepted, 2026-11-24. Amends ADR-0030.
+
+### Context
+The note composer's first field took both typing and dictation, so a dictated note landed in what
+people read as the title.
+
+### Decision
+- Schema v13 adds `note.title`, optional, up to 80 characters.
+- The composer is Title, then the note's text (several lines), then Subject. Dictation only ever
+  appends to the text; the title is only typed. A note card shows its title above its text.
+
+### Consequences
+Notes written before v13 have no title and show as before.

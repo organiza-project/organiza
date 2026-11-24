@@ -32,14 +32,14 @@ class NotesController(private val app: OrganizaCore) {
     }
 
     /** Saves a note; [remindDay] is 0 for today or 1 for tomorrow, at [minute] of the day, or null for none. */
-    fun add(body: String, subject: String, remindDay: Int?, minute: Int) = app.onStores { stores ->
+    fun add(title: String, body: String, subject: String, remindDay: Int?, minute: Int) = app.onStores { stores ->
         val text = body.trim()
         if (text.isEmpty()) return@onStores say("Write or dictate something first")
         val zone = ZoneId.systemDefault()
         val now = app.clock.now()
         val remindAt = remindDay?.let { now.atZone(zone).toLocalDate().plusDays(it.toLong()).atStartOfDay(zone).plusMinutes(minute.toLong()).toInstant() }
         if (remindAt != null && !remindAt.isAfter(now)) return@onStores say("That time has already passed today. Choose a later one")
-        stores.notes.add(Note(UUID.randomUUID().toString(), text, subject.trim().take(MAX_SUBJECT).ifEmpty { null }, now, remindAt))
+        stores.notes.add(Note(UUID.randomUUID().toString(), text, subject.trim().take(MAX_SUBJECT).ifEmpty { null }, now, remindAt, title.trim().take(MAX_TITLE).ifEmpty { null }))
         dictated = null
         say(if (remindAt == null) "Note saved" else "Note saved. You will be reminded")
         app.rescheduleReminders()
@@ -65,7 +65,7 @@ class NotesController(private val app: OrganizaCore) {
                 when (result) {
                     is AiResult.Ok -> {
                         val at = result.value.remindAt?.atZone(zone)?.toInstant()?.takeIf { it.isAfter(app.clock.now()) }
-                        current.notes.update(note.id, note.body, result.value.subject, at ?: note.remindAt)
+                        current.notes.update(note.id, note.body, result.value.subject, at ?: note.remindAt, note.title)
                         say("Filed under ${result.value.subject}" + if (at != null) ", with a reminder" else "")
                         app.rescheduleReminders()
                     }
@@ -102,5 +102,6 @@ class NotesController(private val app: OrganizaCore) {
 
     private companion object {
         const val MAX_SUBJECT = 40
+        const val MAX_TITLE = 80
     }
 }
