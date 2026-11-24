@@ -13,6 +13,6 @@ class SchemaV13Test {
         Migrations.migrate(db, 12)
         db.execute("INSERT INTO note (id, body, subject, created_at_ms, remind_at_ms) VALUES ('a', 'Call the dentist', 'Errands', 1, NULL)")
         Migrations.migrate(db)
-        assertEquals(listOf(Note("a", "Call the dentist", "Errands", Instant.ofEpochMilli(1), null, null)), NoteStore(db).all())
+        assertEquals(listOf(Note("a", "Call the dentist", "Errands", Instant.ofEpochMilli(1), null, null)), NoteStore(db).recent(100, null))
     }
 }

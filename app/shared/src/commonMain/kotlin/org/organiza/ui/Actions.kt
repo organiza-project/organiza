@@ -100,6 +100,8 @@ interface Actions {
     // Notes (ADR-0030)
     /** [remindDay]: 0 today, 1 tomorrow, null for no reminder; [minute] of that day. */
     fun addNote(title: String, body: String, subject: String, remindDay: Int?, minute: Int)
+
+    fun showOlderNotes()
     fun deleteNote(id: String)
     fun organizeNote(id: String)
     fun filterNotes(subject: String?)

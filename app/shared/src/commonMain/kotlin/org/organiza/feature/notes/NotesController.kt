@@ -22,12 +22,25 @@ class NotesController(private val app: OrganizaCore) {
     @Volatile private var dictated: String? = null
     @Volatile private var dictatedAt = 0L
 
+    /** How many notes the tab loads; "Show older notes" adds a page, so a long journal never loads whole. */
+    @Volatile private var limit = PAGE
+
     /** Storage thread. */
-    fun view(stores: OrganizaCore.Storage, today: LocalDate, zone: ZoneId): NotesView =
-        NotesView(NotesModel.build(stores.notes.all(), subject, today, zone), subject, status, busy, dictated, dictatedAt)
+    fun view(stores: OrganizaCore.Storage, today: LocalDate, zone: ZoneId): NotesView {
+        // One more than shown says whether older notes exist.
+        val page = stores.notes.recent(limit + 1, subject)
+        val model = NotesModel.build(page.take(limit), subject, today, zone, stores.notes.subjects(), more = page.size > limit)
+        return NotesView(model, subject, status, busy, dictated, dictatedAt)
+    }
 
     fun filter(subject: String?) {
         this.subject = subject
+        limit = PAGE
+        app.requestUiRefresh()
+    }
+
+    fun showOlder() {
+        limit += PAGE
         app.requestUiRefresh()
     }
 
@@ -53,7 +66,7 @@ class NotesController(private val app: OrganizaCore) {
 
     /** Sends this one note, sanitized, to the person's own Groq key for a subject and a reminder time. */
     fun organize(id: String) = app.onStores { stores ->
-        val note = stores.notes.all().firstOrNull { it.id == id } ?: return@onStores
+        val note = stores.notes.find(id) ?: return@onStores
         if (!app.hasApiKey()) return@onStores say("Add your Groq key in Profile to organize notes with AI")
         busy = true
         say("Organizing with your AI key")
@@ -103,5 +116,6 @@ class NotesController(private val app: OrganizaCore) {
     private companion object {
         const val MAX_SUBJECT = 40
         const val MAX_TITLE = 80
+        const val PAGE = 100
     }
 }

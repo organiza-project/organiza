@@ -11,18 +11,25 @@ public data class NoteRow(val id: String, val title: String?, val body: String, 
 
 public data class NoteDay(val label: String, val notes: List<NoteRow>)
 
-/** Notes by day, newest first, optionally only one [subject] (ADR-0030). */
-public data class NotesModel(val days: List<NoteDay>, val subjects: List<String>) {
+/** Notes by day, newest first, optionally only one [subject] (ADR-0030). [more] is true when older notes are not loaded. */
+public data class NotesModel(val days: List<NoteDay>, val subjects: List<String>, val more: Boolean = false) {
     public companion object {
         private val DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.UK)
         private val TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.UK)
 
-        public fun build(notes: List<Note>, subject: String?, today: LocalDate, zone: ZoneId): NotesModel {
+        public fun build(
+            notes: List<Note>,
+            subject: String?,
+            today: LocalDate,
+            zone: ZoneId,
+            subjects: List<String> = notes.mapNotNull { it.subject }.distinct().sorted(),
+            more: Boolean = false,
+        ): NotesModel {
             val shown = notes.filter { subject == null || it.subject == subject }
             val days = shown.groupBy { it.createdAt.atZone(zone).toLocalDate() }.map { (day, group) ->
                 NoteDay(label(day, today), group.map { note -> row(note, zone) })
             }
-            return NotesModel(days, notes.mapNotNull { it.subject }.distinct().sorted())
+            return NotesModel(days, subjects, more)
         }
 
         private fun label(day: LocalDate, today: LocalDate): String = when (day) {

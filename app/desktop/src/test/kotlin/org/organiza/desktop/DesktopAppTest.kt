@@ -12,6 +12,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import androidx.compose.ui.unit.dp
@@ -222,6 +223,25 @@ class DesktopAppTest {
         val right = onNodeWithText("Usage today").fetchSemanticsNode().boundsInRoot
         assertTrue(right.left > left.right, "side by side, not stacked")
         assertTrue(right.top < left.bottom + 200, "both near the top")
+    }
+
+    @Test
+    fun `the notes tab loads a page of notes, and older ones on request`() = runComposeUiTest {
+        core.onboarded = true
+        val done = java.util.concurrent.CountDownLatch(1)
+        core.onStores { stores ->
+            val start = Instant.now().minus(Duration.ofDays(200))
+            (1..105).forEach { stores.notes.add(org.organiza.storage.Note("n$it", "Entry $it", null, start.plus(Duration.ofDays(it.toLong())), null)) }
+            done.countDown()
+        }
+        done.await()
+        core.requestUiRefresh()
+        setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
+        onNodeWithContentDescription("Notes").performClick()
+        waitUntilExactlyOneExists(hasText("Entry 105"), 5_000)
+        onNodeWithText("Entry 5").assertDoesNotExist()
+        onNodeWithText("Show older notes").performScrollTo().performClick()
+        waitUntilExactlyOneExists(hasText("Entry 5"), 5_000)
     }
 
     @Test

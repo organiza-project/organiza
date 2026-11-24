@@ -31,12 +31,25 @@ public class NoteStore(private val db: Database) {
         db.execute("DELETE FROM note WHERE id = ?", listOf(id))
     }
 
-    /** Every note, newest first. */
-    public fun all(): List<Note> = read("SELECT id, body, subject, created_at_ms, remind_at_ms, title FROM note ORDER BY created_at_ms DESC, id", emptyList())
+    /** The newest [limit] notes, only those under [subject] when it is given. */
+    public fun recent(limit: Int, subject: String?): List<Note> =
+        if (subject == null) {
+            read("SELECT $COLUMNS FROM note ORDER BY created_at_ms DESC, id LIMIT ?", listOf(limit.toLong()))
+        } else {
+            read("SELECT $COLUMNS FROM note WHERE subject = ? ORDER BY created_at_ms DESC, id LIMIT ?", listOf(subject, limit.toLong()))
+        }
+
+    public fun find(id: String): Note? = read("SELECT $COLUMNS FROM note WHERE id = ?", listOf(id)).firstOrNull()
+
+    public fun count(): Int = db.query("SELECT count(*) FROM note") { it.long(0) }.single()?.toInt() ?: 0
+
+    /** Every subject in use, in order. */
+    public fun subjects(): List<String> =
+        db.query("SELECT DISTINCT subject FROM note WHERE subject IS NOT NULL ORDER BY subject") { it.string(0).orEmpty() }
 
     /** Notes whose reminder is still ahead of [now], soonest first. */
     public fun upcoming(now: Instant): List<Note> = read(
-        "SELECT id, body, subject, created_at_ms, remind_at_ms, title FROM note WHERE remind_at_ms > ? ORDER BY remind_at_ms",
+        "SELECT $COLUMNS FROM note WHERE remind_at_ms > ? ORDER BY remind_at_ms",
         listOf(now.toEpochMilli()),
     )
 
@@ -49,5 +62,9 @@ public class NoteStore(private val db: Database) {
             row.long(4)?.let(Instant::ofEpochMilli),
             row.string(5),
         )
+    }
+
+    private companion object {
+        const val COLUMNS = "id, body, subject, created_at_ms, remind_at_ms, title"
     }
 }

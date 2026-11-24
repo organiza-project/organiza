@@ -56,6 +56,7 @@ fun NotesScreen(ui: UiSnapshot, actions: Actions) {
                     }
                 }
             }
+            if (notes.model.more) Action("Show older notes", ButtonKind.SECONDARY) { actions.showOlderNotes() }
         },
     )
 }

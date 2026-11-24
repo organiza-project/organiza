@@ -636,7 +636,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
                     .sumOf { Duration.between(it.start, it.finishedAt ?: it.end).toMinutes().coerceAtLeast(0) },
                 stayedFocused = stayed,
                 longestStreak = streak,
-                notesWritten = active.notes.all().size,
+                notesWritten = active.notes.count(),
             )
             val baseXp = Progression.xp(facts)
             game.settle(active, today, zone, baseXp)

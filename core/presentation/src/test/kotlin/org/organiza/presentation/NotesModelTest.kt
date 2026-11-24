@@ -24,4 +24,12 @@ class NotesModelTest {
         assertEquals(listOf("Errands", "Journal"), model.subjects)
         assertEquals(listOf("b"), NotesModel.build(notes, "Journal", today, ZoneOffset.UTC).days.flatMap { it.notes }.map { it.id })
     }
+
+    @Test
+    fun `a page of notes keeps every subject and says when older ones exist`() {
+        val model = NotesModel.build(notes.take(1), null, today, ZoneOffset.UTC, subjects = listOf("Errands", "Journal", "Work"), more = true)
+        assertEquals(listOf("Errands", "Journal", "Work"), model.subjects)
+        assertEquals(true, model.more)
+        assertEquals(false, NotesModel.build(notes, null, today, ZoneOffset.UTC).more)
+    }
 }

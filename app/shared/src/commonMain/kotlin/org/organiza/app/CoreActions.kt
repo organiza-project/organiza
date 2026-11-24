@@ -199,6 +199,8 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
 
     override fun addNote(title: String, body: String, subject: String, remindDay: Int?, minute: Int) = core.journal.add(title, body, subject, remindDay, minute)
 
+    override fun showOlderNotes() = core.journal.showOlder()
+
     override fun deleteNote(id: String) = core.journal.delete(id)
 
     override fun organizeNote(id: String) = core.journal.organize(id)
