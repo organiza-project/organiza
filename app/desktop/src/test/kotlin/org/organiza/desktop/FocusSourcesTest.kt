@@ -35,6 +35,13 @@ class FocusSourcesTest {
     }
 
     @Test
+    fun `a blank screen counts as nothing in front, and waking reads the app again`() {
+        assertEquals(true, GnomeFocus.blank("/org/gnome/ScreenSaver: org.gnome.ScreenSaver.ActiveChanged (true,)"))
+        assertEquals(false, GnomeFocus.blank("/org/gnome/ScreenSaver: org.gnome.ScreenSaver.ActiveChanged (false,)"))
+        assertNull(GnomeFocus.blank("Monitoring signals on object /org/gnome/ScreenSaver owned by org.gnome.ScreenSaver"))
+    }
+
+    @Test
     fun `xprop gives the active window, its app and its process`() {
         assertEquals("0x3a00007", X11Focus.window("_NET_ACTIVE_WINDOW(WINDOW): window id # 0x3a00007"))
         assertNull(X11Focus.window("_NET_ACTIVE_WINDOW(WINDOW): window id # 0x0"))

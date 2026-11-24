@@ -52,21 +52,41 @@ object GnomeFocus : FocusSource {
     const val UUID = "organiza-focus@organiza.org"
     private const val PATH = "/org/organiza/Focus"
     private val REPLY = Regex("""\((['"])(.*?)\1(?:, (\d+))?,?\)""")
+    private const val SCREEN_SAVER = "org.gnome.ScreenSaver"
+    private const val SCREEN_SAVER_PATH = "/org/gnome/ScreenSaver"
+    private val BLANK = Regex("""ScreenSaver\.ActiveChanged \((true|false),\)""")
 
     override fun start(onChange: (Focus?) -> Unit): AutoCloseable? {
         // Listening starts before the first question, so no change falls between the two.
         val monitor = follow(listOf("gdbus", "monitor", "--session", "--dest", "org.gnome.Shell", "--object-path", PATH), onChange) { line ->
             if ("org.organiza.Focus.Changed" in line) focus(line)?.let { onChange(it.takeIf { it.app.isNotEmpty() }) }
         } ?: return null
-        val current = output("gdbus", "call", "--session", "--dest", "org.gnome.Shell", "--object-path", PATH, "--method", "org.organiza.Focus.Current")
-            ?.let(::focus)
+        val current = ask()
         if (current == null) {
             monitor.close()
             return null
         }
         onChange(current.takeIf { it.app.isNotEmpty() })
-        return monitor
+        // A blank screen counts as nothing in front, as a screen turned off does on Android. The lock screen
+        // already does: GNOME turns the extension off there. If this watch ends, focus keeps being reported.
+        val screen = follow(listOf("gdbus", "monitor", "--session", "--dest", SCREEN_SAVER, "--object-path", SCREEN_SAVER_PATH), {}) { line ->
+            when (blank(line)) {
+                true -> onChange(null)
+                false -> ask()?.let { onChange(it.takeIf { focus -> focus.app.isNotEmpty() }) }
+                null -> Unit
+            }
+        }
+        return AutoCloseable {
+            monitor.close()
+            screen?.close()
+        }
     }
+
+    private fun ask(): Focus? =
+        output("gdbus", "call", "--session", "--dest", "org.gnome.Shell", "--object-path", PATH, "--method", "org.organiza.Focus.Current")?.let(::focus)
+
+    /** True when the screen goes blank, false when it wakes, null for any other line of the screensaver's signals. */
+    fun blank(line: String): Boolean? = BLANK.find(line)?.groupValues?.get(1)?.toBooleanStrict()
 
     override fun enable(): String {
         install(installDir())
