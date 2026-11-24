@@ -23,4 +23,14 @@ class TimetableOcrTest {
         assertTrue(text, "رياضيات" in text)
         assertTrue(text, "الأحد" in text || "الاحد" in text)
     }
+
+    @Test
+    fun modelsCopiedByAnOlderVersionAreReplacedAfterAnUpdate() {
+        val models = File(instrumentation.targetContext.noBackupFilesDir, "ocr/tessdata")
+        models.mkdirs()
+        // What an older version left behind: models that no longer match the app's.
+        listOf("eng.traineddata", "ara.traineddata").forEach { File(models, it).writeText("old") }
+        File(models, "installed").writeText("0")
+        anArabicTimetableIsReadWithItsSubjectsAndTimes()
+    }
 }

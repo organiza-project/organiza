@@ -42,13 +42,18 @@ class TimetableOcr(private val context: Context) {
     private fun tessData(): Pair<File, String> {
         val root = File(context.noBackupFilesDir, "ocr")
         val names = context.assets.list("tessdata").orEmpty().filter { it.endsWith(".traineddata") }.sorted()
+        // Copied again after each install or update, so a newer model never sits behind an old copy.
+        val marker = File(root, "tessdata/installed")
+        val installed = context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime.toString()
+        val current = marker.exists() && marker.readText() == installed
         names.forEach { name ->
             val model = File(root, "tessdata/$name")
-            if (!model.exists()) {
+            if (!current || !model.exists()) {
                 model.parentFile?.mkdirs()
                 context.assets.open("tessdata/$name").use { input -> model.outputStream().use(input::copyTo) }
             }
         }
+        marker.writeText(installed)
         // English first: it is the language Tesseract falls back on for digits and times.
         return root to names.map { it.removeSuffix(".traineddata") }.sortedBy { it != "eng" }.joinToString("+")
     }
