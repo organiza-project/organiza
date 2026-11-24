@@ -32,4 +32,20 @@ class UsageReportTest {
         assertEquals("1h 20m", report.total)
         assertEquals(listOf("Instagram", "WhatsApp"), report.apps.map { it.label })
     }
+
+    @Test
+    fun `a range shows its daily average, counting only days up to today`() {
+        // 210 minutes over the seven days of the week that have happened.
+        assertEquals("30m a day", UsageReport.build(days, monday.minusDays(6), monday, monday).average)
+        // A week still running divides by the days so far: Monday alone is 80 minutes.
+        assertEquals("1h 20m a day", UsageReport.build(days, monday, monday.plusDays(6), monday).average)
+    }
+
+    @Test
+    fun `the chart's gridlines fall on round times above the tallest bar`() {
+        assertEquals(listOf(15L, 30L), UsageReport.ticks(25))
+        assertEquals(listOf(30L, 60L, 90L), UsageReport.ticks(90))
+        assertEquals(listOf(120L, 240L, 360L), UsageReport.ticks(330))
+        assertEquals(listOf(15L), UsageReport.ticks(0))
+    }
 }

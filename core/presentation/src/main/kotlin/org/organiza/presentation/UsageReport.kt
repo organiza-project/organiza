@@ -21,6 +21,8 @@ public data class UsageReport(
     val bars: List<UsageBar>,
     val categories: List<CategoryShare>,
     val apps: List<AppShare>,
+    /** The total over the range's days up to today, per day, like "2h 10m a day". */
+    val average: String = "",
 ) {
     public companion object {
         private val DAY = DateTimeFormatter.ofPattern("d MMM", Locale.UK)
@@ -47,8 +49,18 @@ public data class UsageReport(
                 else -> "${from.format(DAY)} – ${last.format(DAY)}"
             }
             val bars = range.map { day -> UsageBar(if (range.size <= 7) day.format(WEEKDAY) else day.dayOfMonth.toString(), days[day].orEmpty().sumOf { it.minutes }, day == today) }
-            return UsageReport(title, Format.usage(total, null), bars, categories, apps)
+            val daysSoFar = range.count { !it.isAfter(today) }.coerceAtLeast(1)
+            return UsageReport(title, Format.usage(total, null), bars, categories, apps, Format.usage(total / daysSoFar, null) + " a day")
         }
+
+        /** Gridlines for a chart whose tallest bar is [most] minutes: round steps, at most three lines, the last above it. */
+        public fun ticks(most: Long): List<Long> {
+            val step = STEPS.firstOrNull { (most + it - 1) / it <= MAX_TICKS } ?: STEPS.last()
+            return (1..((most + step - 1) / step).coerceAtLeast(1)).map { it * step }
+        }
+
+        private val STEPS = listOf(15L, 30L, 60L, 120L, 180L, 240L, 360L, 480L, 720L)
+        private const val MAX_TICKS = 3
 
         private fun share(minutes: Long, total: Long): Double = if (total == 0L) 0.0 else minutes.toDouble() / total
     }

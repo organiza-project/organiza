@@ -92,21 +92,22 @@ fun <T> Segmented(options: List<T>, chosen: T, label: (T) -> String, onChoose: (
 fun Stepper(value: Int, unit: String, range: IntRange, enabled: Boolean = true, onChange: (Int) -> Unit) {
     val colors = Theme.colors
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        StepButton(Glyph.MINUS, "Fewer", enabled && value > range.first) { onChange(value - 1) }
+        IconButton(Glyph.MINUS, "Fewer", enabled && value > range.first) { onChange(value - 1) }
         Column(Modifier.width(72.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Txt(value.toString(), Type.figure, if (enabled) colors.text else colors.muted)
             Txt(unit, Type.small, colors.muted)
         }
-        StepButton(Glyph.PLUS, "More", enabled && value < range.last) { onChange(value + 1) }
+        IconButton(Glyph.PLUS, "More", enabled && value < range.last) { onChange(value + 1) }
     }
 }
 
+/** A square button holding one glyph, named for screen readers by [description]. */
 @Composable
-private fun StepButton(glyph: Glyph, description: String, enabled: Boolean, onClick: () -> Unit) {
+fun IconButton(glyph: Glyph, description: String, enabled: Boolean = true, size: Dp = Space.target + 4.dp, onClick: () -> Unit) {
     val colors = Theme.colors
     Box(
         Modifier
-            .size(Space.target + 4.dp)
+            .size(size)
             .border(Space.stroke, if (enabled) colors.border else colors.rule, RoundedCornerShape(Space.radiusControl))
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = description },
