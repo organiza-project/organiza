@@ -8,6 +8,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.test.assertNotNull
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -83,6 +84,28 @@ class DesktopStorageTest {
         settle(core)
         // Shown in the message panel every screen draws, not only in a field nothing reads.
         assertEquals("Storage problem: python3 is needed to reach the keyring. Your data has not been deleted.", core.uiState.value.message)
+    }
+
+    @Test
+    fun `while storage is closed, habit taps and confirming a command say they were not saved`() {
+        DesktopStorage.open(file, keyring).use { Migrations.migrate(it) }
+        val core = core(object : SecretStore by keyring {
+            override fun get(name: String): ByteArray? = null
+        })
+        settle(core)
+        listOf<() -> Unit>(
+            { core.markHabit("Read", true) },
+            { core.markHabitDone("Read") },
+            { core.addHabit("Read") },
+            { core.propose(org.organiza.voice.VoiceCommand.AddHabit("Read")); core.confirmVoiceCommand() },
+            { core.stopSession() },
+            { core.importCalendar("BEGIN:VCALENDAR\nEND:VCALENDAR") },
+        ).forEach { tap ->
+            core.showMessage("")
+            tap()
+            settle(core)
+            assertTrue(core.statusMessage.orEmpty().startsWith("Not saved"), "said: ${core.statusMessage}")
+        }
     }
 
     @Test

@@ -379,7 +379,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     }
 
     fun markHabitDone(name: String) = onStorageThread {
-        val voice = storage?.voice ?: return@onStorageThread
+        val voice = storage?.voice ?: return@onStorageThread notSaved()
         val today = clock.now().atZone(ZoneId.systemDefault()).toLocalDate()
         statusMessage = when (voice.apply(VoiceCommand.MarkHabit(name.trim(), today, true))) {
             VoiceOutcome.Done -> "Marked done"
@@ -421,7 +421,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
 
     fun confirmVoiceCommand() = onStorageThread {
         val command = pendingCommand ?: return@onStorageThread
-        val voice = storage?.voice ?: return@onStorageThread
+        val voice = storage?.voice ?: return@onStorageThread notSaved()
         pendingCommand = null
         statusMessage = when (val outcome = voice.apply(command)) {
             VoiceOutcome.Done -> "Done: " + command.describe()
@@ -694,7 +694,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
 
     fun addHabit(name: String) = onStorageThread {
         if (name.isBlank()) return@onStorageThread
-        val voice = storage?.voice ?: return@onStorageThread
+        val voice = storage?.voice ?: return@onStorageThread notSaved()
         statusMessage = when (voice.apply(VoiceCommand.AddHabit(name.trim()))) {
             VoiceOutcome.Done -> "Added ${name.trim()}"
             VoiceOutcome.AlreadyExists -> "That habit already exists"
@@ -703,14 +703,14 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     }
 
     fun markHabit(name: String, done: Boolean) = onStorageThread {
-        val voice = storage?.voice ?: return@onStorageThread
+        val voice = storage?.voice ?: return@onStorageThread notSaved()
         val today = clock.now().atZone(ZoneId.systemDefault()).toLocalDate()
         voice.apply(VoiceCommand.MarkHabit(name, today, done))
         refreshUi()
     }
 
     fun markHabitDaysAgoForTesting(name: String, daysAgo: Long, done: Boolean) = onStorageThread {
-        val voice = storage?.voice ?: return@onStorageThread
+        val voice = storage?.voice ?: return@onStorageThread notSaved()
         val day = clock.now().atZone(ZoneId.systemDefault()).toLocalDate().minusDays(daysAgo)
         voice.apply(VoiceCommand.MarkHabit(name, day, done))
         refreshUi()
@@ -725,7 +725,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     }
 
     fun startManual(request: ManualRequest, duration: Duration) = onStorageThread {
-        val scheduler = storage?.scheduler ?: return@onStorageThread
+        val scheduler = storage?.scheduler ?: return@onStorageThread notSaved()
         statusMessage = when (scheduler.startManual(request, duration)) {
             StartResult.Started -> "Session started"
             StartResult.InvalidDuration -> "Length not allowed. Strict sessions can run up to 24 hours."
@@ -734,7 +734,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     }
 
     fun stopSession() = onStorageThread {
-        val scheduler = storage?.scheduler ?: return@onStorageThread
+        val scheduler = storage?.scheduler ?: return@onStorageThread notSaved()
         statusMessage = when (scheduler.stopActive()) {
             StopResult.Stopped -> "Session stopped"
             StopResult.RefusedStrict -> "A strict session is running and cannot be stopped early."
@@ -743,7 +743,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     }
 
     fun saveRule(rule: StoredRule) = onStorageThread {
-        val scheduler = storage?.scheduler ?: return@onStorageThread
+        val scheduler = storage?.scheduler ?: return@onStorageThread notSaved()
         statusMessage = when (scheduler.saveRule(rule)) {
             RuleEdit.Saved -> "Rule saved"
             RuleEdit.RefusedStrict -> "This rule is in a running strict session and cannot be changed."
@@ -752,7 +752,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     }
 
     fun importCalendar(text: String) = onStorageThread {
-        val scheduler = storage?.scheduler ?: return@onStorageThread
+        val scheduler = storage?.scheduler ?: return@onStorageThread notSaved()
         val now = clock.now()
         val until = now.plus(CALENDAR_WINDOW)
         val read = IcsCalendar.read(text, now, until, ZoneId.systemDefault())
@@ -780,7 +780,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     }
 
     fun requestWeeklyReview() = onStorageThread {
-        val facts = storage?.aiFacts ?: return@onStorageThread
+        val facts = storage?.aiFacts ?: return@onStorageThread notSaved()
         val now = clock.now()
         val today = now.atZone(ZoneId.systemDefault()).toLocalDate()
         val habits = facts.habits(today.minusDays(7), today.plusDays(1), Sanitizer())
@@ -794,7 +794,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     }
 
     fun requestSchedule(goal: String) = onStorageThread {
-        val facts = storage?.aiFacts ?: return@onStorageThread
+        val facts = storage?.aiFacts ?: return@onStorageThread notSaved()
         val now = clock.now()
         val busy = facts.busy(now, now.plus(WEEK), ZoneId.systemDefault())
         onAiThread {
