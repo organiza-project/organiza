@@ -19,6 +19,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -82,9 +83,12 @@ private fun Edge(label: String, move: (Int) -> Unit) {
     }
 }
 
-/** A slice's colour: the data hue, lighter for each smaller category, and grey for the rest together. */
-private fun sliceColor(data: Color, muted: Color, index: Int): Color =
-    if (index < SLICES) data.copy(alpha = listOf(1f, 0.72f, 0.5f, 0.34f, 0.22f)[index]) else muted.copy(alpha = 0.35f)
+/**
+ * A slice's colour: the data hue for the largest, blending step by step toward the ink colour for smaller
+ * ones, which stays visible on a light or a dark ground; grey for the rest together.
+ */
+private fun sliceColor(data: Color, ink: Color, muted: Color, index: Int): Color =
+    if (index < SLICES) lerp(data, ink, listOf(0f, 0.3f, 0.5f, 0.68f, 0.84f)[index]) else muted
 
 /** The five largest categories and the rest as one slice, so the donut stays readable. */
 private fun slices(categories: List<CategoryShare>): List<Pair<String, CategoryShare>> {
@@ -109,7 +113,7 @@ private fun Categories(categories: List<CategoryShare>, total: String) {
                 shown.forEachIndexed { index, (_, share) ->
                     val sweep = (share.fraction * 360).toFloat()
                     drawArc(
-                        sliceColor(colors.data, colors.muted, index),
+                        sliceColor(colors.data, colors.text, colors.muted, index),
                         start + gap / 2,
                         (sweep - gap).coerceAtLeast(0.5f),
                         useCenter = false,
@@ -125,7 +129,7 @@ private fun Categories(categories: List<CategoryShare>, total: String) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             shown.forEachIndexed { index, (name, share) ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(10.dp).background(sliceColor(colors.data, colors.muted, index), CircleShape))
+                    Box(Modifier.size(10.dp).background(sliceColor(colors.data, colors.text, colors.muted, index), CircleShape))
                     Txt(name, Type.small, modifier = Modifier.weight(1f).padding(start = 8.dp), maxLines = 1)
                     Txt("${(share.fraction * 100).toInt()}%", Type.small, colors.muted)
                 }
@@ -200,7 +204,7 @@ private fun Bars(bars: List<UsageBar>) {
             Txt(if (index % step == 0) bar.label else "", Type.small.copy(textAlign = TextAlign.Center), if (bar.today) colors.data else colors.muted, Modifier.weight(1f))
         }
     }
-    if (bars.size > 1) {
+    if (bars.size > 1 && average > 0) {
         Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(width = 14.dp, height = 2.dp).background(colors.data))
             Txt("Daily average", Type.small, colors.muted, Modifier.padding(start = 6.dp))

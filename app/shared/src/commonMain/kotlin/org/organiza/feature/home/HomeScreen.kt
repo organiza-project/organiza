@@ -44,22 +44,28 @@ fun HomeScreen(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit, goTo: (T
         }
     }
     MessagePanel(ui.message)
-    home?.let { GoalPanel(it) }
-    FocusCard(ui, actions) { goTo(Tab.METRICS) }
-    WeekPanel(ui.calendar, ui.agendaToday, actions) { open(Route.AGENDA) }
-    Panel {
-        PanelHeader("Today's habits") { Action("New", ButtonKind.TEXT) { open(Route.NEW_HABIT) } }
-        val habits = home?.habits.orEmpty()
-        if (habits.isEmpty()) {
-            Txt("No habits yet. Add one to start filling the dial.", Type.body, colors.muted)
-            Spacer(Modifier.height(8.dp))
-            Action("New habit", ButtonKind.PRIMARY) { open(Route.NEW_HABIT) }
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            habits.forEach { habit -> HabitCard(habit) { done -> actions.markToday(habit.id, habit.name, done) } }
-        }
-    }
-    QuestsPanel(ui.rpg, actions, open, hero = false)
+    Columns(
+        first = {
+            home?.let { GoalPanel(it) }
+            FocusCard(ui, actions) { goTo(Tab.METRICS) }
+        },
+        second = {
+            WeekPanel(ui.calendar, ui.agendaToday, actions) { open(Route.AGENDA) }
+            Panel {
+                PanelHeader("Today's habits") { Action("New", ButtonKind.TEXT) { open(Route.NEW_HABIT) } }
+                val habits = home?.habits.orEmpty()
+                if (habits.isEmpty()) {
+                    Txt("No habits yet. Add one to start filling the dial.", Type.body, colors.muted)
+                    Spacer(Modifier.height(8.dp))
+                    Action("New habit", ButtonKind.PRIMARY) { open(Route.NEW_HABIT) }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    habits.forEach { habit -> HabitCard(habit) { done -> actions.markToday(habit.id, habit.name, done) } }
+                }
+            }
+            QuestsPanel(ui.rpg, actions, open, hero = false)
+        },
+    )
 }
 
 /** The day's status at a glance: the dial beside the goals met and what is left. */

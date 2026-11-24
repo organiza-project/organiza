@@ -44,65 +44,71 @@ fun HabitsScreen(ui: UiSnapshot, actions: Actions, open: (Route) -> Unit) {
         Action("Calendar", ButtonKind.SECONDARY) { open(Route.AGENDA) }
         Action("Import", ButtonKind.SECONDARY) { open(Route.IMPORT) }
     }
-    QuestsPanel(ui.rpg, actions, open)
-    Panel {
-        PanelHeader("Last 30 days") { Txt("Today", Type.small, colors.data) }
-        if (matrix.rows.isEmpty()) {
-            Txt("Add a habit below, or hold the talk button and say \"add habit read\".", Type.body, colors.muted)
-        }
-        matrix.rows.forEachIndexed { index, row ->
-            if (index > 0) Rule()
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Txt(row.name, Type.bodyStrong, maxLines = 1)
-                    Txt("${row.met} of ${row.days} days · streak ${row.streak}", Type.small, colors.muted)
-                }
-                val today = row.cells.last()
-                val done = today == Cell.MET
-                if (done) {
-                    Txt("Done today", Type.small, colors.muted, Modifier.padding(end = 8.dp))
-                    Action("Undo", ButtonKind.TEXT) { actions.markToday(row.id, row.name, false) }
-                } else {
-                    Action("Mark done", ButtonKind.SECONDARY) { actions.markToday(row.id, row.name, true) }
-                }
-            }
-            ui.habitProgress[row.id]?.let { progress -> MinutesRow(row.id, progress, actions) }
-            HabitCells(row.cells, "${row.name}: ${row.met} of ${row.days} days met")
-        }
-        if (matrix.rows.isNotEmpty()) MatrixLegend()
-    }
-    Panel {
-        PanelHeader("Speak a command")
-        Txt("Say \"log 30 minutes of reading\" or \"schedule focus tomorrow at 9\". Nothing changes until you confirm.", Type.small, colors.muted)
-        Spacer(Modifier.height(8.dp))
-        TalkButton(actions)
-        if (ui.pendingCommand != null) {
-            Spacer(Modifier.height(8.dp))
-            Txt(ui.pendingCommand, Type.bodyStrong)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Action("Confirm", ButtonKind.PRIMARY) { actions.confirmCommand() }
-                Action("Discard", ButtonKind.TEXT) { actions.discardCommand() }
-            }
-        }
-    }
     MessagePanel(ui.message)
-    Panel {
-        PanelHeader("Coming up") { Action("Import .ics", ButtonKind.TEXT) { actions.importCalendar() } }
-        if (ui.upcoming.isEmpty()) Txt("No sessions in the next 7 days. Tag calendar events #focus to schedule them.", Type.body, colors.muted)
-        ui.upcoming.forEachIndexed { index, item ->
-            if (index > 0) Rule()
-            Row(Modifier.fillMaxWidth()) {
-                Txt(item.label, Type.body, modifier = Modifier.weight(1f), maxLines = 1)
-                Txt("${item.time} · ${item.length}", Type.body, colors.muted)
+    Columns(
+        first = {
+            QuestsPanel(ui.rpg, actions, open)
+            Panel {
+                PanelHeader("Last 30 days") { Txt("Today", Type.small, colors.data) }
+                if (matrix.rows.isEmpty()) {
+                    Txt("Add a habit below, or hold the talk button and say \"add habit read\".", Type.body, colors.muted)
+                }
+                matrix.rows.forEachIndexed { index, row ->
+                    if (index > 0) Rule()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Txt(row.name, Type.bodyStrong, maxLines = 1)
+                            Txt("${row.met} of ${row.days} days · streak ${row.streak}", Type.small, colors.muted)
+                        }
+                        val today = row.cells.last()
+                        val done = today == Cell.MET
+                        if (done) {
+                            Txt("Done today", Type.small, colors.muted, Modifier.padding(end = 8.dp))
+                            Action("Undo", ButtonKind.TEXT) { actions.markToday(row.id, row.name, false) }
+                        } else {
+                            Action("Mark done", ButtonKind.SECONDARY) { actions.markToday(row.id, row.name, true) }
+                        }
+                    }
+                    ui.habitProgress[row.id]?.let { progress -> MinutesRow(row.id, progress, actions) }
+                    HabitCells(row.cells, "${row.name}: ${row.met} of ${row.days} days met")
+                }
+                if (matrix.rows.isNotEmpty()) MatrixLegend()
             }
-        }
-    }
-    Panel {
-        PanelHeader("Weekly review")
-        Txt("A short, honest summary of your week from your AI coach.", Type.small, colors.muted)
-        Spacer(Modifier.height(8.dp))
-        Action("Ask for a review", ButtonKind.SECONDARY) { actions.weeklyReview() }
-    }
+        },
+        second = {
+            Panel {
+                PanelHeader("Speak a command")
+                Txt("Say \"log 30 minutes of reading\" or \"schedule focus tomorrow at 9\". Nothing changes until you confirm.", Type.small, colors.muted)
+                Spacer(Modifier.height(8.dp))
+                TalkButton(actions)
+                if (ui.pendingCommand != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Txt(ui.pendingCommand, Type.bodyStrong)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Action("Confirm", ButtonKind.PRIMARY) { actions.confirmCommand() }
+                        Action("Discard", ButtonKind.TEXT) { actions.discardCommand() }
+                    }
+                }
+            }
+            Panel {
+                PanelHeader("Coming up") { Action("Import .ics", ButtonKind.TEXT) { actions.importCalendar() } }
+                if (ui.upcoming.isEmpty()) Txt("No sessions in the next 7 days. Tag calendar events #focus to schedule them.", Type.body, colors.muted)
+                ui.upcoming.forEachIndexed { index, item ->
+                    if (index > 0) Rule()
+                    Row(Modifier.fillMaxWidth()) {
+                        Txt(item.label, Type.body, modifier = Modifier.weight(1f), maxLines = 1)
+                        Txt("${item.time} · ${item.length}", Type.body, colors.muted)
+                    }
+                }
+            }
+            Panel {
+                PanelHeader("Weekly review")
+                Txt("A short, honest summary of your week from your AI coach.", Type.small, colors.muted)
+                Spacer(Modifier.height(8.dp))
+                Action("Ask for a review", ButtonKind.SECONDARY) { actions.weeklyReview() }
+            }
+        },
+    )
 }
 
 /** Today's minutes against the goal, from the linked app and from logging by hand (ADR-0020). */

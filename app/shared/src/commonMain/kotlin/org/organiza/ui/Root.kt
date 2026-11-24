@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -74,30 +75,34 @@ fun OrganizaRoot(ui: UiSnapshot, actions: Actions, request: Pair<Route, Long>? =
             ScrollState(0)
         }
         val onTab = !ui.onboarding && route == null
+        // A desktop window takes two columns of panels on the tabs; forms opened on top keep a reading width.
+        val twoColumns = wide && onTab && maxWidth >= TWO_COLUMNS
         val page: @Composable (Modifier) -> Unit = { modifier ->
-            // Content stops at 720dp and centres, so short panels never stretch across a wide window.
+            // Content stops at 720dp, or 1200dp in two columns, and centres, so panels never stretch across a window.
             Box(modifier) {
                 Column(
                     Modifier
                         .fillMaxSize()
                         .verticalScroll(scroll)
                         .wrapContentWidth(Alignment.CenterHorizontally)
-                        .widthIn(max = 720.dp)
+                        .widthIn(max = if (twoColumns) 1200.dp else 720.dp)
                         .padding(start = Space.margin, end = Space.margin, top = if (wide) 12.dp else 0.dp, bottom = Space.margin),
                     verticalArrangement = Arrangement.spacedBy(Space.gap),
                 ) {
-                    when {
-                        ui.onboarding -> OnboardingScreen(ui, actions)
-                        route == Route.NEW_HABIT -> NewHabitScreen(ui, actions, back)
-                        route == Route.AGENDA -> CalendarScreen(ui, actions, back, open)
-                        route == Route.IMPORT -> ImportScreen(ui, actions, back, open)
-                        route == Route.DICTATION -> DictationScreen(ui, actions, back)
-                        route == Route.COPILOT -> CopilotScreen(ui, actions, back)
-                        tab == Tab.HOME -> HomeScreen(ui, actions, open) { tab = it }
-                        tab == Tab.HABITS -> HabitsScreen(ui, actions, open)
-                        tab == Tab.NOTES -> NotesScreen(ui, actions)
-                        tab == Tab.METRICS -> MetricsScreen(ui, actions)
-                        else -> ProfileScreen(ui, actions)
+                    CompositionLocalProvider(LocalTwoColumns provides twoColumns) {
+                        when {
+                            ui.onboarding -> OnboardingScreen(ui, actions)
+                            route == Route.NEW_HABIT -> NewHabitScreen(ui, actions, back)
+                            route == Route.AGENDA -> CalendarScreen(ui, actions, back, open)
+                            route == Route.IMPORT -> ImportScreen(ui, actions, back, open)
+                            route == Route.DICTATION -> DictationScreen(ui, actions, back)
+                            route == Route.COPILOT -> CopilotScreen(ui, actions, back)
+                            tab == Tab.HOME -> HomeScreen(ui, actions, open) { tab = it }
+                            tab == Tab.HABITS -> HabitsScreen(ui, actions, open)
+                            tab == Tab.NOTES -> NotesScreen(ui, actions)
+                            tab == Tab.METRICS -> MetricsScreen(ui, actions)
+                            else -> ProfileScreen(ui, actions)
+                        }
                     }
                 }
                 // The page ends at its last panel. The copilot button steps aside there instead of
@@ -127,6 +132,9 @@ fun OrganizaRoot(ui: UiSnapshot, actions: Actions, request: Pair<Route, Long>? =
 private fun FadingFab(visible: Boolean, modifier: Modifier, onClick: () -> Unit) {
     AnimatedVisibility(visible, modifier, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) { CopilotFab(onClick = onClick) }
 }
+
+// Wide enough, sidebar included, for two columns of panels of a readable width.
+private val TWO_COLUMNS = 1100.dp
 
 // Within this many pixels of the end counts as the end, so a fling that stops just short still clears the button.
 private const val END_SLACK = 24

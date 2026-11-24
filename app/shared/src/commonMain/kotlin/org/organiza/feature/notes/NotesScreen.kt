@@ -33,27 +33,31 @@ fun NotesScreen(ui: UiSnapshot, actions: Actions) {
     val colors = Theme.colors
     TitleBlock("Notes", "Journal, thoughts and reminders. They stay on this device.")
     MessagePanel(ui.message)
-    Composer(notes, actions)
-    if (notes.model.subjects.isNotEmpty()) {
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Action("All", if (notes.subject == null) ButtonKind.PRIMARY else ButtonKind.SECONDARY) { actions.filterNotes(null) }
-            notes.model.subjects.forEach { subject ->
-                Action(subject, if (notes.subject == subject) ButtonKind.PRIMARY else ButtonKind.SECONDARY) { actions.filterNotes(subject) }
+    Columns(
+        first = { Composer(notes, actions) },
+        second = {
+            if (notes.model.subjects.isNotEmpty()) {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Action("All", if (notes.subject == null) ButtonKind.PRIMARY else ButtonKind.SECONDARY) { actions.filterNotes(null) }
+                    notes.model.subjects.forEach { subject ->
+                        Action(subject, if (notes.subject == subject) ButtonKind.PRIMARY else ButtonKind.SECONDARY) { actions.filterNotes(subject) }
+                    }
+                }
             }
-        }
-    }
-    if (notes.model.days.isEmpty()) {
-        Panel { Txt(if (notes.subject == null) "No notes yet. Write or dictate your first one above." else "No notes under ${notes.subject}.", Type.body, colors.muted) }
-    }
-    notes.model.days.forEach { day ->
-        Txt(day.label, Type.section, modifier = Modifier.padding(top = 8.dp).semantics { heading() })
-        Panel {
-            day.notes.forEachIndexed { index, note ->
-                if (index > 0) Rule()
-                NoteItem(note, notes.busy, actions)
+            if (notes.model.days.isEmpty()) {
+                Panel { Txt(if (notes.subject == null) "No notes yet. Write or dictate your first one." else "No notes under ${notes.subject}.", Type.body, colors.muted) }
             }
-        }
-    }
+            notes.model.days.forEach { day ->
+                Txt(day.label, Type.section, modifier = Modifier.padding(top = 8.dp).semantics { heading() })
+                Panel {
+                    day.notes.forEachIndexed { index, note ->
+                        if (index > 0) Rule()
+                        NoteItem(note, notes.busy, actions)
+                    }
+                }
+            }
+        },
+    )
 }
 
 @Composable

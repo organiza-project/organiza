@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
@@ -239,5 +240,22 @@ fun ChoiceRow(
             Txt(title, Type.bodyStrong)
             if (detail != null) Txt(detail, Type.small, colors.muted)
         }
+    }
+}
+
+/** Whether this page is wide enough for two columns of panels, as a desktop window is (ADR-0025). */
+val LocalTwoColumns = staticCompositionLocalOf { false }
+
+/** Two groups of panels side by side on a wide page, and one after the other on a narrow one. */
+@Composable
+fun Columns(first: @Composable () -> Unit, second: @Composable () -> Unit) {
+    if (LocalTwoColumns.current) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.gap), verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.gap)) { first() }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.gap)) { second() }
+        }
+    } else {
+        first()
+        second()
     }
 }

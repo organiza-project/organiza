@@ -28,15 +28,21 @@ import org.organiza.presentation.FocusWeek
 fun MetricsScreen(ui: UiSnapshot, actions: Actions) {
     TitleBlock("Metrics", ui.week?.total)
     MessagePanel(ui.message)
-    ScreenTimePanel(ui.usage, actions) { name -> ui.hub.apps.firstOrNull { it.label == name }?.pkg }
     // One app card open at a time across both lists, so two drafts of one limit never race.
     val openApp = rememberSaveable { mutableStateOf<String?>(null) }
-    UsageDashboard(ui, actions, openApp)
-    BlockerHub(ui, actions, openApp)
-    ui.week?.let { FocusWeekPanel(it) }
-    ui.choices?.let { ChoicesPanel(it) }
-    CopilotPanel(ui, actions)
-    ProtectionPanel(ui, actions)
+    Columns(
+        first = {
+            ScreenTimePanel(ui.usage, actions) { name -> ui.hub.apps.firstOrNull { it.label == name }?.pkg }
+            ui.week?.let { FocusWeekPanel(it) }
+            ui.choices?.let { ChoicesPanel(it) }
+        },
+        second = {
+            UsageDashboard(ui, actions, openApp)
+            BlockerHub(ui, actions, openApp)
+            CopilotPanel(ui, actions)
+            ProtectionPanel(ui, actions)
+        },
+    )
 }
 
 /** One bar per day in ink, today in the data hue, with the zero line drawn even when empty. */

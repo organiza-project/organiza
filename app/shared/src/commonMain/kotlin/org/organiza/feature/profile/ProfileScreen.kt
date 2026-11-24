@@ -38,73 +38,79 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
             LogoMark(56.dp)
         }
     }
-    if (progression != null) {
-        Txt(progression.title, Type.title.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center), modifier = Modifier.fillMaxWidth().semantics { heading() })
-        Panel {
-            Row(Modifier.fillMaxWidth()) {
-                Txt("Level ${progression.level}", Type.bodyStrong, modifier = Modifier.weight(1f))
-                Txt("${progression.xp} XP in total", Type.small, colors.muted)
-            }
-            Spacer(Modifier.height(8.dp))
-            ProgressPill(progression.fraction, ink = colors.data)
-            Txt("${progression.toNext} XP more to reach level ${progression.level + 1}.", Type.body, modifier = Modifier.padding(top = 8.dp))
-            Txt(
-                "You earn 10 XP for each day you meet a habit, 1 XP for every 5 minutes of focus, and 5 XP each time you " +
-                    "stay focused at a pause. Quests add their own. XP stays on this device.",
-                Type.small,
-                colors.muted,
-                Modifier.padding(top = 4.dp),
-            )
-        }
-        Panel {
-            PanelHeader("Badges") { Txt("${progression.badges.count { it.earned }} of ${progression.badges.size}", Type.small, colors.muted) }
-            // Rows of three at every width, so the grid stays even.
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                progression.badges.chunked(3).forEach { row ->
+    Columns(
+        first = {
+            if (progression != null) {
+                Txt(progression.title, Type.title.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center), modifier = Modifier.fillMaxWidth().semantics { heading() })
+                Panel {
                     Row(Modifier.fillMaxWidth()) {
-                        row.forEach { badge ->
-                            val glyph = when (badge.id) {
-                                "first-session", "ten-hours" -> Glyph.CLOCK
-                                "week-streak", "month-streak" -> Glyph.FLAME
-                                "held-the-line" -> Glyph.SHIELD
-                                "journal-keeper" -> Glyph.NOTES
-                                else -> Glyph.CROWN
+                        Txt("Level ${progression.level}", Type.bodyStrong, modifier = Modifier.weight(1f))
+                        Txt("${progression.xp} XP in total", Type.small, colors.muted)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    ProgressPill(progression.fraction, ink = colors.data)
+                    Txt("${progression.toNext} XP more to reach level ${progression.level + 1}.", Type.body, modifier = Modifier.padding(top = 8.dp))
+                    Txt(
+                        "You earn 10 XP for each day you meet a habit, 1 XP for every 5 minutes of focus, and 5 XP each time you " +
+                            "stay focused at a pause. Quests add their own. XP stays on this device.",
+                        Type.small,
+                        colors.muted,
+                        Modifier.padding(top = 4.dp),
+                    )
+                }
+                Panel {
+                    PanelHeader("Badges") { Txt("${progression.badges.count { it.earned }} of ${progression.badges.size}", Type.small, colors.muted) }
+                    // Rows of three at every width, so the grid stays even.
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        progression.badges.chunked(3).forEach { row ->
+                            Row(Modifier.fillMaxWidth()) {
+                                row.forEach { badge ->
+                                    val glyph = when (badge.id) {
+                                        "first-session", "ten-hours" -> Glyph.CLOCK
+                                        "week-streak", "month-streak" -> Glyph.FLAME
+                                        "held-the-line" -> Glyph.SHIELD
+                                        "journal-keeper" -> Glyph.NOTES
+                                        else -> Glyph.CROWN
+                                    }
+                                    Box(Modifier.weight(1f), contentAlignment = Alignment.TopCenter) { Medallion(glyph, badge.title, badge.earned) }
+                                }
                             }
-                            Box(Modifier.weight(1f), contentAlignment = Alignment.TopCenter) { Medallion(glyph, badge.title, badge.earned) }
                         }
                     }
                 }
             }
-        }
-    }
-    MessagePanel(ui.message)
-    LockoutPanel(ui, actions)
-    Panel {
-        val account = ui.account
-        SwitchRow(
-            "Supabase cloud sync",
-            when {
-                account.signedInAs != null -> "Signed in as ${account.signedInAs}"
-                account.kind != null -> "On. Sign in below to share usage across your devices"
-                else -> "Off. Everything stays on this device"
-            },
-            account.kind != null,
-        ) { on ->
-            if (on && account.hostedAvailable) actions.chooseBackend(BackendKind.HOSTED, "", "") else if (!on) actions.chooseBackend(null, "", "")
-            // Without a hosted project in this build, turning sync on means choosing a backend first.
-            showBackend = on && !account.hostedAvailable
-        }
-        Action(if (showBackend) "Hide backend settings" else "Backend settings", ButtonKind.TEXT) { showBackend = !showBackend }
-        Rule()
-        SwitchRow("API configuration", if (ui.hasApiKey) "Groq key saved in the system keystore" else "No Groq key", ui.hasApiKey) { on ->
-            if (!on && ui.hasApiKey) actions.removeKey() else showKey = true
-        }
-        Action(if (showKey) "Hide key settings" else "Key settings", ButtonKind.TEXT) { showKey = !showKey }
-    }
-    if (showBackend) BackendPanel(ui.account, actions, withAccount = false)
-    if (ui.account.kind != null) AccountPanel(ui.account, actions)
-    if (showKey) AiKeyPanel(ui, actions)
-    VaultPanels(ui, actions)
+        },
+        second = {
+            MessagePanel(ui.message)
+            LockoutPanel(ui, actions)
+            Panel {
+                val account = ui.account
+                SwitchRow(
+                    "Supabase cloud sync",
+                    when {
+                        account.signedInAs != null -> "Signed in as ${account.signedInAs}"
+                        account.kind != null -> "On. Sign in below to share usage across your devices"
+                        else -> "Off. Everything stays on this device"
+                    },
+                    account.kind != null,
+                ) { on ->
+                    if (on && account.hostedAvailable) actions.chooseBackend(BackendKind.HOSTED, "", "") else if (!on) actions.chooseBackend(null, "", "")
+                    // Without a hosted project in this build, turning sync on means choosing a backend first.
+                    showBackend = on && !account.hostedAvailable
+                }
+                Action(if (showBackend) "Hide backend settings" else "Backend settings", ButtonKind.TEXT) { showBackend = !showBackend }
+                Rule()
+                SwitchRow("API configuration", if (ui.hasApiKey) "Groq key saved in the system keystore" else "No Groq key", ui.hasApiKey) { on ->
+                    if (!on && ui.hasApiKey) actions.removeKey() else showKey = true
+                }
+                Action(if (showKey) "Hide key settings" else "Key settings", ButtonKind.TEXT) { showKey = !showKey }
+            }
+            if (showBackend) BackendPanel(ui.account, actions, withAccount = false)
+            if (ui.account.kind != null) AccountPanel(ui.account, actions)
+            if (showKey) AiKeyPanel(ui, actions)
+            VaultPanels(ui, actions)
+        },
+    )
 }
 
 @Composable

@@ -213,6 +213,18 @@ class DesktopAppTest {
     }
 
     @Test
+    fun `a wide window puts the metrics panels in two columns`() = androidx.compose.ui.test.v2.runDesktopComposeUiTest(1440, 900) {
+        core.onboarded = true
+        setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
+        onNodeWithContentDescription("Metrics").performClick()
+        waitUntilExactlyOneExists(hasText("Usage today"), 5_000)
+        val left = onNodeWithText("Screen time").fetchSemanticsNode().boundsInRoot
+        val right = onNodeWithText("Usage today").fetchSemanticsNode().boundsInRoot
+        assertTrue(right.left > left.right, "side by side, not stacked")
+        assertTrue(right.top < left.bottom + 200, "both near the top")
+    }
+
+    @Test
     fun `deleting a note takes a second tap`() = runComposeUiTest {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
