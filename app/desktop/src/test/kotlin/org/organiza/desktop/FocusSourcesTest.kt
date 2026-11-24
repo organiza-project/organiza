@@ -42,6 +42,18 @@ class FocusSourcesTest {
     }
 
     @Test
+    fun `while the screen is blank no app counts, even one that takes focus, until it wakes`() {
+        val seen = mutableListOf<Focus?>()
+        val gate = BlankGate { seen += it }
+        gate.focus(Focus("discord", 1))
+        gate.screen(blank = true) { error("not asked while blanking") }
+        gate.focus(Focus("discord", 1))
+        gate.screen(blank = false) { Focus("code", 2) }
+        gate.focus(Focus("firefox", 3))
+        assertEquals(listOf(Focus("discord", 1), null, Focus("code", 2), Focus("firefox", 3)), seen)
+    }
+
+    @Test
     fun `xprop gives the active window, its app and its process`() {
         assertEquals("0x3a00007", X11Focus.window("_NET_ACTIVE_WINDOW(WINDOW): window id # 0x3a00007"))
         assertNull(X11Focus.window("_NET_ACTIVE_WINDOW(WINDOW): window id # 0x0"))

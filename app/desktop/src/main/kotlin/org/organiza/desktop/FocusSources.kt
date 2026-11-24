@@ -57,9 +57,10 @@ object GnomeFocus : FocusSource {
     private val BLANK = Regex("""ScreenSaver\.ActiveChanged \((true|false),\)""")
 
     override fun start(onChange: (Focus?) -> Unit): AutoCloseable? {
+        val gate = BlankGate(onChange)
         // Listening starts before the first question, so no change falls between the two.
         val monitor = follow(listOf("gdbus", "monitor", "--session", "--dest", "org.gnome.Shell", "--object-path", PATH), onChange) { line ->
-            if ("org.organiza.Focus.Changed" in line) focus(line)?.let { onChange(it.takeIf { it.app.isNotEmpty() }) }
+            if ("org.organiza.Focus.Changed" in line) focus(line)?.let { gate.focus(it.takeIf { it.app.isNotEmpty() }) }
         } ?: return null
         val current = ask()
         if (current == null) {
@@ -70,11 +71,7 @@ object GnomeFocus : FocusSource {
         // A blank screen counts as nothing in front, as a screen turned off does on Android. The lock screen
         // already does: GNOME turns the extension off there. If this watch ends, focus keeps being reported.
         val screen = follow(listOf("gdbus", "monitor", "--session", "--dest", SCREEN_SAVER, "--object-path", SCREEN_SAVER_PATH), {}) { line ->
-            when (blank(line)) {
-                true -> onChange(null)
-                false -> ask()?.let { onChange(it.takeIf { focus -> focus.app.isNotEmpty() }) }
-                null -> Unit
-            }
+            blank(line)?.let { blank -> gate.screen(blank) { ask()?.takeIf { it.app.isNotEmpty() } } }
         }
         return AutoCloseable {
             monitor.close()
@@ -136,6 +133,21 @@ object GnomeFocus : FocusSource {
         val pid = match.groupValues[3].toLongOrNull()?.takeIf { it > 0 }
         // GNOME names a window it cannot match to a desktop entry `window:N`.
         return if (id.startsWith("window:")) Focus("", null) else Focus(id.removeSuffix(".desktop"), pid)
+    }
+}
+
+/** Holds back focus reports while the screen is blank, so no app counts then, even one that takes focus. */
+internal class BlankGate(private val onChange: (Focus?) -> Unit) {
+    @Volatile private var blank = false
+
+    fun focus(focus: Focus?) {
+        if (!blank) onChange(focus)
+    }
+
+    /** Blanking reports nothing in front; waking reports what [now] says is in front. */
+    fun screen(blank: Boolean, now: () -> Focus?) {
+        this.blank = blank
+        onChange(if (blank) null else now())
     }
 }
 
