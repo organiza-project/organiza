@@ -270,6 +270,19 @@ class DesktopAppTest {
     }
 
     @Test
+    fun `dictation says it is listening with a running clock, then that it is transcribing`() = runComposeUiTest {
+        var listening by androidx.compose.runtime.mutableStateOf(true)
+        var transcribing by androidx.compose.runtime.mutableStateOf(false)
+        setContent { OrganizaTheme { Column { org.organiza.ui.DictationStatus(listening, transcribing, { 0.4f }) } } }
+        onNodeWithText("Listening", substring = true).assertExists()
+        onNodeWithText("0:00 of 2:00", substring = true).assertExists()
+        listening = false
+        transcribing = true
+        waitUntilExactlyOneExists(hasText("Turning your words into text…"), 5_000)
+        onNodeWithText("Listening", substring = true).assertDoesNotExist()
+    }
+
+    @Test
     fun `deleting a note takes a second tap`() = runComposeUiTest {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }

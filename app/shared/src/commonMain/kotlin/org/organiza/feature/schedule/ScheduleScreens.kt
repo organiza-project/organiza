@@ -179,24 +179,8 @@ private fun ImportResult(ui: UiSnapshot, actions: Actions) {
 fun DictationScreen(ui: UiSnapshot, actions: Actions, back: () -> Unit) {
     val colors = Theme.colors
     var held by remember { mutableStateOf(false) }
-    val levels = remember { mutableStateListOf<Float>().apply { repeat(BARS) { add(0f) } } }
-    LaunchedEffect(held) {
-        while (held) {
-            levels.removeAt(0)
-            levels.add(actions.dictationLevel())
-            delay(60)
-        }
-    }
     TopBar("Dictate schedule", back)
     Panel {
-        Canvas(Modifier.fillMaxWidth().height(120.dp).semantics { contentDescription = "Recording level" }) {
-            val step = size.width / BARS
-            levels.forEachIndexed { index, level ->
-                val height = maxOf(3.dp.toPx(), size.height * level)
-                val x = index * step + step / 2
-                drawLine(colors.text, Offset(x, (size.height - height) / 2), Offset(x, (size.height + height) / 2), 3.dp.toPx(), androidx.compose.ui.graphics.StrokeCap.Round)
-            }
-        }
         Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
             Box(
                 Modifier
@@ -215,7 +199,8 @@ fun DictationScreen(ui: UiSnapshot, actions: Actions, back: () -> Unit) {
                 contentAlignment = Alignment.Center,
             ) { Icon(Glyph.MIC, colors.onPrimary, 30.dp) }
         }
-        Txt(if (held) "Listening. Release to transcribe" else "Hold and say your week, for example \"Monday nine to eleven, maths\".", Type.small, colors.muted)
+        DictationStatus(held, ui.schedule.busy == "Transcribing", actions::dictationLevel)
+        Txt(if (held) "Release to transcribe" else "Hold and say your week, for example \"Monday nine to eleven, maths\".", Type.small, colors.muted)
     }
     Panel {
         PanelHeader("Preview")
@@ -226,4 +211,3 @@ fun DictationScreen(ui: UiSnapshot, actions: Actions, back: () -> Unit) {
     ImportResult(ui, actions)
 }
 
-private const val BARS = 48

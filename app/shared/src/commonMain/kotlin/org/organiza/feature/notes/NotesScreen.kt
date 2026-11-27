@@ -95,6 +95,7 @@ private fun Composer(notes: NotesView, actions: Actions) {
                 listening = !listening
             }
         }
+        DictationStatus(listening, notes.transcribing, actions::dictationLevel)
         Txt("Dictation sends your voice to Groq on your key. Typed notes never leave this device.", Type.small, colors.muted, Modifier.padding(top = 8.dp))
     }
 }

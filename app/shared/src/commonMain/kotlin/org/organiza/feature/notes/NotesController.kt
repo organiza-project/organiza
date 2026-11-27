@@ -21,6 +21,7 @@ class NotesController(private val app: OrganizaCore) {
     @Volatile private var busy = false
     @Volatile private var dictated: String? = null
     @Volatile private var dictatedAt = 0L
+    @Volatile private var transcribing = false
 
     /** How many notes the tab loads; "Show older notes" adds a page, so a long journal never loads whole. */
     @Volatile private var limit = PAGE
@@ -30,7 +31,7 @@ class NotesController(private val app: OrganizaCore) {
         // One more than shown says whether older notes exist.
         val page = stores.notes.recent(limit + 1, subject)
         val model = NotesModel.build(page.take(limit), subject, today, zone, stores.notes.subjects(), more = page.size > limit)
-        return NotesView(model, subject, status, busy, dictated, dictatedAt)
+        return NotesView(model, subject, status, busy, dictated, dictatedAt, transcribing)
     }
 
     fun filter(subject: String?) {
@@ -90,11 +91,17 @@ class NotesController(private val app: OrganizaCore) {
 
     fun dictated(samples: ShortArray, sampleRate: Int) {
         busy = true
-        say("Transcribing")
+        transcribing = true
+        say(null)
         app.onAi {
             val pipeline = VoicePipeline(app.keys, GroqClient(UrlConnectionTransport(), app.aiEndpoint), Sanitizer())
-            busy = false
-            when (val result = pipeline.transcript(samples, sampleRate)) {
+            val result = try {
+                pipeline.transcript(samples, sampleRate)
+            } finally {
+                busy = false
+                transcribing = false
+            }
+            when (result) {
                 is VoiceResult.Transcript -> {
                     dictated = result.text
                     dictatedAt = System.nanoTime()

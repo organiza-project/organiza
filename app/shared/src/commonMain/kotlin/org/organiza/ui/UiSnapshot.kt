@@ -62,6 +62,7 @@ data class NotesView(
     val busy: Boolean = false,
     val dictated: String? = null,
     val dictatedAt: Long = 0,
+    val transcribing: Boolean = false,
 )
 
 /** One app on the distraction hub: on the focus list or not, today's use and its daily limit. */

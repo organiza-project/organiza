@@ -227,7 +227,7 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
         core.schedule.dictated(active.stop(), active.sampleRate)
     }
 
-    override fun dictationLevel(): Float = dictation?.level ?: 0f
+    override fun dictationLevel(): Float = (dictation ?: noteVoice)?.level ?: 0f
 
     override fun markToday(habitId: String, name: String, done: Boolean) = core.markHabit(name, done)
 
