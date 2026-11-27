@@ -4,6 +4,7 @@ import android.app.Notification
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,5 +31,11 @@ class RemindersTest {
         assertEquals("Evening check-in", evening.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
         assertEquals(null, evening.actions)
         assertEquals("evening_checkin", evening.channelId)
+    }
+
+    @Test
+    fun laterHasItsOwnAlarmSoRescheduledDailyRemindersNeverReplaceIt() {
+        // An alarm is keyed by its pending intent; sharing the daily one let any reschedule move "Later" to tomorrow.
+        assertNotEquals(Reminders.intent(context, "habit-a", "Read"), Reminders.laterIntent(context, "habit-a", "Read"))
     }
 }

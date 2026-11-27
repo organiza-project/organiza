@@ -48,7 +48,7 @@ object Reminders {
         }
     }
 
-    private fun intent(context: Context, id: String, name: String): PendingIntent = PendingIntent.getBroadcast(
+    internal fun intent(context: Context, id: String, name: String): PendingIntent = PendingIntent.getBroadcast(
         context,
         id.hashCode(),
         Intent(context, ReminderReceiver::class.java).putExtra(EXTRA_ID, id).putExtra(EXTRA_NAME, name),
@@ -100,11 +100,18 @@ object Reminders {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    /** Rings again in an hour, in place of today's alarm; the reschedule after it puts the daily one back. */
+    /** Rings again in an hour, on an alarm of its own, so rescheduling the daily reminders never moves it. */
     internal fun later(context: Context, id: String, name: String) {
         val at = System.currentTimeMillis() + LATER_MS
-        context.getSystemService(AlarmManager::class.java).setWindow(AlarmManager.RTC_WAKEUP, at, WINDOW_MS, intent(context, id, name))
+        context.getSystemService(AlarmManager::class.java).setWindow(AlarmManager.RTC_WAKEUP, at, WINDOW_MS, laterIntent(context, id, name))
     }
+
+    internal fun laterIntent(context: Context, id: String, name: String): PendingIntent = PendingIntent.getBroadcast(
+        context,
+        (LATER + id).hashCode(),
+        Intent(context, ReminderReceiver::class.java).putExtra(EXTRA_ID, id).putExtra(EXTRA_NAME, name),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
 
     internal fun dismiss(context: Context, id: String) = context.getSystemService(NotificationManager::class.java).cancel(id.hashCode())
 
