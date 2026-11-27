@@ -50,12 +50,15 @@ fun Txt(
     BasicText(text, modifier, style.copy(color = color), maxLines = maxLines, overflow = TextOverflow.Ellipsis)
 }
 
-/** The screen's title row: a noun, and one line on the data (app-screens §4.3). */
+/** The screen's title row: a noun, and one line on the data (app-screens §4.3), after an optional [leading] mark. */
 @Composable
-fun TitleBlock(title: String, subline: String?) {
-    Column(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 4.dp)) {
-        Txt(title, Type.title, modifier = Modifier.semantics { heading() })
-        if (subline != null) Txt(subline, Type.body, Theme.colors.muted, Modifier.padding(top = 4.dp))
+fun TitleBlock(title: String, subline: String?, leading: (@Composable () -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        leading?.invoke()
+        Column {
+            Txt(title, Type.title, modifier = Modifier.semantics { heading() })
+            if (subline != null) Txt(subline, Type.body, Theme.colors.muted, Modifier.padding(top = 4.dp))
+        }
     }
 }
 

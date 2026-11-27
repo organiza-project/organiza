@@ -79,30 +79,35 @@ fun OrganizaRoot(ui: UiSnapshot, actions: Actions, request: Pair<Route, Long>? =
         // A desktop window takes two columns of panels on the tabs; forms opened on top keep a reading width.
         val twoColumns = wide && onTab && maxWidth >= TWO_COLUMNS
         val page: @Composable (Modifier) -> Unit = { modifier ->
-            // Content stops at 720dp, or 1200dp in two columns, and centres, so panels never stretch across a window.
+            // One frame for every page on a desktop: 1200dp, centred, so tabs and opened screens share a left edge.
+            // Opened screens keep a 720dp reading width from that edge; a phone, and onboarding, are one 720dp column.
             Box(modifier) {
                 Column(
                     Modifier
                         .fillMaxSize()
                         .verticalScroll(scroll)
                         .wrapContentWidth(Alignment.CenterHorizontally)
-                        .widthIn(max = if (twoColumns) 1200.dp else 720.dp)
+                        .widthIn(max = if (wide && !ui.onboarding) 1200.dp else 720.dp)
+                        // Always the frame's full width, so a narrow screen starts at the same edge, not centred.
+                        .fillMaxWidth()
                         .padding(start = Space.margin, end = Space.margin, top = if (wide) 12.dp else 0.dp, bottom = Space.margin),
                     verticalArrangement = Arrangement.spacedBy(Space.gap),
                 ) {
                     CompositionLocalProvider(LocalTwoColumns provides twoColumns) {
-                        when {
-                            ui.onboarding -> OnboardingScreen(ui, actions)
-                            route == Route.NEW_HABIT -> NewHabitScreen(ui, actions, back)
-                            route == Route.AGENDA -> CalendarScreen(ui, actions, back, open)
-                            route == Route.IMPORT -> ImportScreen(ui, actions, back, open)
-                            route == Route.DICTATION -> DictationScreen(ui, actions, back)
-                            route == Route.COPILOT -> CopilotScreen(ui, actions, back)
-                            tab == Tab.HOME -> HomeScreen(ui, actions, open) { tab = it }
-                            tab == Tab.HABITS -> HabitsScreen(ui, actions, open)
-                            tab == Tab.NOTES -> NotesScreen(ui, actions)
-                            tab == Tab.METRICS -> MetricsScreen(ui, actions)
-                            else -> ProfileScreen(ui, actions)
+                        Column(if (onTab) Modifier.fillMaxWidth() else Modifier.widthIn(max = 720.dp), verticalArrangement = Arrangement.spacedBy(Space.gap)) {
+                            when {
+                                ui.onboarding -> OnboardingScreen(ui, actions)
+                                route == Route.NEW_HABIT -> NewHabitScreen(ui, actions, back)
+                                route == Route.AGENDA -> CalendarScreen(ui, actions, back, open)
+                                route == Route.IMPORT -> ImportScreen(ui, actions, back, open)
+                                route == Route.DICTATION -> DictationScreen(ui, actions, back)
+                                route == Route.COPILOT -> CopilotScreen(ui, actions, back)
+                                tab == Tab.HOME -> HomeScreen(ui, actions, open) { tab = it }
+                                tab == Tab.HABITS -> HabitsScreen(ui, actions, open)
+                                tab == Tab.NOTES -> NotesScreen(ui, actions)
+                                tab == Tab.METRICS -> MetricsScreen(ui, actions)
+                                else -> ProfileScreen(ui, actions)
+                            }
                         }
                     }
                 }

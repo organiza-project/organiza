@@ -296,6 +296,20 @@ class DesktopAppTest {
     }
 
     @Test
+    fun `on a wide window, opened screens start at the same edge as the tabs`() = androidx.compose.ui.test.v2.runDesktopComposeUiTest(1440, 900) {
+        core.onboarded = true
+        setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
+        openTab("Profile")
+        waitUntilExactlyOneExists(hasText("Level 1 of 100"), 5_000)
+        val tab = onNodeWithText("Level 1 of 100").fetchSemanticsNode().boundsInRoot.left
+        openTab("Habits")
+        onNodeWithText("New habit").performClick()
+        waitUntilExactlyOneExists(hasText("Task title"), 5_000)
+        val opened = onNodeWithText("Task title").fetchSemanticsNode().boundsInRoot.left
+        assertEquals(tab, opened, 1f)
+    }
+
+    @Test
     fun `deleting a note takes a second tap`() = runComposeUiTest {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }

@@ -32,16 +32,17 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
     val progression = ui.progression
     var showBackend by rememberSaveable { mutableStateOf(false) }
     var showKey by rememberSaveable { mutableStateOf(false) }
-    Box(Modifier.fillMaxWidth().padding(top = 24.dp).wrapContentWidth(Alignment.CenterHorizontally)) {
+    // The same header as every tab, led by the level ring, so both columns below start level.
+    TitleBlock("Profile", progression?.title) {
         Box(contentAlignment = Alignment.Center) {
-            Dial(progression?.fraction ?: 0.0, "", "", 112.dp)
-            LogoMark(56.dp)
+            Dial(progression?.fraction ?: 0.0, "", "", 72.dp)
+            LogoMark(36.dp)
         }
     }
+    MessagePanel(ui.message)
     Columns(
         first = {
             if (progression != null) {
-                Txt(progression.title, Type.title.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center), modifier = Modifier.fillMaxWidth().semantics { heading() })
                 Panel {
                     Row(Modifier.fillMaxWidth()) {
                         Txt("Level ${progression.level} of 100", Type.bodyStrong, modifier = Modifier.weight(1f))
@@ -96,7 +97,6 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
             }
         },
         second = {
-            MessagePanel(ui.message)
             // First in the settings: people looked for how to link devices and did not find it.
             org.organiza.feature.sync.DeviceGuide(ui.account)
             LockoutPanel(ui, actions)
