@@ -126,23 +126,10 @@ private fun dayTitle(day: LocalDate) = "${day.dayOfWeek.getDisplayName(TextStyle
 @Composable
 private fun Stepped(title: String, previous: () -> Unit, next: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Arrow(Glyph.BACK, "Previous", previous)
-        Txt(title, Type.section, modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
-        Arrow(Glyph.NEXT, "Next", next)
+        IconButton(Glyph.BACK, "Previous", size = Space.target, onClick = previous)
+        Txt(title, Type.section.copy(textAlign = TextAlign.Center), modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
+        IconButton(Glyph.NEXT, "Next", size = Space.target, onClick = next)
     }
-}
-
-@Composable
-private fun Arrow(glyph: Glyph, label: String, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(Space.radiusControl)
-    Box(
-        Modifier
-            .size(Space.target)
-            .border(Space.stroke, Theme.colors.border, shape)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = label },
-        contentAlignment = Alignment.Center,
-    ) { Icon(glyph) }
 }
 
 @Composable
