@@ -38,7 +38,11 @@ object Reminders {
     /** Replaces every scheduled reminder with [reminders]. */
     fun schedule(context: Context, reminders: List<Reminder>, previous: Set<String>) {
         val alarms = context.getSystemService(AlarmManager::class.java)
-        (previous - reminders.map { it.id }.toSet()).forEach { alarms.cancel(intent(context, it, "")) }
+        // A removed reminder's daily alarm and any "Later" still waiting both go.
+        (previous - reminders.map { it.id }.toSet()).forEach {
+            alarms.cancel(intent(context, it, ""))
+            alarms.cancel(laterIntent(context, it, ""))
+        }
         val now = ZonedDateTime.now(ZoneId.systemDefault())
         reminders.forEach { reminder ->
             // A note's reminder is one moment; a habit's comes back at its minute every day.

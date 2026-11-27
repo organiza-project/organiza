@@ -70,7 +70,8 @@ fun QuestsPanel(rpg: RpgView, actions: Actions, open: (Route) -> Unit, hero: Boo
         RankLadder(rpg.rank)
         Txt(rpg.rankLine, Type.small, colors.muted, Modifier.padding(top = 6.dp))
         Spacer(Modifier.height(14.dp))
-        StatBar("HP", rpg.hp.toDouble() / rpg.maxHp, "${rpg.hp} / ${rpg.maxHp}", colors.negative)
+        // Green while healthy, red under a quarter, as in Profile.
+        StatBar("HP", rpg.hp.toDouble() / rpg.maxHp, "${rpg.hp} / ${rpg.maxHp}", if (rpg.hp * 4 < rpg.maxHp) colors.negative else colors.positive)
         Spacer(Modifier.height(10.dp))
         StatBar("XP", rpg.xpFraction, rpg.xpCaption, colors.data)
     }
@@ -107,9 +108,9 @@ private fun single(kind: RpgKind) = when (kind) {
 }
 
 private fun rule(kind: RpgKind) = when (kind) {
-    RpgKind.HABIT -> "Tap + for a good one (+5 XP) and − for a slip (−5 HP), as often as it happens."
-    RpgKind.DAILY -> "+10 XP each. Left undone at midnight, each costs 8 HP."
-    RpgKind.TODO -> "+15 XP once, then it is gone."
+    RpgKind.HABIT -> "Tap + for a good one (+5 XP, +1 HP) and − for a slip (−5 HP), as often as it happens."
+    RpgKind.DAILY -> "+10 XP and +2 HP each. Left undone at midnight, each costs 8 HP."
+    RpgKind.TODO -> "+15 XP and +3 HP once, then it is gone."
 }
 
 /** The level in a square key, like the task buttons. */
@@ -147,7 +148,9 @@ private fun RankLadder(current: Rank) {
                             .border(if (rank == current) EDGE else 0.dp, colors.border, CORNER),
                     )
                 }
-                Txt("${rank.from}", Type.small, if (reached) colors.text else colors.muted, Modifier.padding(top = 2.dp))
+                // Eleven numbers do not fit a small phone: the ends, where you are and what is next; the rest are read out.
+                val labelled = rank == current || rank == current.next || rank == Rank.entries.first() || rank == Rank.entries.last()
+                Txt(if (labelled) "${rank.from}" else "", Type.small, if (reached) colors.text else colors.muted, Modifier.padding(top = 2.dp), maxLines = 1)
             }
         }
     }

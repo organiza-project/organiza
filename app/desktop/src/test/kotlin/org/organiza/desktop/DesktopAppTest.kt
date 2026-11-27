@@ -287,6 +287,15 @@ class DesktopAppTest {
     }
 
     @Test
+    fun `the rank ladder labels only where you are, what is next and the ends, and the hints say what heals`() = runComposeUiTest {
+        setContent { OrganizaTheme { Column { org.organiza.feature.rpg.QuestsPanel(org.organiza.ui.RpgView(rank = org.organiza.presentation.Rank.INITIATE), actions, {}) } } }
+        listOf("20", "30", "100").forEach { onNodeWithText(it).assertExists() }
+        // Eleven numbers do not fit a small phone; the in-between ones are read out, not drawn.
+        listOf("50", "70").forEach { onNodeWithText(it).assertDoesNotExist() }
+        onNodeWithText("+2 HP", substring = true).assertExists()
+    }
+
+    @Test
     fun `deleting a note takes a second tap`() = runComposeUiTest {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
