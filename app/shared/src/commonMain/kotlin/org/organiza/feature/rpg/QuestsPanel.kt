@@ -128,7 +128,7 @@ private fun LevelBadge(level: Int) {
     }
 }
 
-/** The five ranks as steps: reached ones filled, the current one marked, so the next milestone is in view. */
+/** The eleven ranks as steps: reached ones filled, the current one marked, so the next milestone is in view. */
 @Composable
 private fun RankLadder(current: Rank) {
     val colors = Theme.colors

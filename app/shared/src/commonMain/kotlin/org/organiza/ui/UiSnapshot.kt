@@ -106,8 +106,8 @@ data class RpgTaskView(val id: String, val kind: RpgKind, val title: String, val
 /** The hero and the Habitica-style task lists (ADR-0019). */
 @Immutable
 data class RpgView(
-    val hp: Int = Rpg.MAX_HP,
-    val maxHp: Int = Rpg.MAX_HP,
+    val hp: Int = Rpg.maxHp(1),
+    val maxHp: Int = Rpg.maxHp(1),
     val badge: String = "Lvl 1 · Novice",
     val xpFraction: Double = 0.0,
     val xpCaption: String = "",

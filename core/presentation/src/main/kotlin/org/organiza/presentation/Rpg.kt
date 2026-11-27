@@ -18,19 +18,24 @@ public data class HeroModel(val hp: Int, val maxHp: Int, val progression: Progre
  * override. At zero the hero faints: full health again, but back to the start of the previous level.
  */
 public object Rpg {
-    public const val MAX_HP: Int = 50
-    public val HABIT_UP: RpgEntry = RpgEntry(xp = 5, hp = 0)
+    /** More than any hero's health, so an entry of it always refills to full. */
+    public const val FULL: Int = 100
+    public val HABIT_UP: RpgEntry = RpgEntry(xp = 5, hp = 1)
     public val HABIT_DOWN: RpgEntry = RpgEntry(xp = 0, hp = -5)
-    public val DAILY: RpgEntry = RpgEntry(xp = 10, hp = 0)
-    public val TODO: RpgEntry = RpgEntry(xp = 15, hp = 0)
+    public val DAILY: RpgEntry = RpgEntry(xp = 10, hp = 2)
+    public val TODO: RpgEntry = RpgEntry(xp = 15, hp = 3)
     public val MISSED_DAILY: RpgEntry = RpgEntry(xp = 0, hp = -8)
     public val BROKE_BLOCK: RpgEntry = RpgEntry(xp = 0, hp = -10)
 
-    public fun hp(entries: List<RpgEntry>): Int = entries.fold(MAX_HP) { hp, entry -> (hp + entry.hp).coerceIn(0, MAX_HP) }
+    /** Health grows with the hero: 50 at level 1, 100 at level 100. */
+    public fun maxHp(level: Int): Int = 50 + level.coerceIn(1, Progression.MAX_LEVEL) / 2
+
+    /** Health after [entries], starting full and kept between 0 and [max]. */
+    public fun hp(entries: List<RpgEntry>, max: Int): Int = entries.fold(max) { hp, entry -> (hp + entry.hp).coerceIn(0, max) }
 
     public fun faint(totalXp: Int): RpgEntry {
         val floor = Progression.startOf((Progression.level(totalXp) - 1).coerceAtLeast(1))
-        return RpgEntry(xp = -(totalXp - floor), hp = MAX_HP)
+        return RpgEntry(xp = -(totalXp - floor), hp = FULL)
     }
 
     /** Damage for each day from [from] up to, not including, [until]: undone dailies, then broken blocks. */
@@ -40,6 +45,9 @@ public object Rpg {
             List(undone) { day to MISSED_DAILY } + List(brokenBlocks[day] ?: 0) { day to BROKE_BLOCK }
         }.toList()
 
-    public fun hero(baseXp: Int, entries: List<RpgEntry>, badges: List<Badge> = emptyList()): HeroModel =
-        HeroModel(hp(entries), MAX_HP, Progression.of(baseXp + entries.sumOf { it.xp }, badges))
+    public fun hero(baseXp: Int, entries: List<RpgEntry>, badges: List<Badge> = emptyList()): HeroModel {
+        val progression = Progression.of(baseXp + entries.sumOf { it.xp }, badges)
+        val max = maxHp(progression.level)
+        return HeroModel(hp(entries, max), max, progression)
+    }
 }

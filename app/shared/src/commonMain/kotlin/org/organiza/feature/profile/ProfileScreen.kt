@@ -44,18 +44,33 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
                 Txt(progression.title, Type.title.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center), modifier = Modifier.fillMaxWidth().semantics { heading() })
                 Panel {
                     Row(Modifier.fillMaxWidth()) {
-                        Txt("Level ${progression.level}", Type.bodyStrong, modifier = Modifier.weight(1f))
-                        Txt("${progression.xp} XP in total", Type.small, colors.muted)
+                        Txt("Level ${progression.level} of 100", Type.bodyStrong, modifier = Modifier.weight(1f))
+                        Txt("${"%,d".format(java.util.Locale.UK, progression.xp)} XP in total", Type.small, colors.muted)
                     }
                     Spacer(Modifier.height(8.dp))
                     ProgressPill(progression.fraction, ink = colors.data)
-                    Txt("${progression.toNext} XP more to reach level ${progression.level + 1}.", Type.body, modifier = Modifier.padding(top = 8.dp))
+                    Txt(
+                        if (progression.level == 100) "The top level. Every good day still counts toward your badges."
+                        else "${"%,d".format(java.util.Locale.UK, progression.toNext)} XP more to reach level ${progression.level + 1}.",
+                        Type.body,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    Txt(progression.rankLine, Type.small, colors.muted)
+                    val rpg = ui.rpg
+                    Row(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                        Txt("Health", Type.bodyStrong, modifier = Modifier.weight(1f))
+                        Txt("${rpg.hp} / ${rpg.maxHp}", Type.small, colors.muted)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    ProgressPill(rpg.hp.toDouble() / rpg.maxHp, ink = if (rpg.hp * 4 < rpg.maxHp) colors.negative else colors.positive)
                     Txt(
                         "You earn 10 XP for each day you meet a habit, 1 XP for every 5 minutes of focus, and 5 XP each time you " +
-                            "stay focused at a pause. Quests add their own. XP stays on this device.",
+                            "stay focused at a pause. Quests add their own. A daily left undone, a slip on a habit or a broken " +
+                            "focus block costs health; dailies, good habits and to-dos heal it, and health grows as you level up. " +
+                            "At zero you faint: health refills, but you drop a level. All of it stays on this device.",
                         Type.small,
                         colors.muted,
-                        Modifier.padding(top = 4.dp),
+                        Modifier.padding(top = 8.dp),
                     )
                 }
                 Panel {

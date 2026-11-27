@@ -100,33 +100,42 @@ class WireframeModelsTest {
     fun `xp comes from local results and sets the level and title`() {
         val model = Progression.build(ProgressFacts(habitDaysMet = 60, focusMinutes = 1500, stayedFocused = 40, longestStreak = 9))
         assertEquals(60 * 10 + 1500 / 5 + 40 * 5, model.xp)
-        assertEquals(7, model.level)
-        assertEquals("Level 7 · Novice", model.title)
-        assertEquals("Initiate at level 10 · 1,150 XP to go", model.rankLine)
+        assertEquals(9, model.level)
+        assertEquals("Level 9 · Novice", model.title)
+        assertEquals("Apprentice at level 10 · 160 XP to go", model.rankLine)
         assertTrue(model.fraction in 0.0..1.0)
         assertEquals(setOf("first-session", "week-streak", "held-the-line", "ten-hours"), model.badges.filter { it.earned }.map { it.id }.toSet())
     }
 
     @Test
-    fun `levels grow further apart`() {
+    fun `levels run from 1 to 100, each 20 XP longer than the last`() {
         assertEquals(1, Progression.level(0))
-        assertEquals(2, Progression.level(50))
-        assertEquals(3, Progression.level(150))
-        assertEquals(9, Progression.level(2249))
-        assertEquals(10, Progression.level(2250))
-        assertEquals(50, Progression.level(61250))
+        assertEquals(1, Progression.level(59))
+        assertEquals(2, Progression.level(60))
+        assertEquals(3, Progression.level(140))
+        assertEquals(9, Progression.level(1259))
+        assertEquals(10, Progression.level(1260))
+        assertEquals(50, Progression.level(26460))
+        assertEquals(100, Progression.level(102960))
+        assertEquals(100, Progression.level(10_000_000))
+        val top = Progression.of(200_000)
+        assertEquals("Level 100 · Legend", top.title)
+        assertEquals(0, top.toNext)
+        assertEquals(1.0, top.fraction)
     }
 
     @Test
-    fun `ranks change every ten levels, then at thirty and fifty`() {
+    fun `a new rank every ten levels, up to Legend at 100`() {
+        assertEquals(11, Rank.entries.size)
+        assertEquals(listOf(1) + (10..100 step 10).toList(), Rank.entries.map { it.from })
         assertEquals(
-            listOf("Novice", "Novice", "Initiate", "Initiate", "Focus Adept", "Stoic Master", "Stoic Master", "Zen Grandmaster", "Zen Grandmaster"),
-            listOf(1, 9, 10, 19, 20, 30, 49, 50, 80).map { Rank.of(it).title },
+            listOf("Novice", "Novice", "Apprentice", "Initiate", "Focus Adept", "Stoic", "Zen Grandmaster", "Legend"),
+            listOf(1, 9, 10, 20, 30, 50, 99, 100).map { Rank.of(it).title },
         )
-        assertEquals(Rank.FOCUS_ADEPT, Rank.of(12).next)
-        assertEquals(null, Rank.ZEN_GRANDMASTER.next)
-        assertEquals("Highest rank reached", Progression.of(Progression.startOf(55)).rankLine)
-        assertEquals("Stoic Master at level 30 · 50 XP to go", Progression.of(Progression.startOf(30) - 50).rankLine)
+        assertEquals(Rank.INITIATE, Rank.of(12).next)
+        assertEquals(null, Rank.LEGEND.next)
+        assertEquals("Highest rank reached", Progression.of(Progression.startOf(100)).rankLine)
+        assertEquals("Focus Adept at level 30 · 50 XP to go", Progression.of(Progression.startOf(30) - 50).rankLine)
     }
 
     @Test

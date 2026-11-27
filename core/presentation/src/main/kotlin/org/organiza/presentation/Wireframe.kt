@@ -148,10 +148,16 @@ public data class ProgressionModel(
 /** Named tiers over the levels, so progress has milestones worth reaching (ADR-0021). */
 public enum class Rank(public val title: String, public val from: Int) {
     NOVICE("Novice", 1),
-    INITIATE("Initiate", 10),
-    FOCUS_ADEPT("Focus Adept", 20),
-    STOIC_MASTER("Stoic Master", 30),
-    ZEN_GRANDMASTER("Zen Grandmaster", 50),
+    APPRENTICE("Apprentice", 10),
+    INITIATE("Initiate", 20),
+    FOCUS_ADEPT("Focus Adept", 30),
+    PATHFINDER("Pathfinder", 40),
+    STOIC("Stoic", 50),
+    MASTER("Master", 60),
+    SAGE("Sage", 70),
+    GRANDMASTER("Grandmaster", 80),
+    ZEN_GRANDMASTER("Zen Grandmaster", 90),
+    LEGEND("Legend", 100),
     ;
 
     public val next: Rank? get() = entries.getOrNull(ordinal + 1)
@@ -162,10 +168,16 @@ public enum class Rank(public val title: String, public val from: Int) {
 }
 
 public object Progression {
-    /** Level n starts at 25 n (n - 1) XP, so each level takes 50 XP more than the last. */
-    public fun level(xp: Int): Int = ((1 + sqrt(1 + 4 * xp / 25.0)) / 2).toInt().coerceAtLeast(1)
+    public const val MAX_LEVEL: Int = 100
 
-    public fun startOf(level: Int): Int = 25 * level * (level - 1)
+    /**
+     * Level n starts at 10 (n - 1)(n + 4) XP: level 2 takes 60, each next one 20 more, and level 100,
+     * the last, about 103,000, two to three years of steady days (ADR-0038).
+     */
+    public fun level(xp: Int): Int =
+        ((-30 + sqrt(900.0 + 40.0 * (xp.coerceAtLeast(0) + 40))) / 20).toInt().coerceIn(1, MAX_LEVEL)
+
+    public fun startOf(level: Int): Int = 10 * (level - 1) * (level + 4)
 
     public fun titleFor(level: Int): String = Rank.of(level).title
 
@@ -186,13 +198,14 @@ public object Progression {
     public fun of(totalXp: Int, badges: List<Badge> = emptyList()): ProgressionModel {
         val xp = totalXp.coerceAtLeast(0)
         val level = level(xp)
+        val top = level == MAX_LEVEL
         val span = startOf(level + 1) - startOf(level)
         return ProgressionModel(
             xp,
             level,
             "Level $level · ${titleFor(level)}",
-            startOf(level + 1) - xp,
-            (xp - startOf(level)).toDouble() / span,
+            if (top) 0 else startOf(level + 1) - xp,
+            if (top) 1.0 else (xp - startOf(level)).toDouble() / span,
             badges,
             Rank.of(level),
             Rank.of(level).next?.let { "${it.title} at level ${it.from} · ${"%,d".format(Locale.UK, startOf(it.from) - xp)} XP to go" }

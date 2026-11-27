@@ -66,7 +66,7 @@ class RpgController(private val app: OrganizaCore) {
         }
         if (settled == null || settled < today.minusDays(1)) stores.settings.setText(Setting.RPG_SETTLED, today.minusDays(1).toString())
         val entries = entries(stores)
-        if (Rpg.hp(entries) == 0) {
+        if (Rpg.hero(baseXp, entries).hp == 0) {
             log(stores, RpgReason.FAINTED, null, today, Rpg.faint(baseXp + entries.sumOf { it.xp }))
             app.showMessage("You fainted. Health is full again, but you dropped a level")
         }

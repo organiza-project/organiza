@@ -1485,3 +1485,23 @@ find how to make one device show every device's screen time: the controls sat un
 ### Consequences
 More screens to tap through, each quick. The device guide only explains and tracks progress; the
 controls stay in the account panels below it.
+
+## ADR-0038: Levels 1 to 100, eleven ranks, and health that heals
+
+### Status
+Accepted, 2026-11-27. Amends ADR-0019 and ADR-0021.
+
+### Context
+Levels had no top, five ranks stopped at level 50, and health only ever fell until the hero fainted.
+
+### Decision
+- Level n starts at 10 (n - 1)(n + 4) XP: level 2 takes 60, each next level 20 more, and level 100,
+  the last, about 103,000. At a steady 100 to 150 XP a day that is two to three years.
+- A rank every ten levels: Novice, Apprentice, Initiate, Focus Adept, Pathfinder, Stoic, Master,
+  Sage, Grandmaster, Zen Grandmaster, and Legend at 100.
+- Maximum health grows from 50 at level 1 to 100 at level 100. A daily done heals 2, a good habit 1,
+  a to-do 3; slips, undone dailies and broken focus blocks still cost health. At zero the hero faints,
+  refills and drops a level, as before.
+
+### Consequences
+Existing XP is kept and read on the new curve, so most people move up a level or two on updating.

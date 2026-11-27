@@ -8,19 +8,28 @@ class RpgTest {
     private val monday = LocalDate.parse("2026-11-02")
 
     @Test
-    fun `health starts full, drops with damage and never leaves its range`() {
-        assertEquals(Rpg.MAX_HP, Rpg.hp(emptyList()))
-        assertEquals(Rpg.MAX_HP - 5, Rpg.hp(listOf(Rpg.HABIT_DOWN)))
-        assertEquals(Rpg.MAX_HP, Rpg.hp(listOf(Rpg.HABIT_DOWN, RpgEntry(0, 40))))
-        assertEquals(0, Rpg.hp(List(20) { Rpg.MISSED_DAILY }))
+    fun `health starts full, drops with damage, heals with good days, and never leaves its range`() {
+        assertEquals(50, Rpg.hp(emptyList(), 50))
+        assertEquals(45, Rpg.hp(listOf(Rpg.HABIT_DOWN), 50))
+        // A daily done heals 2, a good habit 1, a to-do 3.
+        assertEquals(48, Rpg.hp(listOf(Rpg.MISSED_DAILY, Rpg.DAILY, Rpg.HABIT_UP, Rpg.TODO), 50))
+        assertEquals(50, Rpg.hp(listOf(Rpg.HABIT_DOWN, RpgEntry(0, 40)), 50))
+        assertEquals(0, Rpg.hp(List(20) { Rpg.MISSED_DAILY }, 50))
+    }
+
+    @Test
+    fun `health grows from 50 at level 1 to 100 at level 100`() {
+        assertEquals(50, Rpg.maxHp(1))
+        assertEquals(75, Rpg.maxHp(50))
+        assertEquals(100, Rpg.maxHp(100))
     }
 
     @Test
     fun `fainting refills health and drops to the start of the previous level`() {
-        // 350 XP is level 4 (starts at 300), so the hero falls to level 3, which starts at 150.
-        assertEquals(RpgEntry(xp = -200, hp = Rpg.MAX_HP), Rpg.faint(totalXp = 350))
-        assertEquals(RpgEntry(xp = -40, hp = Rpg.MAX_HP), Rpg.faint(totalXp = 40))
-        assertEquals(Rpg.MAX_HP, Rpg.hp(List(10) { Rpg.MISSED_DAILY } + Rpg.faint(350)))
+        // 350 XP is level 4 (starts at 240), so the hero falls to level 3, which starts at 140.
+        assertEquals(RpgEntry(xp = -210, hp = Rpg.FULL), Rpg.faint(totalXp = 350))
+        assertEquals(RpgEntry(xp = -40, hp = Rpg.FULL), Rpg.faint(totalXp = 40))
+        assertEquals(51, Rpg.hp(List(10) { Rpg.MISSED_DAILY } + Rpg.faint(350), 51))
     }
 
     @Test
@@ -52,7 +61,8 @@ class RpgTest {
         val hero = Rpg.hero(baseXp = 90, entries = listOf(Rpg.DAILY, Rpg.HABIT_DOWN))
         assertEquals(100, hero.progression.xp)
         assertEquals(2, hero.progression.level)
-        assertEquals(Rpg.MAX_HP - 5, hero.hp)
+        assertEquals(51, hero.maxHp)
+        assertEquals(46, hero.hp)
         assertEquals("Lvl 2 · Novice", hero.badge)
     }
 }
