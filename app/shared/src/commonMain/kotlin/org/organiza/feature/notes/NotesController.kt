@@ -108,7 +108,7 @@ class NotesController(private val app: OrganizaCore) {
                     say("Check the text, then save the note")
                 }
                 VoiceResult.Silent -> say("Nothing heard, nothing was sent")
-                VoiceResult.TooLong -> say("Too long, nothing was sent. Keep a note under two minutes")
+                VoiceResult.TooLong -> say("Too long, nothing was sent. Keep a note under ${VoicePipeline.MAX_SECONDS} seconds")
                 is VoiceResult.Failed -> say("Dictation failed: ${result.failure}. Type the note instead")
                 else -> say(null)
             }

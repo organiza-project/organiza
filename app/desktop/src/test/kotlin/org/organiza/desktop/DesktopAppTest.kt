@@ -275,7 +275,8 @@ class DesktopAppTest {
         var transcribing by androidx.compose.runtime.mutableStateOf(false)
         setContent { OrganizaTheme { Column { org.organiza.ui.DictationStatus(listening, transcribing, { 0.4f }) } } }
         onNodeWithText("Listening", substring = true).assertExists()
-        onNodeWithText("0:00 of 2:00", substring = true).assertExists()
+        // The clock counts to the voice pipeline's own limit, past which nothing is sent.
+        onNodeWithText("0:00 of 0:30", substring = true).assertExists()
         listening = false
         transcribing = true
         waitUntilExactlyOneExists(hasText("Turning your words into text…"), 5_000)

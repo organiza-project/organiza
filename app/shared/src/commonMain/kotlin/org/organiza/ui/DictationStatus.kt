@@ -31,10 +31,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import org.organiza.voice.VoicePipeline
 
 /**
  * What dictation is doing, so nobody waits without knowing why: listening, with a red dot, a running
- * clock against the two-minute limit and the live sound level; then transcribing, with a spinner.
+ * clock against the voice pipeline's limit and the live sound level; then transcribing, with a spinner.
  * [level] reads the microphone's loudness, 0 to 1.
  */
 @Composable
@@ -93,5 +94,6 @@ private fun clock(seconds: Int) = "${seconds / 60}:${(seconds % 60).toString().p
 
 private const val BARS = 40
 private const val TICK_MS = 100L
-private const val LIMIT_S = 120
-private const val WARN_S = 15
+// Past this the pipeline sends nothing, so the clock shows the same limit.
+private const val LIMIT_S = VoicePipeline.MAX_SECONDS
+private const val WARN_S = 10
