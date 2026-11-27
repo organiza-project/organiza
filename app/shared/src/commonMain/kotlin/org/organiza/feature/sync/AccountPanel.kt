@@ -206,5 +206,6 @@ private fun Problem(text: String) {
     Txt(text, Type.small, Theme.colors.negative, Modifier.padding(top = 4.dp, bottom = 4.dp))
 }
 
-private val EMAIL = Regex("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")
+// Something on each side of one @; the server judges the rest.
+private val EMAIL = Regex("[^@\\s]+@[^@\\s]+")
 private const val MIN_PASSWORD = 8

@@ -261,6 +261,9 @@ class DesktopAppTest {
         onNodeWithText("Sign in to own.example.org").assertExists()
         onAllNodes(hasSetTextAction())[0].performTextInput("sam")
         onNodeWithText("Enter an email address, like name@example.com").assertExists()
+        // Something on both sides of the @ is enough; the server judges the rest, so a test server's admin@localhost works.
+        onAllNodes(hasSetTextAction())[0].performTextInput("@localhost")
+        onNodeWithText("Enter an email address, like name@example.com").assertDoesNotExist()
         account = account.copy(busy = true)
         waitUntilExactlyOneExists(hasText("Signing in…"), 5_000)
         account = account.copy(busy = false, authMessage = "Wrong email or password", authFailed = true)
