@@ -19,8 +19,6 @@ public data class HomeWidget(
     val nudge: String,
 ) {
     public companion object {
-        public const val ROWS: Int = 4
-
         public fun build(today: LocalDate, inputs: List<HomeHabitInput>, home: HomeModel, screenTime: String, next: String?): HomeWidget {
             val habits = home.habits.map { WidgetHabit(it.id, it.name, it.progress.doneToday) }.sortedBy { it.doneToday }
             val metOn = { day: LocalDate -> inputs.any { it.results[day] == true } }
@@ -35,7 +33,24 @@ public data class HomeWidget(
                 streak > 0 -> "$streak-day streak. Still open: ${open.name}"
                 else -> "Start a streak today: ${open.name}"
             }
-            return HomeWidget("${(home.completion * 100).roundToInt()}%", home.headline, habits.take(ROWS), "$screenTime today", next, streak, nudge)
+            return HomeWidget("${(home.completion * 100).roundToInt()}%", home.headline, habits, "$screenTime today", next, streak, nudge)
         }
+    }
+}
+
+/**
+ * What a reminder says, or null when it should stay quiet (ADR-0039): never for a habit already done today,
+ * a word about the streak when there is one, and an evening check-in only while something is still open.
+ */
+public object ReminderText {
+    public const val EVENING: String = "evening"
+    public const val NOTE: String = "note-"
+
+    public fun of(id: String, name: String, today: HomeWidget?): String? = when {
+        id.startsWith(NOTE) -> "A reminder from your notes"
+        id == EVENING -> today?.takeIf { widget -> widget.habits.any { !it.doneToday } }?.nudge
+        today?.habits?.any { it.name == name && it.doneToday } == true -> null
+        today != null && today.streak > 0 -> "Keep your ${today.streak}-day streak going. Mark it done in Organiza"
+        else -> "Time for this habit. Mark it done in Organiza"
     }
 }

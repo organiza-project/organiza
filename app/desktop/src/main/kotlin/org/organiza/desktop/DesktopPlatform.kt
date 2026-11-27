@@ -110,6 +110,9 @@ class DesktopPlatform(
     private val scheduled = mutableListOf<ScheduledFuture<*>>()
     private var round = 0
 
+    /** What a reminder says when it rings, or null to stay quiet; the core supplies it once it exists. */
+    var reminderText: (Reminder) -> String? = { "Time for this habit" }
+
     /** Each habit reminder shows as a desktop notification at its minute every day; a note's once, at its time. */
     @Synchronized
     override fun scheduleReminders(reminders: List<Reminder>, previous: Set<String>) {
@@ -130,7 +133,7 @@ class DesktopPlatform(
         scheduled += reminders.schedule(
             {
                 if (once == null) {
-                    notify(reminder.name, "Time for this habit")
+                    reminderText(reminder)?.let { notify(reminder.name, it) }
                     remind(reminder, round)
                 } else {
                     notify(reminder.name, "A reminder from your notes")

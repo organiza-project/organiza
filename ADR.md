@@ -1523,5 +1523,10 @@ language apps do it.
   `Platform.showWidgets` hands it over with each snapshot; Android redraws only when it changed.
 - A tap goes through `markHabit`, so a widget changes nothing the app could not.
 
+- Reminders read the same model when they ring (`ReminderText`): a habit already done today stays quiet;
+  otherwise the text mentions the streak, and Android adds Done and Later (an hour). An evening
+  check-in at 20:00 speaks only while a habit is still open, in its own notification channel.
+
 ### Consequences
-Widgets show the same habit names as the app, on the home screen. The desktop has none.
+Widgets and reminders show the same habit names as the app, on the home screen and in notifications,
+never on a locked screen. The desktop has no widgets; its reminders follow the same rules.

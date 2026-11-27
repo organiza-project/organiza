@@ -83,6 +83,7 @@ import org.organiza.presentation.FocusWeek
 import org.organiza.presentation.HomeHabitInput
 import org.organiza.presentation.HomeModel
 import org.organiza.presentation.HomeWidget
+import org.organiza.presentation.ReminderText
 import org.organiza.presentation.ProgressFacts
 import org.organiza.presentation.Progression
 import org.organiza.presentation.ChoicesModel
@@ -240,11 +241,16 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
     }
 
     /** Sets every habit reminder again, after a change, a reminder firing or a reboot. */
+    /** What reminder [id] should say now, or null to stay quiet (ADR-0039). */
+    fun reminderText(id: String, name: String): String? = ReminderText.of(id, name, uiState.value.widget)
+
     fun rescheduleReminders() = onStorageThread {
         val active = storage ?: return@onStorageThread notSaved()
         // A note's reminder has its own time; ids keep it apart from a habit's.
         val reminders = active.habits.reminders() +
-            active.notes.upcoming(clock.now()).map { Reminder("note-${it.id}", it.body.take(80), 0, it.remindAt) }
+            active.notes.upcoming(clock.now()).map { Reminder(ReminderText.NOTE + it.id, it.body.take(80), 0, it.remindAt) } +
+            // Every evening while there are habits; it speaks only if one is still open then (ReminderText).
+            listOfNotNull(Reminder(ReminderText.EVENING, "Evening check-in", EVENING_MINUTE).takeIf { active.habits.active().isNotEmpty() })
         platform.scheduleReminders(reminders, reminderIds)
         reminderIds = reminders.map { it.id }.toSet()
     }
@@ -934,6 +940,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
         private val WEEK: Duration = Duration.ofDays(7)
         private const val MAX_UPCOMING = 5
         private const val HOME_DAYS = 40L
+        private const val EVENING_MINUTE = 20 * 60
         private const val MAX_LOG_MINUTES = 1440
         private const val MONITOR_APPS = 5
 

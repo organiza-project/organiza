@@ -31,6 +31,7 @@ fun main(args: Array<String>) {
     if (!WINDOWS) nameWindows()
     val platform = DesktopPlatform()
     val core = OrganizaCore(platform)
+    platform.reminderText = { core.reminderText(it.id, it.name) }
     core.start()
     val focus = FocusSource.forSession(apps = platform.apps)
     val app = DesktopApp(core, platform, focus)
