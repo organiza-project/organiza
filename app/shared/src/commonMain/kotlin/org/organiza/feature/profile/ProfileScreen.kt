@@ -62,7 +62,7 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
                         Txt("${rpg.hp} / ${rpg.maxHp}", Type.small, colors.muted)
                     }
                     Spacer(Modifier.height(8.dp))
-                    ProgressPill(rpg.hp.toDouble() / rpg.maxHp, ink = if (rpg.hp * 4 < rpg.maxHp) colors.negative else colors.positive)
+                    ProgressPill(rpg.hp.toDouble() / rpg.maxHp, ink = colors.negative)
                     Txt(
                         "You earn 10 XP for each day you meet a habit, 1 XP for every 5 minutes of focus, and 5 XP each time you " +
                             "stay focused at a pause. Quests add their own. A daily left undone, a slip on a habit or a broken " +

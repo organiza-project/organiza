@@ -70,8 +70,8 @@ fun QuestsPanel(rpg: RpgView, actions: Actions, open: (Route) -> Unit, hero: Boo
         RankLadder(rpg.rank)
         Txt(rpg.rankLine, Type.small, colors.muted, Modifier.padding(top = 6.dp))
         Spacer(Modifier.height(14.dp))
-        // Green while healthy, red under a quarter, as in Profile.
-        StatBar("HP", rpg.hp.toDouble() / rpg.maxHp, "${rpg.hp} / ${rpg.maxHp}", if (rpg.hp * 4 < rpg.maxHp) colors.negative else colors.positive)
+        // Health is red, as in Profile; how much is left shows in the bar's length.
+        StatBar("HP", rpg.hp.toDouble() / rpg.maxHp, "${rpg.hp} / ${rpg.maxHp}", colors.negative)
         Spacer(Modifier.height(10.dp))
         StatBar("XP", rpg.xpFraction, rpg.xpCaption, colors.data)
     }
