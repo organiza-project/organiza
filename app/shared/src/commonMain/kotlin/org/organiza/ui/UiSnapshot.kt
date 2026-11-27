@@ -171,6 +171,8 @@ data class UiSnapshot(
     val monitoring: Boolean = false,
     val lockdown: Boolean = false,
     val upcoming: List<Upcoming> = emptyList(),
+    /** What the home screen widgets show; null until storage is open. */
+    val widget: org.organiza.presentation.HomeWidget? = null,
     val account: AccountView = AccountView(),
     val hasApiKey: Boolean = false,
     val voiceConsent: Boolean = false,

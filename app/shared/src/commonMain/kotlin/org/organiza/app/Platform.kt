@@ -59,6 +59,9 @@ interface Platform {
     /** This app's own package, which never counts as screen time. */
     val selfPackage: String
 
+    /** Puts [widget] on the home screen widgets, where the OS has them (ADR-0039). Main thread. */
+    fun showWidgets(widget: org.organiza.presentation.HomeWidget?) = Unit
+
     /** A value that survives reinstalling Organiza on this machine, or null. Only ever used hashed. */
     val machineId: String? get() = null
 

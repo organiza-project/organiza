@@ -172,6 +172,8 @@ class OrganizaApp : Application(), Platform {
 
     override fun scheduleReminders(reminders: List<Reminder>, previous: Set<String>) = Reminders.schedule(this, reminders, previous)
 
+    override fun showWidgets(widget: org.organiza.presentation.HomeWidget?) = org.organiza.android.feature.widgets.HomeWidgets.show(this, widget)
+
     /** Hands a meeting to the phone's calendar app, which shows it for saving. Nothing is stored here. */
     override fun openCalendar(event: VoiceCommand.AddEvent): String {
         val end = event.start.plus(Duration.ofMinutes(event.minutes.toLong()))

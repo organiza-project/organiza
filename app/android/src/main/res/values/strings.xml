@@ -3,4 +3,7 @@
     <string name="app_name">Organiza</string>
     <string name="accessibility_description">Organiza watches which app is open and reads browser address bars, so it can pause you before what you chose to block during a focus session. Nothing leaves your device.</string>
     <string name="admin_disable_warning">This removes Organiza\'s uninstall protection and is recorded as tampering if a session is running.</string>
+    <string name="widget_today_description">Today\'s habits, screen time and next focus block. Tap a circle to mark a habit done.</string>
+    <string name="widget_streak_description">Your streak, and what is still open today.</string>
+    <string name="widget_open">Open Organiza to fill this in</string>
 </resources>

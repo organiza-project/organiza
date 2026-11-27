@@ -1505,3 +1505,23 @@ Levels had no top, five ranks stopped at level 50, and health only ever fell unt
 
 ### Consequences
 Existing XP is kept and read on the new curve, so most people move up a level or two on updating.
+
+## ADR-0039: Home screen widgets
+
+### Status
+Accepted, 2026-11-27.
+
+### Context
+People want today at a glance without opening the app, and a nudge that keeps a streak alive, the way
+language apps do it.
+
+### Decision
+- Two Android widgets with the platform's own `RemoteViews`, no new library: Today (progress, up to four
+  habits with the open ones first and a circle to tap them done, screen time and the next focus block)
+  and Streak (days in a row with a habit met, and one line on what is still open).
+- `HomeWidget` in core/presentation builds what they show from the same data as Home, with tests.
+  `Platform.showWidgets` hands it over with each snapshot; Android redraws only when it changed.
+- A tap goes through `markHabit`, so a widget changes nothing the app could not.
+
+### Consequences
+Widgets show the same habit names as the app, on the home screen. The desktop has none.

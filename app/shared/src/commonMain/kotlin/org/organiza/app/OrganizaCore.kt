@@ -82,6 +82,7 @@ import org.organiza.presentation.AgendaModel
 import org.organiza.presentation.FocusWeek
 import org.organiza.presentation.HomeHabitInput
 import org.organiza.presentation.HomeModel
+import org.organiza.presentation.HomeWidget
 import org.organiza.presentation.ProgressFacts
 import org.organiza.presentation.Progression
 import org.organiza.presentation.ChoicesModel
@@ -685,9 +686,15 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
                     "Tamper events" to active.tamper.all().size.toString(),
                     "Interventions" to active.interventions.between(Instant.EPOCH, now.plusSeconds(1)).size.toString(),
                 ),
-            )
+            ).let { built ->
+                val next = built.upcoming.firstOrNull()?.let { "${it.label} at ${it.time}" }
+                built.copy(widget = built.home?.let { HomeWidget.build(today, plans, it, built.hub.screenTime ?: "0m", next) })
+            }
         }
-        platform.onMain { uiState.value = snapshot }
+        platform.onMain {
+            uiState.value = snapshot
+            platform.showWidgets(snapshot.widget)
+        }
     }
 
     /** The installed app's name, or its package when it is not installed. */
