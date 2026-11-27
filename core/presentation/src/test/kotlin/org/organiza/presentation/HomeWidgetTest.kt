@@ -3,12 +3,21 @@ package org.organiza.presentation
 import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import org.organiza.storage.HabitFrequency
 import org.organiza.storage.HabitPlan
 
 class HomeWidgetTest {
+    // A Friday; its week began on Monday the 23rd.
     private val today = LocalDate.parse("2026-11-27")
     private fun days(vararg back: Long) = back.associate { today.minusDays(it) to true }
-    private fun widget(vararg habits: HomeHabitInput) = HomeWidget.build(today, habits.toList(), HomeModel.build(today, habits.toList(), 10), "1h 05m", "Focus at 14:00")
+    private fun widget(vararg habits: HomeHabitInput) = HomeWidget.build(
+        today,
+        HomeModel.build(today, habits.toList(), 10),
+        "1h 05m",
+        "Focus at 14:00",
+        HomeWidget.currentStreak(today, habits.map { it.results }),
+    )
+    private val weekly = HabitPlan(HabitFrequency.WEEKLY, 3, null)
 
     @Test
     fun `open habits come first, with progress, screen time and the next block`() {
@@ -37,6 +46,21 @@ class HomeWidgetTest {
         assertEquals(0, start.streak)
         assertEquals("Start a streak today: Read", start.nudge)
         assertEquals("Add a habit to start a streak", widget().nudge)
+    }
+
+    @Test
+    fun `a streak counts every day of the history it is given, not only the last weeks`() {
+        assertEquals(60, HomeWidget.currentStreak(today, listOf((0L until 60L).associate { today.minusDays(it) to true })))
+    }
+
+    @Test
+    fun `a weekly habit whose goal is met is not open, though it was not done today`() {
+        val model = widget(HomeHabitInput("w", "Run", weekly, days(2, 3, 4)), HomeHabitInput("d", "Read", HabitPlan.DAILY, emptyMap()))
+        assertEquals(listOf("Read", "Run"), model.habits.map { it.name })
+        assertEquals(listOf(true, false), model.habits.map { it.open })
+        assertEquals(false, model.habits.last().doneToday)
+        assertEquals(null, ReminderText.of("habit-w", "Run", model))
+        assertEquals("Read", ReminderText.of(ReminderText.EVENING, "Evening check-in", model)?.substringAfterLast(": "))
     }
 
     @Test

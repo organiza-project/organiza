@@ -636,8 +636,10 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
             }
             val allSessions = sessions
             val stayed = active.interventions.between(Instant.EPOCH, now.plusSeconds(1)).count { it.choice == InterventionChoice.STAYED }
-            val metDays = plans.sumOf { input -> active.habits.results(input.id, LocalDate.EPOCH, today.plusDays(1)).count { it.value } }
-            val streak = plans.maxOfOrNull { input -> longestStreak(active.habits.results(input.id, LocalDate.EPOCH, today.plusDays(1))) } ?: 0
+            // Every habit's whole history, read once for XP, the longest streak and the widget's current one.
+            val history = plans.map { input -> active.habits.results(input.id, LocalDate.EPOCH, today.plusDays(1)) }
+            val metDays = history.sumOf { results -> results.count { it.value } }
+            val streak = history.maxOfOrNull(::longestStreak) ?: 0
             val facts = ProgressFacts(
                 habitDaysMet = metDays,
                 focusMinutes = allSessions.filter { it.state == SessionState.COMPLETED }
@@ -694,7 +696,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
                 ),
             ).let { built ->
                 val next = built.upcoming.firstOrNull()?.let { "${it.label} at ${it.time}" }
-                built.copy(widget = built.home?.let { HomeWidget.build(today, plans, it, built.hub.screenTime ?: "0m", next) })
+                built.copy(widget = built.home?.let { HomeWidget.build(today, it, built.hub.screenTime ?: "0m", next, HomeWidget.currentStreak(today, history)) })
             }
         }
         platform.onMain {
