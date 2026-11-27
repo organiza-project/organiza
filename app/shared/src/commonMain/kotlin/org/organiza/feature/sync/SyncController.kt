@@ -46,8 +46,13 @@ class SyncController(private val app: OrganizaCore) {
             devicesLinked = app.devices.linked,
             otherDevices = app.devices.others(),
             deviceSync = app.devices.lastResult,
+            authMessage = auth?.let(::result),
+            authFailed = auth != null && auth !in SUCCEEDED,
         )
     }
+
+    /** The last sign-in or sign-up result, kept for the form until the next attempt or backend change. */
+    @Volatile private var auth: AuthResult? = null
 
     fun choose(kind: BackendKind?, url: String, key: String) {
         val config: BackendConfig = when (kind) {
@@ -59,6 +64,7 @@ class SyncController(private val app: OrganizaCore) {
             }
         }
         onNetwork {
+            auth = null
             backend.auth.signOut()
             save(config)
             backend = Backend.create(config, transport, vault, app.clock)
@@ -66,14 +72,21 @@ class SyncController(private val app: OrganizaCore) {
         }
     }
 
-    fun signIn(email: String, password: String) = onNetwork { app.showMessage(result(backend.auth.signIn(email, password))) }
+    fun signIn(email: String, password: String) = authenticate { backend.auth.signIn(email, password) }
 
-    fun signUp(email: String, password: String) = onNetwork { app.showMessage(result(backend.auth.signUp(email, password))) }
+    fun signUp(email: String, password: String) = authenticate { backend.auth.signUp(email, password) }
+
+    // The result shows under the form, where the person is looking, not in a banner at the top.
+    private fun authenticate(attempt: () -> AuthResult) {
+        auth = null
+        onNetwork { auth = attempt() }
+    }
 
     /** Deletes the account and its cloud data. The phone's own data stays (ADR-0020). */
     fun deleteAccount() = onNetwork { app.showMessage(result(backend.auth.deleteAccount())) }
 
     fun signOut() = onNetwork {
+        auth = null
         backend.auth.signOut()
         app.showMessage("Signed out")
     }
@@ -141,5 +154,6 @@ class SyncController(private val app: OrganizaCore) {
         const val KIND = "kind"
         const val URL = "url"
         const val KEY = "anon_key"
+        val SUCCEEDED = setOf(AuthResult.SIGNED_IN, AuthResult.CHECK_EMAIL)
     }
 }

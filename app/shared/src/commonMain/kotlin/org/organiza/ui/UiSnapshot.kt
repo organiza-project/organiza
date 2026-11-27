@@ -34,6 +34,9 @@ data class AccountView(
     val devicesLinked: Boolean = false,
     val otherDevices: Int = 0,
     val deviceSync: String? = null,
+    /** What the last sign-in or sign-up said, shown under the form; [authFailed] when it went wrong. */
+    val authMessage: String? = null,
+    val authFailed: Boolean = false,
 )
 
 enum class UsageSpan(val label: String) { DAY("Day"), WEEK("Week"), MONTH("Month"), RANGE("Range") }

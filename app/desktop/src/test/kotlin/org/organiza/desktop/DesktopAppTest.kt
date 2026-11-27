@@ -41,6 +41,8 @@ import org.organiza.ui.AccountView
 import org.organiza.sync.BackendKind
 import org.organiza.feature.sync.BackendPanel
 import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import org.organiza.ui.OrganizaTheme
 
 @OptIn(ExperimentalTestApi::class)
@@ -250,6 +252,21 @@ class DesktopAppTest {
         onNodeWithText("Entry 5").assertDoesNotExist()
         onNodeWithText("Show older notes").performScrollTo().performClick()
         waitUntilExactlyOneExists(hasText("Entry 5"), 5_000)
+    }
+
+    @Test
+    fun `the sign-in form checks what is typed, shows it is working, and says what went wrong`() = runComposeUiTest {
+        var account by androidx.compose.runtime.mutableStateOf(AccountView(kind = BackendKind.SELF_HOSTED, url = "https://own.example.org"))
+        setContent { OrganizaTheme { Column { org.organiza.feature.sync.AccountPanel(account, actions) } } }
+        onNodeWithText("Sign in to own.example.org").assertExists()
+        onAllNodes(hasSetTextAction())[0].performTextInput("sam")
+        onNodeWithText("Enter an email address, like name@example.com").assertExists()
+        account = account.copy(busy = true)
+        waitUntilExactlyOneExists(hasText("Signing in…"), 5_000)
+        account = account.copy(busy = false, authMessage = "Wrong email or password", authFailed = true)
+        waitUntilExactlyOneExists(hasText("Wrong email or password"), 5_000)
+        onNodeWithText("Create account").performClick()
+        onNodeWithText("Create your account").assertExists()
     }
 
     @Test

@@ -14,9 +14,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.organiza.ui.AccountView
+import org.organiza.ui.Space
+import org.organiza.ui.Spinner
+import androidx.compose.foundation.layout.padding
 import org.organiza.ui.Action
 import org.organiza.ui.Actions
 import org.organiza.ui.ButtonKind
@@ -134,6 +140,7 @@ fun AccountPanel(account: AccountView, actions: Actions) {
     var email by rememberSaveable { mutableStateOf("") }
     // Secrets use remember, not rememberSaveable, so they never reach saved instance state.
     var password by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
     Panel {
         PanelHeader("Account") { Txt(account.url.removePrefix("https://"), Type.small, colors.muted, maxLines = 1) }
         if (account.signedInAs != null) {
@@ -151,16 +158,53 @@ fun AccountPanel(account: AccountView, actions: Actions) {
             }
             return@Panel
         }
+        val host = account.url.substringAfter("://").substringBefore('/')
+        Txt(if (mode == AuthMode.SIGN_IN) "Sign in to $host" else "Create your account", Type.section, modifier = Modifier.semantics { heading() })
+        Txt(
+            if (mode == AuthMode.SIGN_IN) "Use the same account on each of your devices." else "On $host. Then sign in with it on each of your devices.",
+            Type.small,
+            colors.muted,
+            Modifier.padding(bottom = 12.dp),
+        )
         Segmented(AuthMode.entries, mode, { it.label }) { mode = it }
         Spacer(Modifier.height(12.dp))
         Field(email, { email = it.trim() }, "Email")
-        Field(password, { password = it }, "Password", secret = true)
-        if (mode == AuthMode.SIGN_UP) Txt("At least 8 characters. Your password goes to this backend only.", Type.small, colors.muted)
+        // Checked as it is typed, so a mistake shows before anything is sent.
+        val badEmail = email.isNotEmpty() && !EMAIL.matches(email)
+        if (badEmail) Problem("Enter an email address, like name@example.com")
+        Row(verticalAlignment = Alignment.Bottom) {
+            Field(password, { password = it }, "Password", Modifier.weight(1f), secret = !showPassword)
+            Action(if (showPassword) "Hide" else "Show", ButtonKind.TEXT, modifier = Modifier.padding(start = 4.dp, bottom = 12.dp)) { showPassword = !showPassword }
+        }
+        val short = mode == AuthMode.SIGN_UP && password.length < MIN_PASSWORD
+        if (mode == AuthMode.SIGN_UP) {
+            if (short && password.isNotEmpty()) Problem("At least $MIN_PASSWORD characters: ${MIN_PASSWORD - password.length} more")
+            else Txt("At least $MIN_PASSWORD characters. Your password goes to this backend only.", Type.small, colors.muted)
+        }
         Spacer(Modifier.height(8.dp))
-        val ready = "@" in email && password.isNotEmpty() && !account.busy
-        Action(if (account.busy) "Working" else mode.label, ButtonKind.PRIMARY, enabled = ready, modifier = Modifier.fillMaxWidth()) {
-            if (mode == AuthMode.SIGN_IN) actions.signIn(email, password) else actions.signUp(email, password)
-            password = ""
+        if (account.busy) {
+            Row(Modifier.fillMaxWidth().heightIn(min = Space.target), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                Spinner()
+                Txt(if (mode == AuthMode.SIGN_IN) "Signing in…" else "Creating your account…", Type.bodyStrong, modifier = Modifier.padding(start = 10.dp))
+            }
+        } else {
+            val ready = email.isNotEmpty() && !badEmail && password.isNotEmpty() && !short
+            Action(mode.label, ButtonKind.PRIMARY, enabled = ready, modifier = Modifier.fillMaxWidth()) {
+                if (mode == AuthMode.SIGN_IN) actions.signIn(email, password) else actions.signUp(email, password)
+                password = ""
+            }
+        }
+        account.authMessage?.let { message ->
+            if (account.authFailed) Problem(message) else Txt(message, Type.body, colors.positive, Modifier.padding(top = 8.dp))
         }
     }
 }
+
+/** A problem with what was typed or sent, in the warning colour, right where it happened. */
+@Composable
+private fun Problem(text: String) {
+    Txt(text, Type.small, Theme.colors.negative, Modifier.padding(top = 4.dp, bottom = 4.dp))
+}
+
+private val EMAIL = Regex("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")
+private const val MIN_PASSWORD = 8

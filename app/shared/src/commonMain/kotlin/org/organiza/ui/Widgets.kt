@@ -1,6 +1,12 @@
 package org.organiza.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -152,5 +158,15 @@ fun Medallion(glyph: Glyph, title: String, earned: Boolean) {
             Icon(glyph, if (earned) colors.ground else colors.muted, 24.dp)
         }
         Txt(title, Type.small, if (earned) colors.text else colors.muted, Modifier.padding(top = 6.dp), maxLines = 2)
+    }
+}
+
+/** A small turning arc, for work that takes a moment: signing in, transcribing. */
+@Composable
+fun Spinner(size: Dp = 18.dp, color: androidx.compose.ui.graphics.Color = Theme.colors.text) {
+    val turn by rememberInfiniteTransition(label = "spinner").animateFloat(0f, 360f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "turn")
+    Canvas(Modifier.size(size)) {
+        val width = 2.dp.toPx()
+        drawArc(color, turn, 270f, useCenter = false, style = Stroke(width, cap = StrokeCap.Round))
     }
 }
