@@ -3,6 +3,8 @@ package org.organiza.desktop
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasContentDescription
@@ -324,6 +326,25 @@ class DesktopAppTest {
         waitUntilExactlyOneExists(hasText("Dentist"), 5_000)
         onNodeWithText("Remove").performClick()
         waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Dentist")).fetchSemanticsNodes().isEmpty() }
+    }
+
+    @Test
+    fun `balanced panels fill the shorter column, so both columns end together`() = runComposeUiTest {
+        setContent {
+            androidx.compose.runtime.CompositionLocalProvider(org.organiza.ui.LocalTwoColumns provides true) {
+                Column(Modifier.size(1000.dp, 2000.dp)) {
+                    org.organiza.ui.Balanced {
+                        listOf("tall" to 300, "a" to 100, "b" to 100, "c" to 100).forEach { (name, height) ->
+                            Box(Modifier.size(10.dp, height.dp).semantics { contentDescription = name })
+                        }
+                    }
+                }
+            }
+        }
+        val tall = onNodeWithContentDescription("tall").fetchSemanticsNode().boundsInRoot
+        val last = onNodeWithContentDescription("c").fetchSemanticsNode().boundsInRoot
+        assertTrue(last.left > tall.left, "the short panels share the other column")
+        assertTrue(kotlin.math.abs(last.bottom - tall.bottom) < 40f, "both columns end together: ${tall.bottom} and ${last.bottom}")
     }
 
     @Test

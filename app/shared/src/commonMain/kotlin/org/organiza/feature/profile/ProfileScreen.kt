@@ -40,94 +40,91 @@ fun ProfileScreen(ui: UiSnapshot, actions: Actions) {
         }
     }
     MessagePanel(ui.message)
-    Columns(
-        first = {
-            if (progression != null) {
-                Panel {
-                    Row(Modifier.fillMaxWidth()) {
-                        Txt("Level ${progression.level} of 100", Type.bodyStrong, modifier = Modifier.weight(1f))
-                        Txt("${"%,d".format(java.util.Locale.UK, progression.xp)} XP in total", Type.small, colors.muted)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    ProgressPill(progression.fraction, ink = colors.data)
-                    Txt(
-                        if (progression.level == 100) "The top level. Every good day still counts toward your badges."
-                        else "${"%,d".format(java.util.Locale.UK, progression.toNext)} XP more to reach level ${progression.level + 1}.",
-                        Type.body,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                    Txt(progression.rankLine, Type.small, colors.muted)
-                    val rpg = ui.rpg
-                    Row(Modifier.fillMaxWidth().padding(top = 16.dp)) {
-                        Txt("Health", Type.bodyStrong, modifier = Modifier.weight(1f))
-                        Txt("${rpg.hp} / ${rpg.maxHp}", Type.small, colors.muted)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    ProgressPill(rpg.hp.toDouble() / rpg.maxHp, ink = colors.negative)
-                    Txt(
-                        "You earn 10 XP for each day you meet a habit, 1 XP for every 5 minutes of focus, and 5 XP each time you " +
-                            "stay focused at a pause. Quests add their own. A daily left undone, a slip on a habit or a broken " +
-                            "focus block costs health; dailies, good habits and to-dos heal it, and health grows as you level up. " +
-                            "At zero you faint: health refills, but you drop a level. All of it stays on this device.",
-                        Type.small,
-                        colors.muted,
-                        Modifier.padding(top = 8.dp),
-                    )
+    // Each panel goes to the shorter column, so both columns end together however long each one is.
+    Balanced {
+        if (progression != null) {
+            Panel {
+                Row(Modifier.fillMaxWidth()) {
+                    Txt("Level ${progression.level} of 100", Type.bodyStrong, modifier = Modifier.weight(1f))
+                    Txt("${"%,d".format(java.util.Locale.UK, progression.xp)} XP in total", Type.small, colors.muted)
                 }
-                Panel {
-                    PanelHeader("Badges") { Txt("${progression.badges.count { it.earned }} of ${progression.badges.size}", Type.small, colors.muted) }
-                    // Rows of three at every width, so the grid stays even.
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        progression.badges.chunked(3).forEach { row ->
-                            Row(Modifier.fillMaxWidth()) {
-                                row.forEach { badge ->
-                                    val glyph = when (badge.id) {
-                                        "first-session", "ten-hours" -> Glyph.CLOCK
-                                        "week-streak", "month-streak" -> Glyph.FLAME
-                                        "held-the-line" -> Glyph.SHIELD
-                                        "journal-keeper" -> Glyph.NOTES
-                                        else -> Glyph.CROWN
-                                    }
-                                    Box(Modifier.weight(1f), contentAlignment = Alignment.TopCenter) { Medallion(glyph, badge.title, badge.earned) }
+                Spacer(Modifier.height(8.dp))
+                ProgressPill(progression.fraction, ink = colors.data)
+                Txt(
+                    if (progression.level == 100) "The top level. Every good day still counts toward your badges."
+                    else "${"%,d".format(java.util.Locale.UK, progression.toNext)} XP more to reach level ${progression.level + 1}.",
+                    Type.body,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Txt(progression.rankLine, Type.small, colors.muted)
+                val rpg = ui.rpg
+                Row(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                    Txt("Health", Type.bodyStrong, modifier = Modifier.weight(1f))
+                    Txt("${rpg.hp} / ${rpg.maxHp}", Type.small, colors.muted)
+                }
+                Spacer(Modifier.height(8.dp))
+                ProgressPill(rpg.hp.toDouble() / rpg.maxHp, ink = colors.negative)
+                Txt(
+                    "You earn 10 XP for each day you meet a habit, 1 XP for every 5 minutes of focus, and 5 XP each time you " +
+                        "stay focused at a pause. Quests add their own. A daily left undone, a slip on a habit or a broken " +
+                        "focus block costs health; dailies, good habits and to-dos heal it, and health grows as you level up. " +
+                        "At zero you faint: health refills, but you drop a level. All of it stays on this device.",
+                    Type.small,
+                    colors.muted,
+                    Modifier.padding(top = 8.dp),
+                )
+            }
+            Panel {
+                PanelHeader("Badges") { Txt("${progression.badges.count { it.earned }} of ${progression.badges.size}", Type.small, colors.muted) }
+                // Rows of three at every width, so the grid stays even.
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    progression.badges.chunked(3).forEach { row ->
+                        Row(Modifier.fillMaxWidth()) {
+                            row.forEach { badge ->
+                                val glyph = when (badge.id) {
+                                    "first-session", "ten-hours" -> Glyph.CLOCK
+                                    "week-streak", "month-streak" -> Glyph.FLAME
+                                    "held-the-line" -> Glyph.SHIELD
+                                    "journal-keeper" -> Glyph.NOTES
+                                    else -> Glyph.CROWN
                                 }
+                                Box(Modifier.weight(1f), contentAlignment = Alignment.TopCenter) { Medallion(glyph, badge.title, badge.earned) }
                             }
                         }
                     }
                 }
             }
-        },
-        second = {
-            // First in the settings: people looked for how to link devices and did not find it.
-            org.organiza.feature.sync.DeviceGuide(ui.account)
-            LockoutPanel(ui, actions)
-            Panel {
-                val account = ui.account
-                SwitchRow(
-                    "Supabase cloud sync",
-                    when {
-                        account.signedInAs != null -> "Signed in as ${account.signedInAs}"
-                        account.kind != null -> "On. Sign in below to share usage across your devices"
-                        else -> "Off. Everything stays on this device"
-                    },
-                    account.kind != null,
-                ) { on ->
-                    if (on && account.hostedAvailable) actions.chooseBackend(BackendKind.HOSTED, "", "") else if (!on) actions.chooseBackend(null, "", "")
-                    // Without a hosted project in this build, turning sync on means choosing a backend first.
-                    showBackend = on && !account.hostedAvailable
-                }
-                Action(if (showBackend) "Hide backend settings" else "Backend settings", ButtonKind.TEXT) { showBackend = !showBackend }
-                Rule()
-                SwitchRow("API configuration", if (ui.hasApiKey) "Groq key saved in the system keystore" else "No Groq key", ui.hasApiKey) { on ->
-                    if (!on && ui.hasApiKey) actions.removeKey() else showKey = true
-                }
-                Action(if (showKey) "Hide key settings" else "Key settings", ButtonKind.TEXT) { showKey = !showKey }
+        }
+        // First in the settings: people looked for how to link devices and did not find it.
+        org.organiza.feature.sync.DeviceGuide(ui.account)
+        LockoutPanel(ui, actions)
+        Panel {
+            val account = ui.account
+            SwitchRow(
+                "Supabase cloud sync",
+                when {
+                    account.signedInAs != null -> "Signed in as ${account.signedInAs}"
+                    account.kind != null -> "On. Sign in below to share usage across your devices"
+                    else -> "Off. Everything stays on this device"
+                },
+                account.kind != null,
+            ) { on ->
+                if (on && account.hostedAvailable) actions.chooseBackend(BackendKind.HOSTED, "", "") else if (!on) actions.chooseBackend(null, "", "")
+                // Without a hosted project in this build, turning sync on means choosing a backend first.
+                showBackend = on && !account.hostedAvailable
             }
-            if (showBackend) BackendPanel(ui.account, actions, withAccount = false)
-            if (ui.account.kind != null) AccountPanel(ui.account, actions)
-            if (showKey) AiKeyPanel(ui, actions)
-            VaultPanels(ui, actions)
-        },
-    )
+            Action(if (showBackend) "Hide backend settings" else "Backend settings", ButtonKind.TEXT) { showBackend = !showBackend }
+            Rule()
+            SwitchRow("API configuration", if (ui.hasApiKey) "Groq key saved in the system keystore" else "No Groq key", ui.hasApiKey) { on ->
+                if (!on && ui.hasApiKey) actions.removeKey() else showKey = true
+            }
+            Action(if (showKey) "Hide key settings" else "Key settings", ButtonKind.TEXT) { showKey = !showKey }
+        }
+        if (showBackend) BackendPanel(ui.account, actions, withAccount = false)
+        if (ui.account.kind != null) AccountPanel(ui.account, actions)
+        if (showKey) AiKeyPanel(ui, actions)
+        VaultPanels(ui, actions)
+    }
 }
 
 @Composable

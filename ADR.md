@@ -1530,3 +1530,41 @@ language apps do it.
 ### Consequences
 Widgets and reminders show the same habit names as the app, on the home screen and in notifications,
 never on a locked screen. The desktop has no widgets; its reminders follow the same rules.
+
+## ADR-0040: Calendar events
+
+### Status
+Accepted, 2026-11-28. Amends ADR-0019.
+
+### Context
+The calendar held only focus sessions, so it could not stand in for a calendar app: there was no way to
+put "Dentist, Tuesday 14:00" on a day.
+
+### Decision
+- Schema v14 adds `calendar_event`: a title of up to 120 characters, a start, a length of up to a day,
+  and an optional reminder 0 to 1,440 minutes before it.
+- Events show in the month counts, the week and day grids and the chosen day's list, beside focus
+  blocks, and are removed from that list. Home's agenda includes today's.
+- A reminder rings on the device as a one-off titled with the event; it says "From your calendar".
+  Events never arm the blocker and never leave the device.
+
+### Consequences
+Organiza keeps its own events; it does not write to the phone's or computer's calendar.
+
+## ADR-0041: Desktop pages share one frame and balance their columns
+
+### Status
+Accepted, 2026-11-28. Amends ADR-0025.
+
+### Context
+On a wide window some pages filled the width and others did not, and Profile's columns ended far apart.
+
+### Decision
+- Every desktop page sits in one 1200dp frame from the same left edge. Tabs and the calendar use two
+  columns; forms keep a 720dp reading width from that edge.
+- The calendar puts the month beside the chosen day.
+- `Balanced` places each panel, in order, in the shorter column, so both end together; Profile uses it.
+  Pages whose two sides mean different things (Notes, Metrics, the calendar) keep explicit columns.
+
+### Consequences
+Profile's panels alternate between the columns by height rather than by topic.

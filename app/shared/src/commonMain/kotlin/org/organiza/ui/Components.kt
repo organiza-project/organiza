@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.Layout
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
@@ -260,5 +262,30 @@ fun Columns(first: @Composable () -> Unit, second: @Composable () -> Unit) {
     } else {
         first()
         second()
+    }
+}
+
+/**
+ * Panels shared between two columns on a wide page, each going, in order, to the shorter column so far,
+ * so both end together whatever the panels hold. One column, in the same order, on a narrow page.
+ */
+@Composable
+fun Balanced(content: @Composable () -> Unit) {
+    if (!LocalTwoColumns.current) return content()
+    val gap = Space.gap
+    Layout(content, Modifier.fillMaxWidth()) { panels, constraints ->
+        val space = gap.roundToPx()
+        val width = (constraints.maxWidth - space) / 2
+        val bottoms = intArrayOf(0, 0)
+        val placed = panels.map { panel ->
+            val measured = panel.measure(Constraints(minWidth = width, maxWidth = width))
+            val column = if (bottoms[0] <= bottoms[1]) 0 else 1
+            val top = bottoms[column]
+            bottoms[column] += measured.height + space
+            Triple(measured, column, top)
+        }
+        layout(constraints.maxWidth, (bottoms.max() - space).coerceAtLeast(0)) {
+            placed.forEach { (measured, column, top) -> measured.place(column * (width + space), top) }
+        }
     }
 }
