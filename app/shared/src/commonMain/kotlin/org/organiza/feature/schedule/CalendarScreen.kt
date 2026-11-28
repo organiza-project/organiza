@@ -50,12 +50,17 @@ fun CalendarScreen(ui: UiSnapshot, actions: Actions, back: () -> Unit, open: (Ro
     val calendar = ui.calendar
     TopBar("Calendar", back)
     MessagePanel(ui.message)
-    CalendarPanel(calendar, actions)
-    DayPanel(calendar.selected, calendar.blocks, actions)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Action("Import schedule", ButtonKind.SECONDARY) { open(Route.IMPORT) }
-        Action("Import .ics", ButtonKind.SECONDARY) { actions.importCalendar() }
-    }
+    // On a wide window the month and the chosen day sit side by side, so neither needs a scroll.
+    Columns(
+        first = {
+            CalendarPanel(calendar, actions)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Action("Import schedule", ButtonKind.SECONDARY) { open(Route.IMPORT) }
+                Action("Import .ics", ButtonKind.SECONDARY) { actions.importCalendar() }
+            }
+        },
+        second = { DayPanel(calendar.selected, calendar.blocks, actions) },
+    )
 }
 
 /**
@@ -227,18 +232,23 @@ private fun DayPanel(day: LocalDate, blocks: List<CalendarBlock>, actions: Actio
     var editing by rememberSaveable(day) { mutableStateOf<String?>(null) }
     var start by rememberSaveable(day) { mutableIntStateOf(9 * 60) }
     var length by rememberSaveable(day) { mutableIntStateOf(60) }
+    var kind by rememberSaveable(day) { mutableStateOf(KINDS.first()) }
+    var title by rememberSaveable(day) { mutableStateOf("") }
+    var remind by rememberSaveable(day) { mutableStateOf(REMINDERS.first().first) }
     Panel {
-        PanelHeader(dayTitle(day)) { Txt(Format.count(blocks.size, "session", "sessions"), Type.small, colors.muted) }
-        if (blocks.isEmpty()) Txt("Nothing planned. Add a focus block below.", Type.body, colors.muted)
+        PanelHeader(dayTitle(day)) { Txt(Format.count(blocks.size, "item", "items"), Type.small, colors.muted) }
+        if (blocks.isEmpty()) Txt("Nothing planned. Add an event or a focus block below.", Type.body, colors.muted)
         blocks.forEachIndexed { index, block ->
             if (index > 0) Rule()
             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Txt(block.label, Type.bodyStrong, maxLines = 1)
-                    Txt(block.time + if (block.editable) "" else " · locked", Type.small, colors.muted)
+                    Txt(block.time + if (block.event) " · event" else if (block.editable) "" else " · locked", Type.small, colors.muted)
                 }
+                if (block.event) Action("Remove", ButtonKind.DANGER) { actions.deleteEvent(block.id) }
                 if (block.editable) {
                     Action("Edit", ButtonKind.TEXT) {
+                        kind = KINDS.last()
                         editing = block.id
                         start = block.startMinute
                         length = block.minutes
@@ -250,7 +260,13 @@ private fun DayPanel(day: LocalDate, blocks: List<CalendarBlock>, actions: Actio
         }
     }
     Panel {
-        PanelHeader(if (editing == null) "Add a focus block" else "Move this focus block")
+        PanelHeader(if (editing == null) "Add to this day" else "Move this focus block")
+        val event = kind == KINDS.first() && editing == null
+        if (editing == null) {
+            Segmented(KINDS, kind, { it }) { kind = it }
+            Spacer(Modifier.height(12.dp))
+        }
+        if (event) Field(title, { title = it.take(120) }, "Title, like Dentist or Exam")
         // Keyed by the block, so choosing Edit refills the boxes with that block's time.
         key(day, editing) {
             ClockField("Starts at", start) { start = it }
@@ -258,12 +274,24 @@ private fun DayPanel(day: LocalDate, blocks: List<CalendarBlock>, actions: Actio
             MinutesField("Length", length, MIN_LENGTH..MAX_LENGTH, listOf(30, 60, 90, 120)) { length = it }
         }
         Spacer(Modifier.height(12.dp))
-        Txt("The blocker arms itself at the start with your focus list.", Type.small, colors.muted)
+        if (event) {
+            Segmented(REMINDERS.map { it.first }, remind, { it }) { remind = it }
+            Spacer(Modifier.height(8.dp))
+            Txt("A reminder rings on this device. The title never leaves it.", Type.small, colors.muted)
+        } else {
+            Txt("The blocker arms itself at the start with your focus list.", Type.small, colors.muted)
+        }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Action(if (editing == null) "Add block" else "Save", ButtonKind.PRIMARY) {
-                actions.saveFocusBlock(editing, day, start, length)
-                editing = null
+            when {
+                event -> Action("Add event", ButtonKind.PRIMARY, enabled = title.isNotBlank()) {
+                    actions.addEvent(day, start, length, title, REMINDERS.first { it.first == remind }.second)
+                    title = ""
+                }
+                else -> Action(if (editing == null) "Add block" else "Save", ButtonKind.PRIMARY) {
+                    actions.saveFocusBlock(editing, day, start, length)
+                    editing = null
+                }
             }
             if (editing != null) Action("Cancel", ButtonKind.SECONDARY) { editing = null }
         }
@@ -272,3 +300,8 @@ private fun DayPanel(day: LocalDate, blocks: List<CalendarBlock>, actions: Actio
 
 private const val MIN_LENGTH = 15
 private const val MAX_LENGTH = 480
+
+private val KINDS = listOf("Event", "Focus block")
+
+/** Each reminder choice, and how many minutes before the start it rings, or null for none. */
+private val REMINDERS = listOf("No reminder" to null, "At start" to 0, "10 min before" to 10, "1 hour before" to 60)

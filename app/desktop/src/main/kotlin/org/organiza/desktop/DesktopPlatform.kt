@@ -136,7 +136,7 @@ class DesktopPlatform(
                     reminderText(reminder)?.let { notify(reminder.name, it) }
                     remind(reminder, round)
                 } else {
-                    notify(reminder.name, "A reminder from your notes")
+                    notify(reminder.name, reminderText(reminder) ?: "A reminder from your notes")
                 }
             },
             Duration.between(now.toInstant(), once ?: nextReminder(reminder.minute, now).toInstant()).toMillis(),

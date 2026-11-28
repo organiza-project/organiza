@@ -310,6 +310,23 @@ class DesktopAppTest {
     }
 
     @Test
+    fun `an event is added to a day from the calendar, which sits beside that day on a wide window`() = androidx.compose.ui.test.v2.runDesktopComposeUiTest(1440, 900) {
+        core.onboarded = true
+        setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }
+        openTab("Home")
+        onNodeWithText("Open calendar").performClick()
+        waitUntilExactlyOneExists(hasText("Add to this day"), 5_000)
+        val month = onNodeWithText("Month").fetchSemanticsNode().boundsInRoot
+        val day = onNodeWithText("Add to this day").fetchSemanticsNode().boundsInRoot
+        assertTrue(day.left > month.right, "the chosen day sits to the right of the month")
+        onAllNodes(hasSetTextAction())[0].performTextInput("Dentist")
+        onNodeWithText("Add event").performClick()
+        waitUntilExactlyOneExists(hasText("Dentist"), 5_000)
+        onNodeWithText("Remove").performClick()
+        waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Dentist")).fetchSemanticsNodes().isEmpty() }
+    }
+
+    @Test
     fun `deleting a note takes a second tap`() = runComposeUiTest {
         core.onboarded = true
         setContent { OrganizaTheme { OrganizaRoot(core.uiState.value, actions) } }

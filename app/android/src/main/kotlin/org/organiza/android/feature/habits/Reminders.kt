@@ -90,7 +90,7 @@ object Reminders {
             .setPublicVersion(locked)
             .setContentIntent(open)
             .setAutoCancel(true)
-        if (!evening && !id.startsWith(NOTE)) {
+        if (!evening && !id.startsWith(NOTE) && !id.startsWith(ReminderText.EVENT)) {
             builder.addAction(android.app.Notification.Action.Builder(null, "Done", action(context, DONE, id, name)).build())
             builder.addAction(android.app.Notification.Action.Builder(null, "Later", action(context, LATER, id, name)).build())
         }

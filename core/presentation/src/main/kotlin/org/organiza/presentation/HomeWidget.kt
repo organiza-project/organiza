@@ -51,9 +51,11 @@ public data class HomeWidget(
 public object ReminderText {
     public const val EVENING: String = "evening"
     public const val NOTE: String = "note-"
+    public const val EVENT: String = "event-"
 
     public fun of(id: String, name: String, today: HomeWidget?): String? = when {
         id.startsWith(NOTE) -> "A reminder from your notes"
+        id.startsWith(EVENT) -> "From your calendar"
         id == EVENING -> today?.takeIf { widget -> widget.habits.any { it.open } }?.nudge
         today?.habits?.any { it.name == name && !it.open } == true -> null
         today != null && today.streak > 0 -> "Keep your ${today.streak}-day streak going. Mark it done in Organiza"

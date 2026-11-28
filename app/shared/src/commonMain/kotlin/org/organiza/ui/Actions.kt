@@ -43,6 +43,10 @@ interface Actions {
     fun saveFocusBlock(replacing: String?, day: LocalDate, startMinute: Int, minutes: Int)
     fun deleteFocusBlock(id: String)
 
+    fun addEvent(day: LocalDate, startMinute: Int, minutes: Int, title: String, remindBefore: Int?)
+
+    fun deleteEvent(id: String)
+
     // Habits, dailies and to-dos with health and XP (ADR-0019)
     fun addQuest(kind: RpgKind, title: String)
     fun tapHabit(id: String, up: Boolean)

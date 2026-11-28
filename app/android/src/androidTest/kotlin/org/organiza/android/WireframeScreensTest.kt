@@ -120,6 +120,8 @@ class WireframeScreensTest {
         val calendar = CalendarView(selected = today, month = CalendarMonth.build(YearMonth.from(today), today, today, emptyMap()))
         show { CalendarScreen(UiSnapshot(calendar = calendar), actions, {}, {}) }
         compose.onNodeWithContentDescription("${Format.dayMonth(other)}, 0 blocks").performClick()
+        // The form opens on an event; a focus block is the other choice.
+        compose.onNodeWithText("Focus block").performScrollTo().performClick()
         compose.onNodeWithText("Add block").performScrollTo().performClick()
         compose.onNodeWithText("Week").performScrollTo().performClick()
         assertEquals(listOf("selectDay $other null", "saveFocusBlock null $today 540 60", "showCalendar WEEK"), actions.calls)

@@ -171,6 +171,11 @@ abstract class CoreActions(protected val core: OrganizaCore) : Actions {
 
     override fun deleteFocusBlock(id: String) = core.guard("Delete a focus block", loosens = true) { core.calendar.delete(id) }
 
+    override fun addEvent(day: LocalDate, startMinute: Int, minutes: Int, title: String, remindBefore: Int?) =
+        core.calendar.addEvent(day, startMinute, minutes, title, remindBefore)
+
+    override fun deleteEvent(id: String) = core.calendar.deleteEvent(id)
+
     override fun addQuest(kind: RpgKind, title: String) = core.game.add(kind, title)
 
     override fun tapHabit(id: String, up: Boolean) = core.game.habit(id, up)

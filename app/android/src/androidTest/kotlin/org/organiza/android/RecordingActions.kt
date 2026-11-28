@@ -25,6 +25,8 @@ class RecordingActions : Actions {
         calls += "saveFocusBlock $replacing $day $startMinute $minutes"
     }
     override fun deleteFocusBlock(id: String) { calls += "deleteFocusBlock $id" }
+    override fun addEvent(day: LocalDate, startMinute: Int, minutes: Int, title: String, remindBefore: Int?) { calls += "addEvent $day $startMinute $minutes $title $remindBefore" }
+    override fun deleteEvent(id: String) { calls += "deleteEvent $id" }
     override fun addQuest(kind: RpgKind, title: String) { calls += "addQuest $kind $title" }
     override fun tapHabit(id: String, up: Boolean) { calls += "tapHabit $id $up" }
     override fun checkDaily(id: String, done: Boolean) { calls += "checkDaily $id $done" }

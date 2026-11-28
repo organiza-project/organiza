@@ -31,6 +31,7 @@ import org.organiza.storage.NoteStore
 import org.organiza.storage.Setting
 import org.organiza.presentation.Lockout
 import org.organiza.storage.DeviceUsageStore
+import org.organiza.storage.EventStore
 import org.organiza.storage.Reminder
 import org.organiza.feature.sync.SyncController
 import org.organiza.calendar.IcsCalendar
@@ -230,6 +231,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
         val rules = RuleStore(db)
         val notes = NoteStore(db)
         val deviceUsage = DeviceUsageStore(db)
+        val events = EventStore(db)
     }
 
     private val usageHistory: AppUsage get() = platform.usage
@@ -250,7 +252,8 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
         val reminders = active.habits.reminders() +
             active.notes.upcoming(clock.now()).map { Reminder(ReminderText.NOTE + it.id, it.body.take(80), 0, it.remindAt) } +
             // Every evening while there are habits; it speaks only if one is still open then (ReminderText).
-            listOfNotNull(Reminder(ReminderText.EVENING, "Evening check-in", EVENING_MINUTE).takeIf { active.habits.active().isNotEmpty() })
+            listOfNotNull(Reminder(ReminderText.EVENING, "Evening check-in", EVENING_MINUTE).takeIf { active.habits.active().isNotEmpty() }) +
+            active.events.reminders(clock.now()).map { Reminder(ReminderText.EVENT + it.id, it.title, 0, it.start.minus(Duration.ofMinutes((it.remindBefore ?: 0).toLong()))) }
         platform.scheduleReminders(reminders, reminderIds)
         reminderIds = reminders.map { it.id }.toSet()
     }
@@ -654,8 +657,8 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
             val progression = hero.progression
             UiSnapshot(
                 home = HomeModel.build(today, plans, now.atZone(zone).hour),
-                agendaToday = AgendaModel.build(now, zone, today, views),
-                agendaTomorrow = AgendaModel.build(now, zone, today.plusDays(1), views),
+                agendaToday = AgendaModel.build(now, zone, today, views, active.events.between(today.atStartOfDay(zone).toInstant(), today.plusDays(1).atStartOfDay(zone).toInstant())),
+                agendaTomorrow = AgendaModel.build(now, zone, today.plusDays(1), views, active.events.between(today.plusDays(1).atStartOfDay(zone).toInstant(), today.plusDays(2).atStartOfDay(zone).toInstant())),
                 progression = progression,
                 week = FocusWeek.build(today, zone, allSessions),
                 hub = hub.view(active, zone),
@@ -664,7 +667,7 @@ class OrganizaCore(val platform: Platform) : EnforcementCapabilities, Interventi
                 aboutMe = active.settings.text(Setting.ABOUT_ME).orEmpty().also { chat.load(active) },
                 lockout = active.settings.flag(Setting.LOCKOUT).also { lockout = it },
                 unlockReason = pendingUnlock?.first,
-                calendar = calendar.view(now, zone, views),
+                calendar = calendar.view(now, zone, views, active),
                 rpg = game.view(active, today, hero),
                 schedule = schedule.view,
                 onboarding = onboarding,

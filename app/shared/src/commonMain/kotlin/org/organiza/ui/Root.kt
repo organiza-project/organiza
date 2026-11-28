@@ -77,7 +77,9 @@ fun OrganizaRoot(ui: UiSnapshot, actions: Actions, request: Pair<Route, Long>? =
         }
         val onTab = !ui.onboarding && route == null
         // A desktop window takes two columns of panels on the tabs; forms opened on top keep a reading width.
-        val twoColumns = wide && onTab && maxWidth >= TWO_COLUMNS
+        // The calendar sets its month beside the chosen day, so it takes the frame's width like a tab.
+        val fullWidth = onTab || (route == Route.AGENDA && !ui.onboarding)
+        val twoColumns = wide && fullWidth && maxWidth >= TWO_COLUMNS
         val page: @Composable (Modifier) -> Unit = { modifier ->
             // One frame for every page on a desktop: 1200dp, centred, so tabs and opened screens share a left edge.
             // Opened screens keep a 720dp reading width from that edge; a phone, and onboarding, are one 720dp column.
@@ -94,7 +96,7 @@ fun OrganizaRoot(ui: UiSnapshot, actions: Actions, request: Pair<Route, Long>? =
                     verticalArrangement = Arrangement.spacedBy(Space.gap),
                 ) {
                     CompositionLocalProvider(LocalTwoColumns provides twoColumns) {
-                        Column(if (onTab) Modifier.fillMaxWidth() else Modifier.widthIn(max = 720.dp), verticalArrangement = Arrangement.spacedBy(Space.gap)) {
+                        Column(if (fullWidth) Modifier.fillMaxWidth() else Modifier.widthIn(max = 720.dp), verticalArrangement = Arrangement.spacedBy(Space.gap)) {
                             when {
                                 ui.onboarding -> OnboardingScreen(ui, actions)
                                 route == Route.NEW_HABIT -> NewHabitScreen(ui, actions, back)

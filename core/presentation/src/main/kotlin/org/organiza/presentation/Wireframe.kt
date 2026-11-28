@@ -9,6 +9,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.sqrt
+import org.organiza.storage.CalendarEvent
 import org.organiza.storage.HabitFrequency
 import org.organiza.storage.HabitPlan
 import org.organiza.storage.SessionState
@@ -86,7 +87,7 @@ public data class AgendaModel(val dayLabel: String, val fromHour: Int, val toHou
         private const val FROM = 6
         private const val TO = 24
 
-        public fun build(now: Instant, zone: ZoneId, day: LocalDate, sessions: List<SessionView>): AgendaModel {
+        public fun build(now: Instant, zone: ZoneId, day: LocalDate, sessions: List<SessionView>, events: List<CalendarEvent> = emptyList()): AgendaModel {
             val start = day.atStartOfDay(zone).toInstant()
             val end = day.plusDays(1).atStartOfDay(zone).toInstant()
             fun at(instant: Instant): Double {
@@ -112,13 +113,22 @@ public data class AgendaModel(val dayLabel: String, val fromHour: Int, val toHou
                         kind,
                     )
                 }
+            // Calendar events (ADR-0040) sit among the focus blocks, marked by the clock.
+            val held = events.filter { it.end > start && it.start < end }.map { event ->
+                val kind = when {
+                    now >= event.end -> BarKind.PAST
+                    now >= event.start -> BarKind.NOW
+                    else -> BarKind.LATER
+                }
+                AgendaBlock(event.id, event.title, "${clock(event.start)}–${clock(event.end)}", at(event.start), at(event.end), kind)
+            }
             val today = now.atZone(zone).toLocalDate() == day
             val label = when (day) {
                 now.atZone(zone).toLocalDate() -> "Today"
                 now.atZone(zone).toLocalDate().plusDays(1) -> "Tomorrow"
                 else -> Format.dayMonth(day)
             }
-            return AgendaModel(label, FROM, TO, blocks, if (today) at(now) else null)
+            return AgendaModel(label, FROM, TO, (blocks + held).sortedBy { it.top }, if (today) at(now) else null)
         }
     }
 }

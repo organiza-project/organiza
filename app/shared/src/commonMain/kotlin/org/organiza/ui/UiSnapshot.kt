@@ -91,7 +91,8 @@ enum class CalendarMode { MONTH, WEEK, DAY }
 
 /** A session on the chosen day. Only focus blocks not yet started can be edited. */
 @Immutable
-data class CalendarBlock(val id: String, val label: String, val time: String, val startMinute: Int, val minutes: Int, val editable: Boolean)
+/** A focus block, or with [event] a calendar event (ADR-0040), which is removed rather than moved. */
+data class CalendarBlock(val id: String, val label: String, val time: String, val startMinute: Int, val minutes: Int, val editable: Boolean, val event: Boolean = false)
 
 /** The calendar (ADR-0019): a month, the chosen day's week and the chosen day itself. */
 @Immutable

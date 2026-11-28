@@ -70,6 +70,7 @@ class HomeWidgetTest {
         assertEquals("Keep your 2-day streak going. Mark it done in Organiza", ReminderText.of("habit-b", "Run", day))
         assertEquals("Time for this habit. Mark it done in Organiza", ReminderText.of("habit-b", "Run", null))
         assertEquals("A reminder from your notes", ReminderText.of("note-1", "Call the bank", day))
+        assertEquals("From your calendar", ReminderText.of(ReminderText.EVENT + "e1", "Dentist", day))
         // The evening check-in speaks only while something is open, in the streak widget's words.
         assertEquals("2-day streak. Still open: Run", ReminderText.of(ReminderText.EVENING, "Evening check-in", day))
         val allDone = widget(HomeHabitInput("a", "Read", HabitPlan.DAILY, days(0)))

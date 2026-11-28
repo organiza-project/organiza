@@ -1,5 +1,7 @@
 package org.organiza.feature.schedule
 
+import org.organiza.storage.CalendarEvent
+import java.util.UUID
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -22,6 +24,10 @@ import org.organiza.voice.VoiceCommand
  * moved or removed on any day. A block is a scheduled session, so the scheduler arms it at its start.
  */
 class CalendarController(private val app: OrganizaCore) {
+    private companion object {
+        const val MAX_TITLE = 120
+    }
+
     @Volatile private var selected: LocalDate? = null
     @Volatile private var mode = CalendarMode.MONTH
 
@@ -53,20 +59,57 @@ class CalendarController(private val app: OrganizaCore) {
         app.requestReconcileNow()
     }
 
+    /** Puts an event on the calendar; [remindBefore] minutes before it a reminder rings, or none when null. */
+    fun addEvent(day: LocalDate, startMinute: Int, minutes: Int, title: String, remindBefore: Int?) = app.onStores { stores ->
+        val name = title.trim().take(MAX_TITLE)
+        if (name.isEmpty()) return@onStores app.showMessage("Give the event a title")
+        val start = day.atStartOfDay(ZoneId.systemDefault()).plusMinutes(startMinute.toLong()).toInstant()
+        stores.events.add(CalendarEvent(UUID.randomUUID().toString(), name, start, minutes, remindBefore))
+        app.showMessage(if (remindBefore == null) "Added to your calendar" else "Added to your calendar, with a reminder")
+        app.rescheduleReminders()
+    }
+
+    fun deleteEvent(id: String) = app.onStores { stores ->
+        stores.events.delete(id)
+        app.showMessage("Event removed")
+        app.rescheduleReminders()
+    }
+
     fun delete(id: String) = app.onStores { stores ->
         stores.sessions.removeScheduled(id)
         app.showMessage("Focus block removed")
         app.requestReconcileNow()
     }
 
-    fun view(now: Instant, zone: ZoneId, sessions: List<SessionView>): CalendarView {
+    /** Storage thread. */
+    fun view(now: Instant, zone: ZoneId, sessions: List<SessionView>, stores: OrganizaCore.Storage): CalendarView {
         val today = now.atZone(zone).toLocalDate()
         val day = selected ?: today
-        val perDay = sessions.flatMap { view ->
-            val first = view.session.start.atZone(zone).toLocalDate()
-            val last = view.session.end.minusMillis(1).atZone(zone).toLocalDate()
-            generateSequence(first) { it.plusDays(1) }.takeWhile { it <= last }.toList()
-        }.groupingBy { it }.eachCount()
+        // The month around the chosen day, with the edges of the weeks it shows.
+        val month = YearMonth.from(day)
+        val events = stores.events.between(
+            month.atDay(1).minusDays(7).atStartOfDay(zone).toInstant(),
+            month.atEndOfMonth().plusDays(8).atStartOfDay(zone).toInstant(),
+        )
+        fun days(start: Instant, end: Instant): List<LocalDate> {
+            val first = start.atZone(zone).toLocalDate()
+            val last = end.minusMillis(1).atZone(zone).toLocalDate()
+            return generateSequence(first) { it.plusDays(1) }.takeWhile { it <= last }.toList()
+        }
+        val perDay = (sessions.flatMap { days(it.session.start, it.session.end) } + events.flatMap { days(it.start, it.end) })
+            .groupingBy { it }.eachCount()
+        val dayEvents = events.filter { it.start.atZone(zone).toLocalDate() == day }.map { event ->
+            val start = event.start.atZone(zone)
+            CalendarBlock(
+                event.id,
+                event.title,
+                "${start.toLocalTime().toString().take(5)}–${event.end.atZone(zone).toLocalTime().toString().take(5)}",
+                start.hour * 60 + start.minute,
+                event.minutes,
+                editable = false,
+                event = true,
+            )
+        }
         val blocks = sessions
             .filter { it.session.start.atZone(zone).toLocalDate() == day }
             .sortedBy { it.session.start }
@@ -86,9 +129,9 @@ class CalendarController(private val app: OrganizaCore) {
             mode,
             day,
             CalendarMonth.build(YearMonth.from(day), today, day, perDay),
-            CalendarMonth.weekOf(day).map { AgendaModel.build(now, zone, it, sessions) },
-            AgendaModel.build(now, zone, day, sessions),
-            blocks,
+            CalendarMonth.weekOf(day).map { AgendaModel.build(now, zone, it, sessions, events) },
+            AgendaModel.build(now, zone, day, sessions, events),
+            (blocks + dayEvents).sortedBy { it.startMinute },
         )
     }
 }

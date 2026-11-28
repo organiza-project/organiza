@@ -160,4 +160,18 @@ class WireframeModelsTest {
         val earned = Progression.badges(ProgressFacts(0, 600, 0, 0, notesWritten = 10)).filter { it.earned }.map { it.id }
         assertEquals(listOf("first-session", "ten-hours", "journal-keeper"), earned)
     }
+
+    @Test
+    fun `calendar events sit in the day among the focus blocks, marked by the clock`() {
+        val zone = java.time.ZoneOffset.UTC
+        val day = java.time.LocalDate.parse("2026-12-02")
+        val now = java.time.Instant.parse("2026-12-02T14:20:00Z")
+        val events = listOf(
+            org.organiza.storage.CalendarEvent("d", "Dentist", java.time.Instant.parse("2026-12-02T14:00:00Z"), 45, 10),
+            org.organiza.storage.CalendarEvent("m", "Meeting", java.time.Instant.parse("2026-12-02T16:00:00Z"), 30, null),
+        )
+        val agenda = AgendaModel.build(now, zone, day, emptyList(), events)
+        assertEquals(listOf("Dentist" to BarKind.NOW, "Meeting" to BarKind.LATER), agenda.blocks.map { it.label to it.kind })
+        assertEquals("14:00–14:45", agenda.blocks.first().time)
+    }
 }
